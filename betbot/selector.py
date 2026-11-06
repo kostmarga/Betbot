@@ -67,13 +67,26 @@ def label(market, sel, line, home, away, extra=None):
 
 
 def _best_odds(rows):
-    """Μία τιμή ανά (αγορά, επιλογή, γραμμή): η πηγή με τα περισσότερα βιβλία· ισοπαλία -> η μεγαλύτερη απόδοση."""
-    best = {}
+    """Μία γραμμή ανά (αγορά, επιλογή, γραμμή): η πηγή με τα περισσότερα βιβλία (ισοπαλία -> η μεγαλύτερη απόδοση).
+    Η τιμή της χρησιμεύει ως «συναίνεση της αγοράς» για τις πιθανότητες. Επιπλέον κάθε γραμμή παίρνει
+    `best_price`/`best_source`: η ΥΨΗΛΟΤΕΡΗ τιμή που βρέθηκε σε οποιαδήποτε πηγή (εκεί ψάχνεις να παίξεις).
+    Οι πηγές που τελειώνουν σε `_max` (π.χ. fdco_max) δίνουν μόνο καλύτερη τιμή, όχι συναίνεση.
+    Backtest 06/11/2026: η καλύτερη τιμή αντί του μέσου όρου βελτιώνει το ROI κατά ~3 μονάδες."""
+    best, top = {}, {}
     for r in rows:
         k = (r["market"], r["selection"], r["line"])
+        if r["price"] > top.get(k, (0, ""))[0]:
+            top[k] = (r["price"], r["source"])
+        if r["source"].endswith("_max"):
+            continue
         if k not in best or (r["n_books"], r["price"]) > (best[k]["n_books"], best[k]["price"]):
             best[k] = r
-    return best
+    out = {}
+    for k, r in best.items():
+        r = dict(r)
+        r["best_price"], r["best_source"] = top[k]
+        out[k] = r
+    return out
 
 
 def _devig(odds: dict) -> dict:
@@ -135,7 +148,7 @@ class MatchContext:
 def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     m = ctx.m
     market, sel, line = key
-    price = odds_row["price"] if odds_row else None
+    price = (odds_row.get("best_price") or odds_row["price"]) if odds_row else None
     p = (blend * p_model + (1 - blend) * q) if (odds_row and q is not None) else p_model
     mv = ctx.moves.get(key)
     c = {
@@ -153,6 +166,17 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     return c
 
 
+def _avoided(key, avoid, sport) -> bool:
+    """Επιλογές που το backtest έδειξε σταθερά ζημιογόνες (config: selection.avoid)."""
+    market, sel, line = key
+    for a in avoid:
+        if a.get("sport", "football") != sport:
+            continue
+        if a.get("market") == market and a.get("selection") in (None, sel) and a.get("line") in (None, line):
+            return True
+    return False
+
+
 def build_candidates(db, cfg, models, now):
     """Επιστρέφει dict: with_odds (λίστα), fair (λίστα χωρίς απόδοση), contexts (match_id -> ctx)."""
     sel_cfg = cfg["selection"]
@@ -161,6 +185,8 @@ def build_candidates(db, cfg, models, now):
     upcoming = [m for m in db.matches(status="scheduled", since=iso(now + timedelta(minutes=20)),
                                       until=iso(horizon)) if m["league"] in leagues]
     b = sel_cfg["market_blend"]
+    b_fb = sel_cfg.get("market_blend_football", b)    # ποδόσφαιρο: backtest -> βάρος μοντέλου 0
+    avoid = sel_cfg.get("avoid") or []
     min_g = sel_cfg["min_team_matches"]
     with_odds, fair, contexts = [], [], {}
     fm, bms, cms, pm = models.get("football"), models.get("basketball", {}), models.get("counts", {}), models.get("players")
@@ -242,10 +268,12 @@ def build_candidates(db, cfg, models, now):
 
         for key, (pm_, extra) in probs.items():
             orow = odds.get(key)
-            c = _cand(ctx, key, pm_, orow, q.get(key), extra, blend=b)
+            c = _cand(ctx, key, pm_, orow, q.get(key), extra, blend=b_fb if lg["sport"] == "football" else b)
             rules.apply(c, ctx, cfg)
             c["why"] = rules.reasons(c, ctx, cms)
             if orow:
+                if _avoided(key, avoid, lg["sport"]):
+                    continue
                 if sel_cfg["min_odds"] <= orow["price"] <= sel_cfg["max_odds_any"]:
                     with_odds.append(c)
             elif key[0] in ("CORNERS", "CORNERS_MORE", "CARDS", "THROWINS", "PLAYER"):

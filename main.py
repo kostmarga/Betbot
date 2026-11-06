@@ -205,7 +205,13 @@ def main(argv=None):
 
     # 6) Σελίδα
     hist = report.history_by_list(db.slips())
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes)
+    try:
+        from betbot import clv as clv_mod
+        clv = clv_mod.clv_summary(db, now)
+    except Exception as e:     # δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("CLV: %s", e)
+        clv = None
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
 

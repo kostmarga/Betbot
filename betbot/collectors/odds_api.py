@@ -97,6 +97,8 @@ class OddsApiCollector(Collector):
                 if len(prices) >= 2 or market in ("1X2", "ML"):
                     out.append(OddsRow(mid, market, sel, line, round(sum(prices) / len(prices), 3),
                                        len(prices), "oddsapi", fetched))
+                    if len(prices) >= 2:     # καλύτερη τιμή ανάμεσα στα πρακτορεία
+                        out.append(OddsRow(mid, market, sel, line, round(max(prices), 3), 1, "oddsapi_max", fetched))
         return out
 
     @staticmethod

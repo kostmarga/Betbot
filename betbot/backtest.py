@@ -63,8 +63,11 @@ def load_fdco(cfg, now):
                     continue
                 o1x2 = [_price(r, c) for c in (["AvgH", "PSH", "B365H"], ["AvgD", "PSD", "B365D"], ["AvgA", "PSA", "B365A"])]
                 ou = [_price(r, c) for c in (["Avg>2.5", "P>2.5", "B365>2.5"], ["Avg<2.5", "P<2.5", "B365<2.5"])]
+                m1x2 = [_price(r, c) for c in (["MaxH"], ["MaxD"], ["MaxA"])]
+                mou = [_price(r, c) for c in (["Max>2.5"], ["Max<2.5"])]
                 rows.append({"league": lg["id"], "ko": ko.astimezone(timezone.utc), "home": h, "away": a,
-                             "hg": hg, "ag": ag, "o1x2": o1x2 if all(o1x2) else None, "ou": ou if all(ou) else None})
+                             "hg": hg, "ag": ag, "o1x2": o1x2 if all(o1x2) else None, "ou": ou if all(ou) else None,
+                             "m1x2": m1x2 if all(m1x2) else None, "mou": mou if all(mou) else None})
     return rows
 
 
@@ -97,8 +100,8 @@ def bins_table(pairs, edges, label="p"):
     return out
 
 
-def run_football(cfg, db, aliases, now, start):
-    rows = [r for r in load_fdco(cfg, now) if r["ko"] >= start and r["ko"] < now]
+def run_football(cfg, db, aliases, now, start, rows=None):
+    rows = [r for r in (rows if rows is not None else load_fdco(cfg, now)) if r["ko"] >= start and r["ko"] < now]
     rows.sort(key=lambda r: r["ko"])
     all_matches = db.matches(sport="football")
     sel = cfg["selection"]
@@ -155,6 +158,39 @@ def simulate(cands, sel, use_model=True):
                 and edge >= sel["min_edge"]:
             out.append(c)
     return out
+
+
+def market_rules(rows, sel):
+    """Οι ΤΡΕΧΟΝΤΕΣ κανόνες του συστήματος: πιθανότητα από την αγορά (devig), φίλτρα του config.
+    Επιστρέφει (επιλογές) με τιμές μέσου όρου και καλύτερης τιμής."""
+    out = []
+    avoid = sel.get("avoid") or []
+    for r in rows:
+        items = []
+        if r["o1x2"] and r["m1x2"]:
+            q = devig(r["o1x2"]); w = "1" if r["hg"] > r["ag"] else "X" if r["hg"] == r["ag"] else "2"
+            items += [("1X2", s_, None, q[i], r["o1x2"][i], r["m1x2"][i], int(s_ == w)) for i, s_ in enumerate("1X2")]
+        if r["ou"] and r["mou"]:
+            q = devig(r["ou"]); ov = int(r["hg"] + r["ag"] > 2.5)
+            items += [("OU", "OVER", 2.5, q[0], r["ou"][0], r["mou"][0], ov), ("OU", "UNDER", 2.5, q[1], r["ou"][1], r["mou"][1], 1 - ov)]
+        for mk, s_, ln, q, avg, mx, win in items:
+            if any(a.get("market") == mk and a.get("selection") in (None, s_) and a.get("line") in (None, ln) for a in avoid):
+                continue
+            if q >= sel["min_model_prob"] and sel["min_odds"] <= avg <= sel["max_odds_any"] and q * mx - 1 >= sel["min_edge"]:
+                out.append(dict(ko=r["ko"], mk=mk, sel=s_, odds=avg, best=mx, win=win, p=q))
+    return out
+
+
+def rules_table(picks):
+    lines = ["| Τιμή | Επιλογές | Hit-rate | ROI ανά επιλογή | 95% διάστημα ROI |", "|---|---|---|---|---|"]
+    for name, k in (("Μέση τιμή πρακτορείων", "odds"), ("Καλύτερη τιμή πρακτορείων", "best")):
+        pr = [(c[k] if c["win"] else 0) - 1 for c in picks]
+        if not pr:
+            continue
+        ci = bootstrap_roi(pr)
+        lines.append(f"| {name} | {len(picks)} | {np.mean([c['win'] for c in picks]):.1%} | {np.mean(pr):+.1%} | "
+                     f"{ci[0]:+.1%} … {ci[1]:+.1%} |" if ci else f"| {name} | {len(picks)} | — | — | — |")
+    return lines
 
 
 def roi_line(name, picks):
@@ -215,7 +251,8 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
     start = now - timedelta(days=int(months * 30.4))
     start = start.replace(hour=0, minute=0, second=0, microsecond=0)
     log.info("backtest ποδοσφαίρου από %s…", start.date())
-    res, cands, n_total, n_used = run_football(cfg, db, aliases, now, start)
+    all_rows = load_fdco(cfg, now)
+    res, cands, n_total, n_used = run_football(cfg, db, aliases, now, start, rows=all_rows)
     sel = cfg["selection"]
     L = [f"# BetBot – Backtest ({now:%d/%m/%Y})", "",
          f"Διάστημα ελέγχου: {start:%d/%m/%Y} – {now:%d/%m/%Y}, παράθυρα {WINDOW_DAYS} ημερών (walk-forward). "
@@ -240,12 +277,20 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
     L.append(roi_line(" └ μόνο Over/Under 2.5", [c for c in mine if c["mk"] == "OU2.5"]))
     L.append(roi_line(" └ μόνο Under", [c for c in mine if c["sel"] == "UNDER"]))
     L.append(roi_line(" └ μόνο Over", [c for c in mine if c["sel"] == "OVER"]))
-    L.append(roi_line("Μόνο αγορά (χωρίς μοντέλο), ίδια φίλτρα", simulate(cands, sel, use_model=False)))
     big = [c for c in mine if c["pm"] - c["q"] >= 0.15]
     L.append(roi_line("Επιλογές όπου το μοντέλο ξεπερνά την αγορά κατά ≥15 μονάδες", big))
     L.append(roi_line("Όλες οι επιλογές με απόδοση 1.5–2.5 (τυφλά)", [dict(c, p=c["q"]) for c in cands if 1.5 <= c["odds"] <= 2.5]))
     L += ["", "Το ROI είναι το κέρδος ανά 1€: −5% σημαίνει ότι κατά μέσο όρο χάνεις 5 λεπτά ανά ευρώ. Το πρακτορείο κρατά περίπου 5–8% προμήθεια, "
           "άρα ROI γύρω στο −5% είναι «κανονικό» για τυχαίες επιλογές. Αν το διάστημα περιλαμβάνει το 0, δεν μπορούμε να πούμε ότι υπάρχει πραγματικό πλεονέκτημα.", ""]
+    cur = market_rules([r for r in all_rows if start <= r["ko"] < now], sel)
+    mid = start + (now - start) / 2
+    L += ["## 3β. ΝΕΟΙ κανόνες του συστήματος (πιθανότητα από την αγορά, χωρίς Under 2.5, απόδοση έως "
+          f"{sel['max_odds_any']:g}) – ίδιος έλεγχος", "",
+          f"Πιθανότητα αγοράς ≥ {sel['min_model_prob']:.0%}, απόδοση {sel['min_odds']}–{sel['max_odds_any']}, "
+          f"value ≥ {sel['min_edge']:+.2f}. Πλήρης περίοδος:", ""] + rules_table(cur)
+    for nm, f in (("1η μισή περιόδου", lambda c: c["ko"] < mid), ("2η μισή περιόδου", lambda c: c["ko"] >= mid)):
+        L += ["", f"{nm}:", ""] + rules_table([c for c in cur if f(c)])
+    L += ["", "Η «καλύτερη τιμή» είναι το μέγιστο ανάμεσα στα πρακτορεία του football-data: αισιόδοξη, γιατί δεν έχεις πάντα πρόσβαση σε όλα και υπάρχουν όρια στοιχήματος.", ""]
     log.info("backtest κόρνερ/καρτών…")
     counts = run_counts(cfg, db, aliases, now, start)
     L += ["## 4. Κόρνερ και κάρτες (χωρίς ιστορικές αποδόσεις: μόνο ακρίβεια πιθανοτήτων)", "",

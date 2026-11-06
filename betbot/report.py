@@ -128,7 +128,8 @@ class Page:
 <div class="tile"><div class="k">Συνολική απόδοση</div><div class="v">{sl['total_odds']:.2f}</div></div>
 <div class="tile"><div class="k">Επιλογές</div><div class="v">{len(sl['legs'])}</div></div>
 <div class="tile"><div class="k">Πιθανότητα (εκτίμηση)</div><div class="v">{sl['p_win'] * 100:.1f}%</div></div>
-<div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>{stake_txt}{ret}
+<div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>
+<div class="tile"><div class="k">Αναμενόμενο ανά 1€</div><div class="v {'pos' if sl['p_win'] * sl['total_odds'] >= 1 else ''}">{(sl['p_win'] * sl['total_odds'] - 1) * 100:+.0f}%</div></div>{stake_txt}{ret}
 </div>{self.pick_table(sl['legs'])}
 <details><summary>Διάγραμμα: μοντέλο vs αγορά ανά επιλογή</summary>{ch}</details></div>"""
 
@@ -184,7 +185,20 @@ td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
 """
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes) -> str:
+def _clv_card(clv) -> str:
+    if not clv or not clv.get("n"):
+        return ("<div class='card'><h3>🎯 CLV – παίρνουμε καλύτερη τιμή από την αγορά;</h3><p class='muted'>Δεν υπάρχουν ακόμα αρκετά "
+                "δεδομένα. Μετά τους πρώτους αγώνες θα φαίνεται αν οι τιμές που προτείνουμε είναι υψηλότερες από τις τελευταίες πριν το ματς.</p></div>")
+    good = clv["mean"] > 0
+    return (f"<div class='card'><h3>🎯 CLV – παίρνουμε καλύτερη τιμή από την αγορά;</h3><p class='muted'>Σύγκριση της τιμής που "
+            "προτείναμε με την τελευταία τιμή που είδαμε πριν τον αγώνα. Θετικό CLV σε βάθος χρόνου = πραγματική αξία· "
+            "χρειάζονται 200+ επιλογές για σοβαρό συμπέρασμα.</p><div class='tiles'>"
+            f"<div class='tile'><div class='k'>Επιλογές</div><div class='v'>{clv['n']}</div></div>"
+            f"<div class='tile'><div class='k'>Μέσο CLV</div><div class='v {'pos' if good else ''}'>{clv['mean'] * 100:+.1f}%</div></div>"
+            f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
+
+
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None) -> str:
     P = Page(cfg)
     tz = cfg["timezone"]
     loc = now.astimezone(ZoneInfo(tz))
@@ -199,6 +213,11 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes) -> str:
     rec = lists["recommended"]
     single = rec["single"]
     sec["recommended"] = f"""
+<div class="card"><h3>Τι να περιμένεις (backtest 13 μηνών, 6.100 αγώνες)</h3><ul class="rules">
+<li>Δεν βρήκαμε τρόπο να <b>νικήσουμε την αγορά</b>: το στατιστικό μοντέλο γκολ ήταν χειρότερο από τις αποδόσεις των πρακτορείων, γι' αυτό οι πιθανότητες βγαίνουν πλέον από την αγορά.</li>
+<li>Με τους σημερινούς κανόνες (φαβορί, χωρίς Under 2.5, απόδοση έως 3.0) το ιστορικό ROI ήταν <b>≈ −0.2%</b> στην καλύτερη τιμή και <b>≈ −3%</b> στη μέση τιμή: δηλαδή περίπου «στο μηδέν» μείον την προμήθεια.</li>
+<li>Άρα ό,τι παίζεις είναι <b>ψυχαγωγία με ελεγχόμενο κόστος</b>, όχι εισόδημα. Κράτα το ταμείο και τα όριά σου. Η «Αναμενόμενη» τιμή σε κάθε δελτίο είναι η εκτίμηση κέρδους/ζημιάς ανά 1€.</li>
+<li>Ψάξε <b>την καλύτερη τιμή</b> ανάμεσα στα πρακτορεία: αξίζει ~3 μονάδες ROI. Οι τιμές εδώ είναι της αγοράς, όχι απαραίτητα του δικού σου πρακτορείου.</li></ul></div>
 <div class="card"><h3>Πλάνο εβδομάδας</h3><ul class="rules">
 <li>Ταμείο εβδομάδας: <b>{br['weekly']:.0f}€</b> · μονάδα <b>{br['unit']:.2f}€</b> · έως <b>{br['max_bets_per_day']}</b> στοιχήματα τη μέρα</li>
 <li>Stop: αν το ταμείο πέσει στα <b>{br['stop_at']:.0f}€</b>, σταματάμε για την εβδομάδα</li>
@@ -298,7 +317,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes) -> str:
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"
                          "<th>Επιτυχία επιλογών</th><th>Κ/Ζ</th><th>ROI</th><th>Ανοιχτά</th></tr></thead><tbody>"
                          + "".join(rows) + "</tbody></table></div>" if rows else "<p class='muted'>Δεν υπάρχει ακόμα ιστορικό.</p>")
-                      + "</div>" + hist_chart)
+                      + "</div>" + hist_chart + _clv_card(clv))
 
     # ⚙️ Πηγές + κανόνες
     rr = cfg["rules"]

@@ -1,0 +1,111 @@
+<!doctype html><html lang="el"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>BetBot Δελτίο</title>
+<style>
+:root{--surface:#fcfcfb;--plane:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;
+--border:rgba(11,11,11,.10);--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;--s8:#e34948;
+--good:#0ca30c;--goodtxt:#006300;--bad:#d03b3b;--warn:#fab219;--chip:#efeee9}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--surface:#1a1a19;--plane:#0d0d0d;--ink:#f0efec;
+--ink2:#c3c2b7;--grid:#2c2c2a;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;
+--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;--goodtxt:#0ca30c;--chip:#262624}}
+:root[data-theme=dark]{--surface:#1a1a19;--plane:#0d0d0d;--ink:#f0efec;--ink2:#c3c2b7;--grid:#2c2c2a;
+--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--goodtxt:#0ca30c;--chip:#262624}
+*{box-sizing:border-box}body{margin:0;background:var(--plane);color:var(--ink);
+font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1150px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:23px;margin:0 0 4px}h2{font-size:19px;margin:22px 0 8px}h3{font-size:16px;margin:0 0 8px}
+.sub{color:var(--ink2);margin:0 0 12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.tile .k{color:var(--ink2);font-size:12px}.tile .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
+.warn{border-left:4px solid var(--warn);background:var(--surface);padding:10px 14px;border-radius:8px;color:var(--ink2);font-size:14px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;margin:10px 0;position:sticky;top:0;background:var(--plane);z-index:5}
+.tabs button{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:999px;
+padding:7px 12px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--plane);border-color:var(--ink)}
+.tab{display:none}.tab.on{display:block}
+.tbl{width:100%;overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
+th{color:var(--ink2);font-weight:600;font-size:12px;white-space:nowrap}
+td.n{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.fb{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;
+font-size:11px;font-weight:700;margin-right:2px;color:#fff}.fb.w{background:var(--good)}.fb.d{background:var(--muted)}.fb.l{background:var(--bad)}
+.pos{color:var(--goodtxt)}.neg{color:var(--bad)}.muted{color:var(--muted);font-size:13px}
+.wr{font-size:12px;color:var(--ink2);margin-top:3px}
+.mv{font-size:12px;font-weight:650;padding:1px 6px;border-radius:999px;background:var(--chip);white-space:nowrap}
+.mv.dn{color:var(--s1)}.mv.up{color:var(--s2)}
+ul.why{margin:6px 0 4px 18px;padding:0;font-size:13px;color:var(--ink2)}
+details{margin-top:4px}summary{cursor:pointer;color:var(--ink2);font-size:13px}
+.chart{position:relative;height:260px;margin-top:8px}.chart.sm{height:170px}
+.rules li{margin:3px 0;font-size:14px;color:var(--ink2)}
+td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
+@media (max-width:640px){
+ table.picks thead{display:none}
+ table.picks tr{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:2px 18px;
+   padding:10px 0;border-bottom:1px solid var(--grid)}
+ table.picks td{border:0;padding:1px 0;text-align:left}
+ table.picks td.t,table.picks td:nth-child(2),table.picks td:nth-child(3){grid-column:1/-1}
+ table.picks td[data-l]::before{content:attr(data-l) " ";color:var(--muted);font-size:11px;font-weight:400}
+ .chart{height:220px}
+}
+</style></head><body><main>
+<header><h1>BetBot · Παρ 06/11/2026</h1>
+<p class="sub">Ενημέρωση 10:38 · 26 αγώνες · 0 επιλογές με απόδοση · 0 με «δίκαιη απόδοση»</p></header>
+
+<div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
+Παίζε μόνο το ποσό της εβδομάδας.</div>
+<nav class="tabs" role="tablist"><button role='tab' data-t='recommended' aria-selected='true'>⭐ Προτεινόμενο</button><button role='tab' data-t='safe' aria-selected='false'>🛡️ Safe</button><button role='tab' data-t='x10' aria-selected='false'>🎯 10+</button><button role='tab' data-t='x30' aria-selected='false'>🔥 30+</button><button role='tab' data-t='x100' aria-selected='false'>🎰 100+</button><button role='tab' data-t='overs' aria-selected='false'>⚽ Over</button><button role='tab' data-t='corners' aria-selected='false'>🚩 Κόρνερ</button><button role='tab' data-t='cards' aria-selected='false'>🟨 Κάρτες</button><button role='tab' data-t='throw_ins' aria-selected='false'>↔️ Πλάγια</button><button role='tab' data-t='players' aria-selected='false'>👤 Παίκτες</button><button role='tab' data-t='combo' aria-selected='false'>🔀 Συνδυαστικό</button><button role='tab' data-t='moves' aria-selected='false'>📉 Κινήσεις</button><button role='tab' data-t='history' aria-selected='false'>📊 Ιστορικό</button><button role='tab' data-t='sources' aria-selected='false'>⚙️ Πηγές</button></nav><section class='tab on' id='t-recommended' role='tabpanel'>
+<div class="card"><h3>Πλάνο εβδομάδας</h3><ul class="rules">
+<li>Ταμείο εβδομάδας: <b>10€</b> · μονάδα <b>1.00€</b> · έως <b>2</b> στοιχήματα τη μέρα</li>
+<li>Stop: αν το ταμείο πέσει στα <b>5€</b>, σταματάμε για την εβδομάδα</li>
+<li>Λαχεία (30+ / 100+): <b>0.50€</b>, μία φορά τη βδομάδα</li>
+<li>Ποτέ διπλασιασμός για να «πάρουμε πίσω» τη χθεσινή μέρα</li></ul></div>
+<div class='card'><h3>⭐ Το δελτίο που προτείνω να παίξεις</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div>
+<div class="card"><h3>⭐ Μονό της ημέρας (1.00€)</h3><p class='muted'>Καμία επιλογή σήμερα.</p></div></section><section class='tab' id='t-safe' role='tabpanel'><div class='card'><h3>🛡️ Οι πιο σίγουρες επιλογές της ημέρας (μονά)</h3><p class='muted'>Ταξινομημένες κατά πιθανότητα. Χαμηλές αποδόσεις – καλές για «δέσιμο».</p><p class='muted'>Καμία επιλογή σήμερα.</p></div></section><section class='tab' id='t-x10' role='tabpanel'><div class='card'><h3>🎯 Δελτίο 9+</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div></section><section class='tab' id='t-x30' role='tabpanel'><div class='card'><h3>🔥 Δελτίο 28+</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div></section><section class='tab' id='t-x100' role='tabpanel'><div class='card'><h3>🎰 Λαχείο 100+</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div></section><section class='tab' id='t-overs' role='tabpanel'><div class='card'><h3>⚽ Δελτίο μόνο με γκολ</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div><div class='card'><h3>Όλες οι επιλογές γκολ</h3><p class='muted'>Καμία επιλογή σήμερα.</p></div></section><section class='tab' id='t-corners' role='tabpanel'><div class='card'><h3>🚩 Κόρνερ: επιλογές</h3><p class='muted'>Όπου γράφει «παίξ' το αν ≥», δεν βρήκαμε απόδοση: είναι η ελάχιστη απόδοση που κάνει την επιλογή να αξίζει. Αν το πρακτορείο σου δίνει λιγότερα, την αφήνεις.</p><p class='muted'>Δεν υπάρχουν αρκετά δεδομένα για κόρνερ στα σημερινά ματς.</p></div></section><section class='tab' id='t-cards' role='tabpanel'><div class='card'><h3>🟨 Κάρτες: επιλογές</h3><p class='muted'>Όπου γράφει «παίξ' το αν ≥», δεν βρήκαμε απόδοση: είναι η ελάχιστη απόδοση που κάνει την επιλογή να αξίζει. Αν το πρακτορείο σου δίνει λιγότερα, την αφήνεις.</p><p class='muted'>Δεν υπάρχουν αρκετά δεδομένα για κάρτες στα σημερινά ματς.</p></div></section><section class='tab' id='t-throw_ins' role='tabpanel'><div class='card'><h3>↔️ Πλάγια: επιλογές</h3><p class='muted'>Όπου γράφει «παίξ' το αν ≥», δεν βρήκαμε απόδοση: είναι η ελάχιστη απόδοση που κάνει την επιλογή να αξίζει. Αν το πρακτορείο σου δίνει λιγότερα, την αφήνεις.</p><p class='muted'>Τα πλάγια έρχονται μόνο από το Sofascore. Αν σήμερα δεν απάντησε, η λίστα μένει άδεια (δες ⚙️ Πηγές).</p><p class='muted'>Δεν υπάρχουν αρκετά δεδομένα για πλάγια στα σημερινά ματς.</p></div></section><section class='tab' id='t-players' role='tabpanel'><div class='card'><h3>👤 Παίκτες: επιλογές</h3><p class='muted'>Όπου γράφει «παίξ' το αν ≥», δεν βρήκαμε απόδοση: είναι η ελάχιστη απόδοση που κάνει την επιλογή να αξίζει. Αν το πρακτορείο σου δίνει λιγότερα, την αφήνεις.</p><p class='muted'>⚠️ Παίκτες: παίζεις ΜΟΝΟ αφού βγει η ενδεκάδα (~1 ώρα πριν).</p><p class='muted'>Δεν υπάρχουν αρκετά δεδομένα για παίκτες στα σημερινά ματς.</p></div></section><section class='tab' id='t-combo' role='tabpanel'><div class='card'><h3>🔀 Συνδυαστικό (διαφορετικές αγορές)</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div></section><section class='tab' id='t-moves' role='tabpanel'><div class="card"><h3>📉 Τι σημαίνουν οι κινήσεις</h3>
+<p class="muted">Απόδοση που <b>πέφτει</b> = μπαίνουν λεφτά ή η αγορά έμαθε κάτι (ενδεκάδα, τραυματισμός). Συχνά είναι «έξυπνα» λεφτά.
+Απόδοση που <b>ανεβαίνει</b> = η αγορά πάει κόντρα. Το bot βγάζει αυτόματα από το Προτεινόμενο ό,τι ανεβαίνει πάνω από
+8%.</p></div>
+<div class="card"><h3>▼ Πέφτουν (μπαίνουν λεφτά)</h3><p class='muted'>Καμία σημαντική κίνηση ακόμα. Χρειάζονται τουλάχιστον 2 λήψεις αποδόσεων (το bot τρέχει πρωί και απόγευμα).</p></div>
+<div class="card"><h3>▲ Ανεβαίνουν (η αγορά πάει κόντρα)</h3><p class='muted'>Καμία σημαντική κίνηση ακόμα. Χρειάζονται τουλάχιστον 2 λήψεις αποδόσεων (το bot τρέχει πρωί και απόγευμα).</p></div></section><section class='tab' id='t-history' role='tabpanel'><div class='card'><h3>📊 Πώς πάει κάθε λίστα</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. «Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p><p class='muted'>Δεν υπάρχει ακόμα ιστορικό.</p></div></section><section class='tab' id='t-sources' role='tabpanel'><div class='card'><h3>Κατάσταση πηγών (σημερινή εκτέλεση)</h3><div class='tbl'><table><tbody><tr><td>✅ espn</td><td class='muted'>9997 αγώνες</td></tr><tr><td>✅ euroleague</td><td class='muted'>782 αγώνες</td></tr><tr><td>⚠️ μοντέλο corners</td><td class='muted'>λίγα δεδομένα για κόρνερ (0 αγώνες)</td></tr><tr><td>⚠️ μοντέλο cards</td><td class='muted'>λίγα δεδομένα για κάρτες (0 αγώνες)</td></tr><tr><td>⚠️ μοντέλο throw_ins</td><td class='muted'>λίγα δεδομένα για πλάγια (0 αγώνες)</td></tr></tbody></table></div></div><div class="card"><h3>Κανόνες που εφαρμόζονται (από τα λάθη μας)</h3><ul class="rules">
+<li>Όχι «νίκη» σε ομάδα με λιγότερους από 1.3 β/ματς στα 5 τελευταία (Atalanta, 05/11)</li>
+<li>Όχι Over/GG όταν μια ομάδα έχει ≥5 απουσίες ή ≥3 στην επίθεση (Leverkusen, 05/11)</li>
+<li>Μπάσκετ: το πολύ 1 σκέλος στο Προτεινόμενο· όχι γηπεδούχος κάτω από 1.55 ως «safe» (Efes/Hapoel/ASVEL, 05/11)</li>
+<li>Παίκτες μόνο με επίσημη ενδεκάδα (Pavlidis πάγκος, 05/11)</li>
+<li>Έξω από Προτεινόμενο/Safe ό,τι η απόδοσή του ανεβαίνει ≥8%</li>
+<li>Κάθε αγώνας το πολύ μία φορά σε κάθε δελτίο · το πολύ 3 επιλογές από την ίδια διοργάνωση</li>
+</ul></div></section></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+ const CH = [];
+ const cs = getComputedStyle(document.documentElement);
+ const v = s => (typeof s==='string' && s.startsWith('var(')) ? cs.getPropertyValue(s.slice(4,-1)).trim() : s;
+ const fix = o => { if(Array.isArray(o)) return o.map(fix); if(o && typeof o==='object'){ for(const k in o) o[k]=fix(o[k]); return o; } return v(o); };
+ const drawn = {};
+ function drawIn(root){
+   if(!window.Chart){ document.querySelectorAll('.chart').forEach(e => e.style.display='none'); return; }
+   Chart.defaults.color = v('var(--ink2)'); Chart.defaults.borderColor = v('var(--grid)');
+   Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",sans-serif';
+   Chart.defaults.maintainAspectRatio = false;
+   Chart.defaults.elements.bar.borderRadius = 4; Chart.defaults.elements.bar.borderSkipped = 'start';
+   for (const [id, cfg] of CH) {
+     const el = document.getElementById(id);
+     if(!el || drawn[id] || !root.contains(el)) continue;
+     const det = el.closest('details');
+     if (det && !det.open) { det.addEventListener('toggle', () => { if(det.open && !drawn[id]){ drawn[id]=new Chart(el, fix(cfg)); } }, {once:false}); continue; }
+     drawn[id] = new Chart(el, fix(cfg));
+   }
+ }
+ const btns = document.querySelectorAll('.tabs button');
+ function show(t){
+   btns.forEach(b => b.setAttribute('aria-selected', String(b.dataset.t===t)));
+   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id==='t-'+t));
+   const s = document.getElementById('t-'+t); if(s) drawIn(s);
+   try { localStorage.setItem('betbot_tab', t); } catch(e) {}
+ }
+ btns.forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
+ let start = 'recommended';
+ try { const s = localStorage.getItem('betbot_tab'); if (s && document.getElementById('t-'+s)) start = s; } catch(e) {}
+ show(start);
+})();
+</script></body></html>

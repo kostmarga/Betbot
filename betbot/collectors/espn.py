@@ -1,7 +1,7 @@
 """Agent 1 – ESPN public API (δωρεάν, χωρίς κλειδί).
 
 Φέρνει αποτελέσματα + πρόγραμμα για ποδόσφαιρο (λίγκες & κύπελλα Ευρώπης) και NBA.
-Endpoint: https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates=YYYYMMDD-YYYYMMDD
+Endpoint: https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates=YYYYMM (ανά μήνα· το εύρος YYYYMMDD-YYYYMMDD δίνει πλέον 400)
 
 Πρώτη εκτέλεση: γεμίζει ιστορικό (history_days) σε κομμάτια των 30 ημερών.
 Επόμενες: μόνο τις τελευταίες 4 μέρες (για αποτελέσματα) + τις επόμενες 3 (πρόγραμμα).
@@ -55,8 +55,17 @@ class EspnCollector(Collector):
 
     def fetch_range(self, league, start, end):
         url = BASE.format(sport=SPORT[league["sport"]], league=league["espn"])
-        data, _ = http_get(url, params={"dates": f"{start:%Y%m%d}-{end:%Y%m%d}", "limit": 1000})
-        return _parse(league, data)
+        # Η μορφή ΑΑΑΑΜΜΗΗ-ΑΑΑΑΜΜΗΗ δίνει 400 από το 06/11/2026 -> ζητάμε ανά μήνα (ΑΑΑΑΜΜ).
+        out, seen = [], set()
+        y, m = start.year, start.month
+        while (y, m) <= (end.year, end.month):
+            data, _ = http_get(url, params={"dates": f"{y}{m:02d}", "limit": 1000})
+            for mt in _parse(league, data):
+                if mt.match_id not in seen:
+                    seen.add(mt.match_id)
+                    out.append(mt)
+            y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        return out
 
     def run(self, ctx: Context) -> str:
         total, notes = 0, []

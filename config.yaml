@@ -145,11 +145,11 @@ lists:
 
 # ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
 bankroll:
-  weekly: 10.0
-  unit: 1.0
+  weekly: 20.0
+  unit: 2.0
   max_bets_per_day: 2
-  stop_at: 5.0
-  lottery_stake: 0.5
+  stop_at: 10.0
+  lottery_stake: 1.0
 
 # ---------- Παράδοση ----------
 email:

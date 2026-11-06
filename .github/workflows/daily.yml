@@ -1,0 +1,50 @@
+# BetBot – καθημερινή εκτέλεση στο GitHub Actions (δωρεάν).
+# Τρέχει 2 φορές τη μέρα: πρωί (δελτία) και απόγευμα (ενδεκάδες + κινήσεις αποδόσεων).
+# Ώρες σε UTC: 05:40 UTC = 07:40 Ελλάδας (χειμώνας) / 08:40 (καλοκαίρι)
+#              15:20 UTC = 17:20 Ελλάδας (χειμώνας) / 18:20 (καλοκαίρι)
+name: BetBot daily
+
+on:
+  schedule:
+    - cron: "40 5 * * *"
+    - cron: "20 15 * * *"
+  workflow_dispatch: {}          # κουμπί «Run workflow» για χειροκίνητη εκτέλεση
+
+permissions:
+  contents: write                # για να αποθηκεύει τη βάση και τη σελίδα πίσω στο repo
+
+concurrency:
+  group: betbot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150         # η 1η εκτέλεση κατεβάζει ιστορικό (~1 ώρα)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Εκτέλεση BetBot
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          PAGE_URL: ${{ vars.PAGE_URL }}
+        run: python main.py
+
+      - name: Αποθήκευση βάσης και σελίδας στο repo
+        if: always()
+        run: |
+          git config user.name "betbot"
+          git config user.email "betbot@users.noreply.github.com"
+          git add data/betbot.sqlite docs/ || true
+          git commit -m "BetBot $(date -u +%Y-%m-%dT%H:%M)Z" || echo "Τίποτα νέο"
+          git push || echo "Push απέτυχε (δες README §10)"

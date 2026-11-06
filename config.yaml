@@ -64,7 +64,20 @@ leagues:
   - {id: BL,   name: Bundesliga,        sport: football,   espn: ger.1, fdco: D1,  sofascore: 35,  odds_api: soccer_germany_bundesliga}
   - {id: L1,   name: Ligue 1,           sport: football,   espn: fra.1, fdco: F1,  sofascore: 34,  odds_api: soccer_france_ligue_one}
   - {id: GSL,  name: Super League,      sport: football,   espn: gre.1, fdco: G1,  sofascore: 185, odds_api: soccer_greece_super_league}
-  - {id: UCL,  name: UEFA Champions League,   sport: football, espn: uefa.champions,   sofascore: 7,     odds_api: soccer_uefa_champs_league}
+  # Επιπλέον λίγκες (06/11/2026) – έχουν ESPN (αγώνες/κόρνερ/κάρτες) + football-data (αποδόσεις στο fixtures.csv)
+  - {id: EFL1, name: Championship,      sport: football,   espn: eng.2, fdco: E1,  odds_api: soccer_efl_champ}
+  - {id: EFL2, name: League One,        sport: football,   espn: eng.3, fdco: E2,  odds_api: soccer_england_league1}
+  - {id: EFL3, name: League Two,        sport: football,   espn: eng.4, fdco: E3,  odds_api: soccer_england_league2}
+  - {id: SCO,  name: Scottish Premiership, sport: football, espn: sco.1, fdco: SC0, odds_api: soccer_spl}
+  - {id: BEL,  name: Jupiler Pro League, sport: football,  espn: bel.1, fdco: B1,  odds_api: soccer_belgium_first_div}
+  - {id: NED,  name: Eredivisie,        sport: football,   espn: ned.1, fdco: N1,  odds_api: soccer_netherlands_eredivisie}
+  - {id: POR,  name: Primeira Liga,     sport: football,   espn: por.1, fdco: P1,  odds_api: soccer_portugal_primeira_liga}
+  - {id: TUR,  name: Süper Lig,         sport: football,   espn: tur.1, fdco: T1,  odds_api: soccer_turkey_super_league}
+  - {id: LIGA2, name: LaLiga 2,         sport: football,   espn: esp.2, fdco: SP2, odds_api: soccer_spain_segunda_division}
+  - {id: SB,   name: Serie B,           sport: football,   espn: ita.2, fdco: I2,  odds_api: soccer_italy_serie_b}
+  - {id: BL2,  name: 2. Bundesliga,     sport: football,   espn: ger.2, fdco: D2,  odds_api: soccer_germany_bundesliga2}
+  - {id: L2,   name: Ligue 2,           sport: football,   espn: fra.2, fdco: F2,  odds_api: soccer_france_ligue_two}
+  - {id: UCL,  name: UEFA Champions League,  sport: football, espn: uefa.champions,   sofascore: 7,     odds_api: soccer_uefa_champs_league}
   - {id: UEL,  name: UEFA Europa League,      sport: football, espn: uefa.europa,      sofascore: 679,   odds_api: soccer_uefa_europa_league}
   - {id: UECL, name: UEFA Conference League,  sport: football, espn: uefa.europa.conf, sofascore: 17015, odds_api: soccer_uefa_europa_conference_league}
   - {id: NBA,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}

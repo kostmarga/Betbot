@@ -158,6 +158,7 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "label": label(market, sel, line, ctx.home, ctx.away, extra),
         "odds": price, "p_model": p_model, "p_market": q, "p": p,
         "edge": (p * price - 1) if price else None,
+        "best_source": odds_row.get("best_source") if odds_row else None,
         "fair_odds": 1 / p_model if p_model > 0 else None,
         "move": mv, "extra": extra or {}, "source": odds_row["source"] if odds_row else None,
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,

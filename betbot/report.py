@@ -27,7 +27,7 @@ SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(
 E = html.escape
 
 TABS = [
-    ("recommended", "⭐ Προτεινόμενο"), ("safe", "🛡️ Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
+    ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "🛡️ Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
     ("x100", "🎰 100+"), ("overs", "⚽ Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
     ("throw_ins", "↔️ Πλάγια"), ("players", "👤 Παίκτες"), ("combo", "🔀 Συνδυαστικό"),
     ("moves", "📉 Κινήσεις"), ("history", "📊 Ιστορικό"), ("sources", "⚙️ Πηγές"),
@@ -185,6 +185,72 @@ td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
 """
 
 
+def _plan_html(plan, cfg, tz) -> str:
+    if not plan:
+        return "<div class='card'><p class='muted'>Το πλάνο δεν είναι διαθέσιμο.</p></div>"
+    from .plan import SRC
+    ws = plan["week"]
+    head = (f"<div class='card'><h3>🎯 Τι να παίξεις σήμερα</h3><div class='tiles'>"
+            f"<div class='tile'><div class='k'>Σύνολο σήμερα</div><div class='v'>{plan['total']:.2f}€</div></div>"
+            f"<div class='tile'><div class='k'>Διαθέσιμο εβδομάδας</div><div class='v'>{ws['remaining']:.2f}€</div></div>"
+            f"<div class='tile'><div class='k'>Ζημιά εβδομάδας</div><div class='v'>{ws['settled_loss']:.2f}€ / {ws['loss_limit']:.0f}€</div></div>"
+            f"<div class='tile'><div class='k'>Ανοιχτά</div><div class='v'>{ws['open_stake']:.2f}€</div></div></div>"
+            + "".join(f"<p>{E(n)}</p>" for n in plan["notes"])
+            + "<p class='muted'>Τα ποσά είναι ΑΝΩΤΑΤΑ όρια, όχι υποχρέωση. Το αναμενόμενο μακροπρόθεσμο αποτέλεσμα είναι μικρή ζημιά "
+              "(περίπου −3% του ποσού, βλ. backtest)· παίζεις μόνο ό,τι μπορείς να χάσεις. Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></div>")
+    cards = []
+    for it in plan["items"]:
+        rows = []
+        for l in it["legs"]:
+            ko = _when(l["kickoff"], cfg["timezone"]) if l.get("kickoff") else "—"
+            src = SRC.get(l.get("best_source") or "", l.get("best_source") or "")
+            rows.append(f"<tr><td>{E(ko)}</td><td><b>{E(l['home'])} – {E(l['away'])}</b><div class='muted'>{E(l.get('league_name') or '')}</div></td>"
+                        f"<td>{E(str(l['label']))}</td><td><b>{l['odds']:.2f}</b></td><td class='muted'>{E(src)}</td></tr>")
+        ev = it["ev"] * 100
+        cards.append(
+            f"<div class='card'><h3>{E(it['title'])}: <b>{it['stake']:.2f}€</b></h3><div class='tiles'>"
+            f"<div class='tile'><div class='k'>Ποντάρισμα</div><div class='v'>{it['stake']:.2f}€</div></div>"
+            f"<div class='tile'><div class='k'>Συνολική απόδοση</div><div class='v'>{it['total_odds']:.2f}</div></div>"
+            f"<div class='tile'><div class='k'>Πιθανότητα</div><div class='v'>{it['p_win'] * 100:.0f}%</div></div>"
+            f"<div class='tile'><div class='k'>Αν κερδίσει</div><div class='v pos'>{it['ret']:.2f}€</div></div>"
+            f"<div class='tile'><div class='k'>Αναμενόμενο ανά 1€</div><div class='v'>{ev:+.0f}%</div></div></div>"
+            "<div class='tbl'><table><thead><tr><th>Ώρα</th><th>Αγώνας</th><th>Επιλογή</th><th>Απόδοση</th><th>Τιμή από</th></tr></thead><tbody>"
+            + "".join(rows) + "</tbody></table></div>"
+            "<p class='muted'>Ψάξε την ίδια επιλογή στο πρακτορείο σου. Αν η απόδοση εκεί είναι αισθητά χαμηλότερη από αυτή που φαίνεται, "
+            "προτίμησε να μην παίξεις.</p></div>")
+    return head + "".join(cards)
+
+
+def _goals_card(g) -> str:
+    if not g:
+        return ""
+    t = g["targets"]
+    ws = g["week"]
+    ok = lambda b: "✅" if b else "⏳"
+    clv_n = g["n_clv"]
+    clv_txt = "—" if g["clv_mean"] is None else f"{g['clv_mean'] * 100:+.1f}%"
+    pos_txt = "—" if g["clv_pos"] is None else f"{g['clv_pos'] * 100:.0f}%"
+    done = clv_n >= t["clv_n"] and g["weeks"] >= t["weeks"]
+    if done:
+        good = (g["clv_mean"] or 0) >= t["clv_mean"] and (g["clv_pos"] or 0) > 0.5
+        verdict = ("✅ Το CLV ξεπερνά το +1% και η πλειοψηφία των επιλογών έχει καλύτερη τιμή από το κλείσιμο: συνεχίζουμε· αύξηση ποσού το πολύ ×2."
+                   if good else "⚠️ Το CLV δεν δείχνει πλεονέκτημα: κράτα το ποσό σταθερό ως διασκέδαση ή σταμάτα. ΔΕΝ αυξάνουμε ποσό.")
+    else:
+        verdict = f"Χρειάζονται ≥{t['clv_n']} διακριτές επιλογές και ≥{t['weeks']} εβδομάδες για απόφαση."
+    rec = "—" if g["rec_hit"] is None else f"{g['rec_hit'] * 100:.0f}% ({g['rec_n']} δελτία)"
+    rows = [
+        ("1. Προστασία", f"ζημιά εβδομάδας {ws['settled_loss']:.2f}€ από όριο {ws['loss_limit']:.0f}€", ok(not ws["stop"])),
+        ("2. Μάθηση (CLV)", f"{clv_n}/{t['clv_n']} διακριτές επιλογές · μέσο CLV {clv_txt} (στόχος ≥ +1%) · θετικές {pos_txt} · "
+                            f"{g['weeks']:.1f}/{t['weeks']} εβδομάδες", ok(done)),
+        ("3. Προτεινόμενο δελτίο", f"βγήκε στο {rec} (στόχος ~{t['rec_hit'][0] * 100:.0f}–{t['rec_hit'][1] * 100:.0f}% μετά από {t['rec_days']}+ δελτία)",
+         ok(g["rec_n"] >= t["rec_days"])),
+        ("4. Αύξηση ποσού", "μόνο αν επιτευχθεί ο στόχος 2 με θετικό αποτέλεσμα", "⏳"),
+    ]
+    return ("<div class='card'><h3>🎯 Στόχοι</h3><div class='tbl'><table><tbody>"
+            + "".join(f"<tr><td>{c}</td><td><b>{E(a)}</b></td><td>{E(b)}</td></tr>" for a, b, c in rows)
+            + f"</tbody></table></div><p>{E(verdict)}</p></div>")
+
+
 def _clv_card(clv) -> str:
     if not clv or not clv.get("n"):
         return ("<div class='card'><h3>🎯 CLV – παίρνουμε καλύτερη τιμή από την αγορά;</h3><p class='muted'>Δεν υπάρχουν ακόμα αρκετά "
@@ -198,7 +264,7 @@ def _clv_card(clv) -> str:
             f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None) -> str:
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None) -> str:
     P = Page(cfg)
     tz = cfg["timezone"]
     loc = now.astimezone(ZoneInfo(tz))
@@ -311,7 +377,8 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None) ->
         hist_chart = "<div class='card'><h3>Σωρευτικό κέρδος/ζημιά ανά λίστα (μονάδες)</h3>" + P.chart(
             {"type": "line", "data": {"labels": labels, "datasets": ds},
              "options": {"scales": {"y": {"title": {"display": True, "text": "μονάδες"}}}}}) + "</div>"
-    sec["history"] = ("<div class='card'><h3>📊 Πώς πάει κάθε λίστα</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
+    sec["today"] = _plan_html(plan, cfg, tz)
+    sec["history"] = (_goals_card(goals) + "<div class='card'><h3>📊 Πώς πάει κάθε λίστα</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
                       "με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. "
                       "«Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p>"
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"
@@ -374,11 +441,11 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None) ->
    btns.forEach(b => b.setAttribute('aria-selected', String(b.dataset.t===t)));
    document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id==='t-'+t));
    const s = document.getElementById('t-'+t); if(s) drawIn(s);
-   try {{ localStorage.setItem('betbot_tab', t); }} catch(e) {{}}
+   try {{ localStorage.setItem('betbot_tab', new Date().toDateString() + '|' + t); }} catch(e) {{}}
  }}
  btns.forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
- let start = 'recommended';
- try {{ const s = localStorage.getItem('betbot_tab'); if (s && document.getElementById('t-'+s)) start = s; }} catch(e) {{}}
+ let start = 'today';      // κάθε νέα μέρα ανοίγει στο πλάνο· η μνήμη καρτέλας ισχύει μόνο μέσα στην ίδια μέρα
+ try {{ const v = (localStorage.getItem('betbot_tab') || '').split('|'); if (v[0] === new Date().toDateString() && document.getElementById('t-'+v[1])) start = v[1]; }} catch(e) {{}}
  show(start);
 }})();
 </script></body></html>"""

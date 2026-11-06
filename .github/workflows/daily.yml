@@ -63,12 +63,19 @@ jobs:
           git config user.email "betbot@users.noreply.github.com"
           git add docs/ || true
           git commit -m "BetBot $(date -u +%Y-%m-%dT%H:%M)Z" || echo "Τίποτα νέο"
-          git pull --rebase --autostash -q || true   # το live workflow μπορεί να έχει κάνει push στο μεταξύ
-          git push || echo "Push απέτυχε (δες README §10)"
+          # Αν άλλη εκτέλεση (ή το live) έγραψε στο main στο μεταξύ: ξανά-βάζουμε το δικό μας commit πάνω στο νεότερο main.
+          # Οι σελίδες docs/ είναι παραγόμενες -> σε σύγκρουση κερδίζει η καινούργια (-X theirs = το δικό μας commit).
+          for i in 1 2 3; do
+            git fetch -q origin main
+            if git rebase -q -X theirs origin/main && git push -q origin HEAD:main; then echo "Σελίδα αποθηκεύτηκε"; break; fi
+            git rebase --abort 2>/dev/null || true
+            echo "Προσπάθεια $i απέτυχε, ξανά σε 5s"; sleep 5
+          done
 
       - name: Αποθήκευση βάσης (branch data, 1 commit)
         if: always()
         run: |
+          git rebase --abort 2>/dev/null || true      # η βάση αποθηκεύεται ΑΝΕΞΑΡΤΗΤΑ από το αν πέτυχε το push της σελίδας
           git update-index --no-skip-worktree data/betbot.sqlite
           git checkout -q --orphan data-tmp
           git rm -rf -q --cached . || true

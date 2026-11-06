@@ -57,5 +57,9 @@ jobs:
           git add docs/live.html
           git diff --cached --quiet && { echo "Καμία αλλαγή"; exit 0; }
           git commit -m "Live $(date -u +%H:%M)Z"
-          for i in 1 2 3; do git pull --rebase --autostash -q && git push && exit 0; sleep 5; done
+          for i in 1 2 3; do
+            git fetch -q origin main
+            if git rebase -q -X theirs origin/main && git push -q origin HEAD:main; then exit 0; fi
+            git rebase --abort 2>/dev/null || true; sleep 5
+          done
           echo "Push απέτυχε"

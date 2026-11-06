@@ -1,0 +1,168 @@
+# ==========================================================
+#  BetBot – ρυθμίσεις
+#  Άλλαξε τιμές εδώ. Δεν χρειάζεται να πειράξεις κώδικα.
+# ==========================================================
+
+timezone: Europe/Athens
+database: data/betbot.sqlite
+reports_dir: docs            # εδώ γράφεται το index.html (GitHub Pages)
+
+# ---------- Δελτίο ----------
+slip:
+  target_odds: 20.0          # στόχος συνολικής απόδοσης
+  min_total_odds: 17.0       # αποδεκτό εύρος γύρω από τον στόχο
+  max_total_odds: 25.0
+  min_legs: 4
+  max_legs: 8
+  alternatives: 2            # πόσα εναλλακτικά δελτία εκτός από το κύριο
+  stake: 2.0                 # ποντάρισμα ανά δελτίο (μόνο για το ιστορικό Κ/Ζ)
+  hours_ahead: 30            # αγώνες που ξεκινούν μέσα στις επόμενες Χ ώρες
+
+# ---------- Φίλτρα επιλογών ----------
+selection:
+  min_model_prob: 0.55       # ελάχιστη πιθανότητα (μετά το blend με την αγορά)
+  min_edge: -0.03            # ελάχιστο value: p*απόδοση - 1 (βλ. README §5: γιατί επιτρέπουμε ελαφρώς αρνητικό)
+  min_odds: 1.15             # κάτω από αυτό δεν αξίζει ούτε για δέσιμο
+  max_odds: 2.10             # (παλιό, για συμβατότητα)
+  max_odds_any: 4.00         # μέγιστη απόδοση μίας επιλογής σε οποιαδήποτε λίστα
+  fair_min_prob: 0.55        # επιλογές ΧΩΡΙΣ απόδοση: ελάχιστη πιθανότητα για να εμφανιστούν
+  fair_min_odds: 1.30        # ... και δίκαιη απόδοση τουλάχιστον 1.30 (αλλιώς δεν αξίζει: π.χ. «Under 12.5 κόρνερ»)
+  fair_value_margin: 0.05    # «παίξ' το αν ≥» = δίκαιη απόδοση × 1.05
+  market_blend: 0.5          # 0 = μόνο αγορά, 1 = μόνο μοντέλο. 0.5 = μισό-μισό (συνιστάται)
+  max_legs_per_league: 3     # διασπορά κινδύνου
+  min_team_matches: 8        # ομάδα με λιγότερα ματς στο ιστορικό -> αγνοείται
+
+# ---------- Μοντέλα ----------
+models:
+  football:
+    history_days: 540        # πόσο πίσω στο ιστορικό
+    half_life_days: 180      # πόσο γρήγορα «ξεχνάει» παλιά ματς
+    dc_rho: -0.08            # διόρθωση Dixon-Coles για 0-0 / 1-1
+    h2h_weight_max: 0.15     # μέγιστη επιρροή αναμετρήσεων μεταξύ τους
+    markets: [1X2, OU15, OU25, OU35, BTTS]
+  basketball:
+    history_days: 400
+    half_life_days: 90
+    markets: [ML, TOTAL, SPREAD]
+  counts:                    # κόρνερ / κάρτες / πλάγια
+    history_days: 400
+    half_life_days: 120
+    shrink_games: 4          # πόσο «τραβάμε» προς τον μέσο όρο ομάδες με λίγα ματς
+    referee_shrink_games: 6
+  players:
+    player_last_n: 10        # τελευταία Ν ματς παίκτη
+    player_min_games: 5
+
+# ---------- Διοργανώσεις ----------
+# espn: κωδικός ESPN · fdco: κωδικός football-data.co.uk · odds_api: κλειδί The Odds API
+# sofascore: id διοργάνωσης στο Sofascore (uniqueTournament). Αν κάποιο είναι λάθος, ο collector
+#            ταιριάζει και με το όνομα της διοργάνωσης (βλ. README §6).
+leagues:
+  - {id: EPL,  name: Premier League,    sport: football,   espn: eng.1, fdco: E0,  sofascore: 17,  odds_api: soccer_epl}
+  - {id: LIGA, name: LaLiga,            sport: football,   espn: esp.1, fdco: SP1, sofascore: 8,   odds_api: soccer_spain_la_liga}
+  - {id: SA,   name: Serie A,           sport: football,   espn: ita.1, fdco: I1,  sofascore: 23,  odds_api: soccer_italy_serie_a}
+  - {id: BL,   name: Bundesliga,        sport: football,   espn: ger.1, fdco: D1,  sofascore: 35,  odds_api: soccer_germany_bundesliga}
+  - {id: L1,   name: Ligue 1,           sport: football,   espn: fra.1, fdco: F1,  sofascore: 34,  odds_api: soccer_france_ligue_one}
+  - {id: GSL,  name: Super League,      sport: football,   espn: gre.1, fdco: G1,  sofascore: 185, odds_api: soccer_greece_super_league}
+  - {id: UCL,  name: UEFA Champions League,   sport: football, espn: uefa.champions,   sofascore: 7,     odds_api: soccer_uefa_champs_league}
+  - {id: UEL,  name: UEFA Europa League,      sport: football, espn: uefa.europa,      sofascore: 679,   odds_api: soccer_uefa_europa_league}
+  - {id: UECL, name: UEFA Conference League,  sport: football, espn: uefa.europa.conf, sofascore: 17015, odds_api: soccer_uefa_europa_conference_league}
+  - {id: NBA,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}
+  - {id: EL,   name: Euroleague,        sport: basketball, euroleague: E,          odds_api: basketball_euroleague}
+  - {id: GBL,  name: ΕΚΟ Basket League, sport: basketball, greek_site: true}   # μόνο μέσω ελληνικού site (βλ. README)
+
+# ---------- Πηγές (collectors / agents) ----------
+collectors:
+  espn:            {enabled: true}
+  euroleague:      {enabled: true}
+  fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
+  odds_api:
+    enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
+    regions: eu
+    markets: [h2h, totals]
+    monthly_budget: 480                 # κρατάμε 20 credits περιθώριο από τα 500
+    skip_if_fdco_covers: true           # μην ξοδεύεις credits για λίγκες που καλύπτει το fdco
+  sofascore:
+    enabled: true                       # πλάγια, κόρνερ, κάρτες, παίκτες, ενδεκάδες, απουσίες, αρχικές αποδόσεις
+    backfill_days: 60                   # πρώτη εκτέλεση: πόσες μέρες ιστορικό (~1 ώρα)
+    daily_lookback_days: 3              # επόμενες εκτελέσεις: μόνο οι τελευταίες μέρες
+    max_calls_per_run: 2500             # ασφάλεια: μέγιστες κλήσεις ανά εκτέλεση
+  espn_stats:
+    enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
+    lookback_days: 120
+    max_calls_per_run: 400
+  greek_site:
+    enabled: false                      # ενεργοποιείται αφού ρυθμιστεί (βλ. README §7)
+    name: ""
+    events_url: ""
+    timeout: 20
+
+# ---------- Κανόνες (από τα λάθη μας – βλ. betbot/rules.py) ----------
+rules:
+  min_ppg_for_win: 1.3           # όχι «νίκη» σε ομάδα με < 1.3 βαθμούς/ματς στα 5 τελευταία
+  min_basket_win_rate: 0.4       # μπάσκετ: όχι νίκη σε ομάδα με < 40% νίκες στα 5 τελευταία
+  max_absences: 5                # ≥5 απουσίες -> όχι Over/GG/νίκη για αυτή την ομάδα στο Προτεινόμενο
+  max_attack_absences: 3         # ή ≥3 απουσίες επιθετικών/μέσων
+  basket_min_ml_odds_safe: 1.55  # γηπεδούχος μπάσκετ κάτω από 1.55 δεν θεωρείται «safe»
+  max_drift_against: 0.08        # απόδοση που ανέβηκε ≥8% -> έξω από Προτεινόμενο/Safe
+  move_show_min: 0.04            # στην καρτέλα Κινήσεις: από 4% και πάνω
+
+# ---------- Λίστες / dashboards ----------
+lists:
+  recommended: {min_total: 1.80, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.62,
+                max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.65, single_max_odds: 2.30,
+                single_min_prob: 0.55}
+  safe:        {count: 10, min_odds: 1.15}
+  x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
+  x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
+  x100:        {min_leg_prob: 0.50, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
+  overs:       {min_leg_prob: 0.55, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
+  corners:     {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
+  cards:       {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
+  throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
+  players:     {min_leg_prob: 0.55, count: 15, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: false}
+  combo:       {min_leg_prob: 0.58, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
+
+# ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
+bankroll:
+  weekly: 10.0
+  unit: 1.0
+  max_bets_per_day: 2
+  stop_at: 5.0
+  lottery_stake: 0.5
+
+# ---------- Παράδοση ----------
+email:
+  enabled: false                        # χρειάζεται SMTP_* env vars (βλ. README)
+  to: ""
+  subject_prefix: "BetBot δελτίο"
+
+# Ψευδώνυμα ονομάτων ομάδων (όταν οι πηγές γράφουν διαφορετικά το ίδιο όνομα)
+team_aliases:
+  man united: manchester united
+  man utd: manchester united
+  man city: manchester city
+  nott'm forest: nottingham forest
+  wolves: wolverhampton wanderers
+  spurs: tottenham hotspur
+  newcastle: newcastle united
+  west ham: west ham united
+  brighton: brighton hove albion
+  ath madrid: atletico madrid
+  ath bilbao: athletic club
+  sociedad: real sociedad
+  betis: real betis
+  espanol: espanyol
+  vallecano: rayo vallecano
+  inter: internazionale
+  ein frankfurt: eintracht frankfurt
+  m'gladbach: borussia monchengladbach
+  leverkusen: bayer leverkusen
+  dortmund: borussia dortmund
+  paris sg: paris saint germain
+  psg: paris saint germain
+  st etienne: saint etienne
+  olympiakos: olympiacos
+  paok: paok salonika
+  aek: aek athens
+  ofi crete: ofi

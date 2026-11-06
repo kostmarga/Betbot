@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/demo.sqlite
+data/t.sqlite
+demo_output/
+.env

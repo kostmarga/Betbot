@@ -213,6 +213,7 @@ main{max-width:860px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 2px
 .leg:first-of-type{border-top:0}.m{font-size:13px;color:var(--muted)}.p{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
 .won,.sure,.ok{color:var(--ok)}.lost,.dead,.bad{color:var(--bad)}.n{color:var(--muted);padding:20px 0}
 a{color:inherit}
+details.fair{margin:18px 0 6px}details.fair summary{cursor:pointer;padding:6px 0;font-size:16px}
 """
 
 
@@ -220,8 +221,8 @@ def render(cfg, now, slips, names: dict | None = None) -> str:
     tz = ZoneInfo(cfg["timezone"])
     loc = now.astimezone(tz)
     names = names or {}
-    body = []
-    for sl in slips:
+
+    def card(sl, fair=False):
         legs = []
         for l in sl["legs"]:
             ic, _ = LABEL[l["code"]]
@@ -229,16 +230,29 @@ def render(cfg, now, slips, names: dict | None = None) -> str:
             score = f" · {st['hs']}-{st['as']} {E(st['clock'])}" if st and st["state"] == "in" else ""
             ko = parse_iso(l["kickoff"]).astimezone(tz) if l.get("kickoff") else None
             when = f"{ko:%H:%M} · " if ko and l["code"] == "pending" else ""
+            price = "παίξ' το αν ≥" if fair else "@"
             legs.append(
                 f'<div class="leg"><div>{ic}</div><div><b>{E(l["home"])} – {E(l["away"])}</b>'
-                f'<div class="m">{when}{E(str(l.get("label") or l["selection"]))} @ {l["odds"]:.2f}{score}</div></div>'
+                f'<div class="m">{when}{E(str(l.get("label") or l["selection"]))} {price} {l["odds"]:.2f}{score}</div></div>'
                 f'<div class="p {l["code"]}">{E(l["progress"])}</div></div>')
         name = names.get(sl.get("list_name"), sl.get("list_name") or "")
-        body.append(f'<div class="card"><h3>{E(name)} <span class="tot">· απόδοση {sl["total_odds"]:.2f} · '
-                    f'{sl["stake"]:.2f}€</span></h3><div class="{sl["code"]}"><b>{E(sl["label"])}</b></div>'
-                    + "".join(legs) + "</div>")
+        tot = "" if fair else f' <span class="tot">· απόδοση {sl["total_odds"]:.2f} · {sl["stake"]:.2f}€</span>'
+        return (f'<div class="card"><h3>{E(name)}{tot}</h3><div class="{sl["code"]}"><b>{E(sl["label"])}</b></div>'
+                + "".join(legs) + "</div>")
+
+    real = [sl for sl in slips if not str(sl.get("list_name") or "").startswith("fair_")]
+    fair = [sl for sl in slips if str(sl.get("list_name") or "").startswith("fair_")]
+    body = [card(sl) for sl in real]
     if not body:
-        body.append('<div class="n">Δεν υπάρχουν ανοιχτά δελτία. Τα δελτία φτιάχνονται στην πρωινή εκτέλεση.</div>')
+        body.append('<div class="n">Δεν υπάρχουν ανοιχτά δελτία με απόδοση. Τα δελτία φτιάχνονται στην πρωινή εκτέλεση.</div>')
+    if fair:
+        active = any(sl["code"] in ("ok", "bad", "sure") for sl in fair)
+        body.append(
+            f'<details class="fair"{" open" if active else ""}><summary><b>📐 Δίκαιες επιλογές ({len(fair)})</b> '
+            f'<span class="tot">· χωρίς απόδοση πρακτορείου</span></summary>'
+            '<p class="sub">Δεν βρέθηκε απόδοση για αυτές. Η τιμή είναι η ελάχιστη που τις κάνει να αξίζουν: '
+            'τις παίζεις μόνο αν το πρακτορείο δίνει τόση ή περισσότερη.</p>'
+            + "".join(card(sl, fair=True) for sl in fair) + "</details>")
     return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="300">
 <title>BetBot Live</title><style>{CSS}</style></head><body><main>

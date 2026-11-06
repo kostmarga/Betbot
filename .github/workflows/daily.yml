@@ -31,6 +31,18 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Φόρτωση βάσης (branch data)
+        run: |
+          # Η βάση ζει στο branch "data" (1 commit που ξαναγράφεται) ώστε το repo να μη φουσκώνει.
+          # Πρώτη φορά: χρησιμοποιείται η αρχική βάση που υπάρχει στο main.
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data
+            git show FETCH_HEAD:data/betbot.sqlite > data/betbot.sqlite
+          else
+            echo "Δεν υπάρχει ακόμα branch data – χρήση της αρχικής βάσης"
+          fi
+          git update-index --skip-worktree data/betbot.sqlite   # να μην μπλέκει στα commit/pull του main
+
       - name: Εκτέλεση BetBot
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
@@ -40,12 +52,28 @@ jobs:
           PAGE_URL: ${{ vars.PAGE_URL }}
         run: python main.py
 
-      - name: Αποθήκευση βάσης και σελίδας στο repo
+      - name: Αντίγραφο βάσης (πριν από οποιαδήποτε εντολή git)
+        if: always()
+        run: cp data/betbot.sqlite "$RUNNER_TEMP/betbot.sqlite"
+
+      - name: Αποθήκευση σελίδας στο main
         if: always()
         run: |
           git config user.name "betbot"
           git config user.email "betbot@users.noreply.github.com"
-          git add data/betbot.sqlite docs/ || true
+          git add docs/ || true
           git commit -m "BetBot $(date -u +%Y-%m-%dT%H:%M)Z" || echo "Τίποτα νέο"
           git pull --rebase --autostash -q || true   # το live workflow μπορεί να έχει κάνει push στο μεταξύ
           git push || echo "Push απέτυχε (δες README §10)"
+
+      - name: Αποθήκευση βάσης (branch data, 1 commit)
+        if: always()
+        run: |
+          git update-index --no-skip-worktree data/betbot.sqlite
+          git checkout -q --orphan data-tmp
+          git rm -rf -q --cached . || true
+          git clean -fdxq
+          mkdir -p data && cp "$RUNNER_TEMP/betbot.sqlite" data/betbot.sqlite
+          git add -f data/betbot.sqlite
+          git commit -q -m "Βάση $(date -u +%Y-%m-%dT%H:%M)Z"
+          git push -f origin data-tmp:data

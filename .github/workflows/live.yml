@@ -5,7 +5,7 @@
 # ΚΟΣΤΟΣ: κάθε εκτέλεση χρεώνεται ~1 λεπτό. Σε private repo το όριο είναι 2.000 λεπτά/μήνα
 #   (≈1.440 για καθημερινά + ≈140 για Σαβ/Κυρ + η καθημερινή εκτέλεση). Αν περνάει το όριο:
 #   μίκρυνε τις ώρες ή βάλε "*/15". Σε public repo δεν υπάρχει όριο.
-# Δεν αγγίζει τη βάση: κάνει commit ΜΟΝΟ το docs/live.html.
+# Διαβάζει τη βάση από το branch data (δεν τη γράφει) και κάνει commit ΜΟΝΟ το docs/live.html.
 name: BetBot live
 
 on:
@@ -34,6 +34,18 @@ jobs:
           cache: pip
 
       - run: pip install -r requirements.txt
+
+      - name: Φόρτωση βάσης (branch data)
+        run: |
+          # Η βάση ζει στο branch "data" (1 commit που ξαναγράφεται) ώστε το repo να μη φουσκώνει.
+          # Πρώτη φορά: χρησιμοποιείται η αρχική βάση που υπάρχει στο main.
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth=1 origin data
+            git show FETCH_HEAD:data/betbot.sqlite > data/betbot.sqlite
+          else
+            echo "Δεν υπάρχει ακόμα branch data – χρήση της αρχικής βάσης"
+          fi
+          git update-index --skip-worktree data/betbot.sqlite   # να μην μπλέκει στα commit/pull του main
 
       - name: Live σελίδα
         run: python main.py --live

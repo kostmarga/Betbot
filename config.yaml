@@ -127,9 +127,11 @@ rules:
 
 # ---------- Λίστες / dashboards ----------
 lists:
-  recommended: {min_total: 1.80, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.62,
-                max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.65, single_max_odds: 2.30,
-                single_min_prob: 0.55}
+  # Προτεινόμενο = ΥΨΗΛΗ πιθανότητα να βγει (όχι μεγάλη απόδοση). Backtest 13 μηνών: μονό σε φαβορί με p≥70% βγήκε στο 79–88%·
+  # διπλό με p≥65% στο ~62–64%. Δεν είναι «σίγουρο»: το διάστημα ROI περιλαμβάνει πάντα το 0 (βλ. docs/backtest.md).
+  recommended: {min_total: 1.35, max_total: 2.40, min_legs: 2, max_legs: 2, min_leg_prob: 0.68,
+                max_leg_odds: 1.70, max_basketball_legs: 1, single_min_odds: 1.12, single_max_odds: 1.70,
+                single_min_prob: 0.72}
   safe:        {count: 10, min_odds: 1.15}
   x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
   x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}

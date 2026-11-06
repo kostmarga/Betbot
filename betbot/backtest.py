@@ -203,14 +203,16 @@ def roi_line(name, picks):
             f"{np.mean([c['p'] for c in picks]):.1%} | {np.mean(profits):+.1%} | {cis} |")
 
 
-def run_counts(cfg, db, aliases, now, start):
+def run_counts(cfg, db, aliases, now, start, only=None, cards_lines=(3.5, 4.5)):
     ts = db.team_stats()
     by_ev = defaultdict(dict)
     for r in ts:
         by_ev[r["event_key"]][r["is_home"]] = r
     events = sorted([(parse_iso(s[1]["kickoff"]), k, s) for k, s in by_ev.items() if 1 in s and 0 in s], key=lambda x: x[0])
     out = {}
-    for metric, col, lines in (("corners", "corners", (8.5, 9.5, 10.5)), ("cards", "yellow", (3.5, 4.5))):
+    for metric, col, lines in (("corners", "corners", (8.5, 9.5, 10.5)), ("cards", "yellow", cards_lines)):
+        if only and metric != only:
+            continue
         pairs = {L: [] for L in lines}
         base_ll = {L: [] for L in lines}
         mod_ll = {L: [] for L in lines}

@@ -105,7 +105,7 @@ def run_football(cfg, db, aliases, now, start, rows=None):
     rows.sort(key=lambda r: r["ko"])
     all_matches = db.matches(sport="football")
     sel = cfg["selection"]
-    blend = sel["market_blend"]
+    blend = 0.5                      # σταθερό: το «παλιό» σύστημα (μίξη 50/50) για σύγκριση με την αγορά
     min_g = sel["min_team_matches"]
     res = defaultdict(list)       # ονόματα μετρικών -> λίστες
     cands = []                    # όλες οι υποψήφιες επιλογές
@@ -254,6 +254,7 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
     all_rows = load_fdco(cfg, now)
     res, cands, n_total, n_used = run_football(cfg, db, aliases, now, start, rows=all_rows)
     sel = cfg["selection"]
+    old = dict(sel, min_edge=-0.03, max_odds_any=4.0, avoid=[])      # ο κανόνας ΠΡΙΝ το backtest (για σύγκριση)
     L = [f"# BetBot – Backtest ({now:%d/%m/%Y})", "",
          f"Διάστημα ελέγχου: {start:%d/%m/%Y} – {now:%d/%m/%Y}, παράθυρα {WINDOW_DAYS} ημερών (walk-forward). "
          f"Αγώνες με αποδόσεις: {n_total}, με αρκετό ιστορικό και για τις δύο ομάδες: {n_used}.", "",
@@ -267,12 +268,12 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
           "## 2. Βαθμονόμηση του μοντέλου (όλες οι επιλογές 1Χ2 και Over/Under 2.5)", ""]
     L += bins_table([(c["pm"], c["win"]) for c in cands], [0, .1, .2, .3, .4, .5, .6, .7, .8, 1.01])
     L += ["", "Σε καλό μοντέλο, οι δύο τελευταίες στήλες είναι κοντά. Αν η πρόβλεψη είναι πολύ μεγαλύτερη από την πραγματική συχνότητα, το μοντέλο είναι υπερβολικά σίγουρο.", "",
-          "## 3. Προσομοίωση των κανόνων επιλογής (1€ ανά επιλογή, αποδόσεις: μέσος όρος πρακτορείων)", "",
-          f"Φίλτρα όπως στο config.yaml: πιθανότητα μετά τη μίξη ≥ {sel['min_model_prob']:.0%}, απόδοση {sel['min_odds']}–{sel['max_odds_any']}, "
-          f"value ≥ {sel['min_edge']:+.2f}.", "",
+          "## 3. Προσομοίωση του ΠΑΛΙΟΥ συστήματος (μίξη μοντέλου/αγοράς 50/50 – πριν το backtest)", "",
+          f"1€ ανά επιλογή, αποδόσεις: μέσος όρος πρακτορείων. Φίλτρα: πιθανότητα ≥ {old['min_model_prob']:.0%}, απόδοση {old['min_odds']}–{old['max_odds_any']:g}, "
+          f"value ≥ {old['min_edge']:+.2f}.", "",
           "| Στρατηγική | Επιλογές | Hit-rate | Μέση πιθανότητα | ROI ανά επιλογή | 95% διάστημα ROI |", "|---|---|---|---|---|---|"]
-    mine = simulate(cands, sel)
-    L.append(roi_line("Μοντέλο+αγορά (όπως το σύστημα)", mine))
+    mine = simulate(cands, old)
+    L.append(roi_line("Παλιό σύστημα (μοντέλο+αγορά 50/50)", mine))
     L.append(roi_line(" └ μόνο 1Χ2", [c for c in mine if c["mk"] == "1X2"]))
     L.append(roi_line(" └ μόνο Over/Under 2.5", [c for c in mine if c["mk"] == "OU2.5"]))
     L.append(roi_line(" └ μόνο Under", [c for c in mine if c["sel"] == "UNDER"]))
@@ -284,7 +285,7 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
           "άρα ROI γύρω στο −5% είναι «κανονικό» για τυχαίες επιλογές. Αν το διάστημα περιλαμβάνει το 0, δεν μπορούμε να πούμε ότι υπάρχει πραγματικό πλεονέκτημα.", ""]
     cur = market_rules([r for r in all_rows if start <= r["ko"] < now], sel)
     mid = start + (now - start) / 2
-    L += ["## 3β. ΝΕΟΙ κανόνες του συστήματος (πιθανότητα από την αγορά, χωρίς Under 2.5, απόδοση έως "
+    L += ["## 3β. ΝΕΟ σύστημα σε ισχύ (πιθανότητα από την αγορά, χωρίς Under 2.5, απόδοση έως "
           f"{sel['max_odds_any']:g}) – ίδιος έλεγχος", "",
           f"Πιθανότητα αγοράς ≥ {sel['min_model_prob']:.0%}, απόδοση {sel['min_odds']}–{sel['max_odds_any']}, "
           f"value ≥ {sel['min_edge']:+.2f}. Πλήρης περίοδος:", ""] + rules_table(cur)

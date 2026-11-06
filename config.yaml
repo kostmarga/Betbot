@@ -89,6 +89,7 @@ collectors:
   espn:            {enabled: true}
   euroleague:      {enabled: true}
   fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
+  espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
   odds_api:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)

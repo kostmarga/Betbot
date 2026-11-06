@@ -54,7 +54,7 @@ def _side(block, which):
 
 
 def parse_odds(sport: str, data: dict) -> list[tuple]:
-    """Επιστρέφει [(market, selection, line, price, open_price, n_books)] με μέσο όρο των πρακτορείων."""
+    """Επιστρέφει [(market, selection, line, price, open_price, n_books, max_price)] με μέσο όρο των πρακτορείων."""
     agg = defaultdict(list)   # (market, sel, line) -> [(price, open)]
     for prov in data.get("odds") or []:
         ml, tot, sp = prov.get("moneyline"), prov.get("total"), prov.get("pointSpread")
@@ -87,7 +87,7 @@ def parse_odds(sport: str, data: dict) -> list[tuple]:
         prices = [v[0] for v in vals]
         opens = [v[1] for v in vals if v[1]]
         out.append((market, sel, line, round(sum(prices) / len(prices), 3),
-                    round(sum(opens) / len(opens), 3) if opens else None, len(prices)))
+                    round(sum(opens) / len(opens), 3) if opens else None, len(prices), round(max(prices), 3)))
     return out
 
 
@@ -116,8 +116,11 @@ class EspnOddsCollector(Collector):
             except Exception:
                 fails += 1
                 continue
-            rows = [OddsRow(m["match_id"], mk, sel, ln, pr, nb, "espn", fetched, op)
-                    for mk, sel, ln, pr, op, nb in parse_odds(lg["sport"], data)]
+            rows = []
+            for mk, sel, ln, pr, op, nb, mx in parse_odds(lg["sport"], data):
+                rows.append(OddsRow(m["match_id"], mk, sel, ln, pr, nb, "espn", fetched, op))
+                if nb >= 2 and mx > pr:      # καλύτερη τιμή ανάμεσα στα δύο πρακτορεία
+                    rows.append(OddsRow(m["match_id"], mk, sel, ln, mx, 1, "espn_max", fetched))
             if rows:
                 n_with += 1
                 n_rows += ctx.db.upsert_odds(rows)

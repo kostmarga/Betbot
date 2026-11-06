@@ -19,6 +19,8 @@ def moves_for_match(db, match_id) -> dict:
     """{(market, selection, line): {"open":…, "now":…, "pct":…, "n_sources":…}} – μέσος όρος πηγών."""
     agg = defaultdict(list)
     for r in db.odds_for(match_id):
+        if r["source"].endswith("_max"):      # οι «καλύτερες τιμές» δεν μετράνε στη μέση κίνηση
+            continue
         op, cur = r.get("open_price") or r["price"], r["price"]
         if op and cur:
             agg[(r["market"], r["selection"], r["line"])].append((op, cur))

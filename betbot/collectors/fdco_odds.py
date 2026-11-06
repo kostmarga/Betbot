@@ -28,6 +28,12 @@ COLUMNS = [
     ("OU", "UNDER", 2.5, ["Avg<2.5", "P<2.5", "B365<2.5"]),
 ]
 
+# Καλύτερη τιμή στο σύνολο των πρακτορείων του football-data (πηγή "fdco_max")
+MAX_COLUMNS = [
+    ("1X2", "1", None, ["MaxH"]), ("1X2", "X", None, ["MaxD"]), ("1X2", "2", None, ["MaxA"]),
+    ("OU", "OVER", 2.5, ["Max>2.5"]), ("OU", "UNDER", 2.5, ["Max<2.5"]),
+]
+
 
 def _price(row, cols):
     for c in cols:
@@ -65,5 +71,9 @@ class FdcoOddsCollector(Collector):
                 p = _price(r, cols)
                 if p:
                     rows.append(OddsRow(mid, market, sel, line, p, 1, "fdco", fetched))
+            for market, sel, line, cols in MAX_COLUMNS:
+                p = _price(r, cols)
+                if p:
+                    rows.append(OddsRow(mid, market, sel, line, p, 1, "fdco_max", fetched))
         ctx.db.upsert_odds(rows)
         return f"{n_matches} αγώνες, {len(rows)} αποδόσεις"

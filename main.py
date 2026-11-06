@@ -7,6 +7,7 @@
   python main.py --no-email
   python main.py --only sofascore,espn_stats   # τρέχει μόνο αυτούς τους collectors
   python main.py --live       # μόνο η live σελίδα των δελτίων (docs/live.html) – ελαφριά
+  python main.py --backtest   # έλεγχος των μοντέλων στο παρελθόν → docs/backtest.md (~10 λεπτά)
   python main.py --live --loop   # το ίδιο, κάθε 10 λεπτά, μέχρι να το κλείσεις (για τον υπολογιστή σου)
 """
 from __future__ import annotations
@@ -132,6 +133,7 @@ def main(argv=None):
     ap.add_argument("--no-fetch", action="store_true")
     ap.add_argument("--no-email", action="store_true")
     ap.add_argument("--only", default="")
+    ap.add_argument("--backtest", action="store_true", help="backtest μοντέλων στο παρελθόν")
     ap.add_argument("--live", action="store_true", help="μόνο live σελίδα δελτίων")
     ap.add_argument("--loop", action="store_true", help="με --live: επανάληψη κάθε 10 λεπτά")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -142,6 +144,11 @@ def main(argv=None):
     cfg = load_cfg(a.config)
     if a.live:
         return run_live(cfg, a.loop)
+    if a.backtest:
+        from betbot import backtest
+        backtest.run(cfg, datetime.now(timezone.utc).replace(microsecond=0))
+        log.info("Backtest: docs/backtest.md")
+        return 0
     now = datetime.now(timezone.utc).replace(microsecond=0)
     if a.demo:
         cfg["database"] = "data/demo.sqlite"
@@ -198,7 +205,13 @@ def main(argv=None):
 
     # 6) Σελίδα
     hist = report.history_by_list(db.slips())
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes)
+    try:
+        from betbot import clv as clv_mod
+        clv = clv_mod.clv_summary(db, now)
+    except Exception as e:     # δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("CLV: %s", e)
+        clv = None
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
 

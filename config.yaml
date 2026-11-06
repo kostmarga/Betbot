@@ -21,14 +21,17 @@ slip:
 # ---------- Φίλτρα επιλογών ----------
 selection:
   min_model_prob: 0.55       # ελάχιστη πιθανότητα (μετά το blend με την αγορά)
-  min_edge: -0.03            # ελάχιστο value: p*απόδοση - 1 (βλ. README §5: γιατί επιτρέπουμε ελαφρώς αρνητικό)
+  min_edge: -0.10            # ελάχιστο value: p*απόδοση - 1. Με πιθανότητες από την αγορά το value = −προμήθεια (~−3…−7%), γι' αυτό −0.10
   min_odds: 1.15             # κάτω από αυτό δεν αξίζει ούτε για δέσιμο
   max_odds: 2.10             # (παλιό, για συμβατότητα)
-  max_odds_any: 4.00         # μέγιστη απόδοση μίας επιλογής σε οποιαδήποτε λίστα
+  max_odds_any: 3.00         # μέγιστη απόδοση μίας επιλογής (backtest: οι υψηλές αποδόσεις χάνουν πολύ περισσότερο· 6+ ≈ −21%)
   fair_min_prob: 0.55        # επιλογές ΧΩΡΙΣ απόδοση: ελάχιστη πιθανότητα για να εμφανιστούν
   fair_min_odds: 1.30        # ... και δίκαιη απόδοση τουλάχιστον 1.30 (αλλιώς δεν αξίζει: π.χ. «Under 12.5 κόρνερ»)
   fair_value_margin: 0.05    # «παίξ' το αν ≥» = δίκαιη απόδοση × 1.05
-  market_blend: 0.5          # 0 = μόνο αγορά, 1 = μόνο μοντέλο. 0.5 = μισό-μισό (συνιστάται)
+  market_blend: 0.0          # 0 = μόνο αγορά, 1 = μόνο μοντέλο. Μπάσκετ: δεν έχει backtest, αλλά το μοντέλο ποδοσφαίρου έχασε από την αγορά και με τα πάντα βάρη -> ίδια προσοχή
+  market_blend_football: 0.0 # ποδόσφαιρο: backtest 13 μηνών -> όσο περισσότερο βάρος στο μοντέλο, τόσο χειρότερα
+  avoid:                     # επιλογές που έχασαν σταθερά και στις δύο μισές του backtest
+    - {sport: football, market: OU, selection: UNDER, line: 2.5}   # ROI −7% (Over: ~−1%)
   max_legs_per_league: 3     # διασπορά κινδύνου
   min_team_matches: 8        # ομάδα με λιγότερα ματς στο ιστορικό -> αγνοείται
 
@@ -47,8 +50,8 @@ models:
   counts:                    # κόρνερ / κάρτες / πλάγια
     history_days: 400
     half_life_days: 120
-    shrink_games: 4          # πόσο «τραβάμε» προς τον μέσο όρο ομάδες με λίγα ματς
-    referee_shrink_games: 6
+    shrink_games: 16         # πόσο «τραβάμε» προς τον μέσο όρο ομάδες με λίγα ματς (backtest 06/11/2026: 4 → 16 βελτιώνει κάρτες 0.0154→0.0206 και κόρνερ 0.0005→0.0065)
+    referee_shrink_games: 24
   players:
     player_last_n: 10        # τελευταία Ν ματς παίκτη
     player_min_games: 5
@@ -124,9 +127,11 @@ rules:
 
 # ---------- Λίστες / dashboards ----------
 lists:
-  recommended: {min_total: 1.80, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.62,
-                max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.65, single_max_odds: 2.30,
-                single_min_prob: 0.55}
+  # Προτεινόμενο = ΥΨΗΛΗ πιθανότητα να βγει (όχι μεγάλη απόδοση). Backtest 13 μηνών: μονό σε φαβορί με p≥70% βγήκε στο 79–88%·
+  # διπλό με p≥65% στο ~62–64%. Δεν είναι «σίγουρο»: το διάστημα ROI περιλαμβάνει πάντα το 0 (βλ. docs/backtest.md).
+  recommended: {min_total: 1.35, max_total: 2.40, min_legs: 2, max_legs: 2, min_leg_prob: 0.68,
+                max_leg_odds: 1.70, max_basketball_legs: 1, single_min_odds: 1.12, single_max_odds: 1.70,
+                single_min_prob: 0.72}
   safe:        {count: 10, min_odds: 1.15}
   x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
   x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}

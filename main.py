@@ -6,6 +6,8 @@
   python main.py --no-fetch   # μόνο μοντέλα/λίστες από ό,τι υπάρχει ήδη στη βάση
   python main.py --no-email
   python main.py --only sofascore,espn_stats   # τρέχει μόνο αυτούς τους collectors
+  python main.py --live       # μόνο η live σελίδα των δελτίων (docs/live.html) – ελαφριά
+  python main.py --live --loop   # το ίδιο, κάθε 10 λεπτά, μέχρι να το κλείσεις (για τον υπολογιστή σου)
 """
 from __future__ import annotations
 
@@ -104,6 +106,25 @@ def save_lists(db, cfg, now, lists):
                          [slim(c, c["play_if"])])
 
 
+def run_live(cfg, loop=False):
+    import subprocess
+    import time
+    from betbot import live
+    while True:
+        try:
+            if loop and os.path.isdir(".git"):   # φέρνει τα νέα δελτία της πρωινής εκτέλεσης
+                subprocess.run(["git", "pull", "--rebase", "--autostash", "-q"], check=False, timeout=120)
+            now = datetime.now(timezone.utc).replace(microsecond=0)
+            log.info("Live σελίδα: %s", live.run(cfg, now))
+        except Exception as e:   # η επανάληψη δεν πρέπει να σταματά από ένα σφάλμα δικτύου
+            log.error("Live απέτυχε: %s", e)
+            if not loop:
+                return 1
+        if not loop:
+            return 0
+        time.sleep(600)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="config.yaml")
@@ -111,12 +132,16 @@ def main(argv=None):
     ap.add_argument("--no-fetch", action="store_true")
     ap.add_argument("--no-email", action="store_true")
     ap.add_argument("--only", default="")
+    ap.add_argument("--live", action="store_true", help="μόνο live σελίδα δελτίων")
+    ap.add_argument("--loop", action="store_true", help="με --live: επανάληψη κάθε 10 λεπτά")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
     cfg = load_cfg(a.config)
+    if a.live:
+        return run_live(cfg, a.loop)
     now = datetime.now(timezone.utc).replace(microsecond=0)
     if a.demo:
         cfg["database"] = "data/demo.sqlite"

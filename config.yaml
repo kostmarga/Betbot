@@ -50,8 +50,8 @@ models:
   counts:                    # κόρνερ / κάρτες / πλάγια
     history_days: 400
     half_life_days: 120
-    shrink_games: 4          # πόσο «τραβάμε» προς τον μέσο όρο ομάδες με λίγα ματς
-    referee_shrink_games: 6
+    shrink_games: 16         # πόσο «τραβάμε» προς τον μέσο όρο ομάδες με λίγα ματς (backtest 06/11/2026: 4 → 16 βελτιώνει κάρτες 0.0154→0.0206 και κόρνερ 0.0005→0.0065)
+    referee_shrink_games: 24
   players:
     player_last_n: 10        # τελευταία Ν ματς παίκτη
     player_min_games: 5

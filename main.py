@@ -29,7 +29,7 @@ from betbot.models import BasketballModel, CountModel, FootballModel, PlayerMode
 from betbot.util import iso, log
 
 SLIM_KEYS = ("match_id", "league", "league_name", "sport", "kickoff", "home", "away", "market",
-             "selection", "line", "label", "odds", "p_model", "p_market", "p", "edge", "family")
+             "selection", "line", "label", "odds", "p_model", "p_market", "p", "edge", "family", "best_source")
 
 
 def load_cfg(path="config.yaml"):
@@ -84,7 +84,7 @@ def save_lists(db, cfg, now, lists):
 
     def put(lid, legs_full, total, p, odds_override=None):
         legs = [slim(l, (odds_override or {}).get(id(l))) for l in legs_full]
-        db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs)
+        db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True)
 
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
@@ -99,12 +99,12 @@ def save_lists(db, cfg, now, lists):
         sl = lists["overs"]["slip"]
         put("overs", sl["legs"], sl["total_odds"], sl["p_win"])
     for i, c in enumerate(lists["safe"]["picks"][:5]):
-        db.save_slip(f"{day}#safe1-{i + 1}", created, "safe1", c["odds"], c["p"], stake, [slim(c)])
+        db.save_slip(f"{day}#safe1-{i + 1}", created, "safe1", c["odds"], c["p"], stake, [slim(c)], keep_first=True)
     # επιλογές χωρίς απόδοση: καταγραφή με την ελάχιστη αποδεκτή απόδοση («παίξ' το αν ≥»)
     for fam in ("corners", "cards", "throw_ins", "players"):
         for i, c in enumerate([c for c in lists[fam]["picks"] if c.get("play_if")][:3]):
             db.save_slip(f"{day}#fair_{fam}-{i + 1}", created, f"fair_{fam}", c["play_if"], c["p"], stake,
-                         [slim(c, c["play_if"])])
+                         [slim(c, c["play_if"])], keep_first=True)
 
 
 def run_live(cfg, loop=False):
@@ -211,7 +211,14 @@ def main(argv=None):
     except Exception as e:     # δεν πρέπει να ρίχνει τη σελίδα
         log.warning("CLV: %s", e)
         clv = None
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv)
+    try:
+        from betbot import plan as plan_mod
+        plan = plan_mod.build_plan(db, cfg, now)
+        goals = plan_mod.goals(db, cfg, now, clv)
+    except Exception as e:     # το πλάνο δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("Πλάνο: %s", e)
+        plan = goals = None
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
 

@@ -436,10 +436,12 @@ class DB:
             c.execute("INSERT OR REPLACE INTO fetch_cache VALUES(?,?,?)", (key, at, int(ok)))
 
     # ---------- slips ----------
-    def save_slip(self, slip_id, created_at, list_name, total_odds, model_prob, stake, legs):
+    def save_slip(self, slip_id, created_at, list_name, total_odds, model_prob, stake, legs, keep_first=False):
+        """keep_first=True: αν υπάρχει ήδη δελτίο με αυτό το id (π.χ. από την πρωινή εκτέλεση), ΔΕΝ αντικαθίσταται –
+        ώστε αυτό που πρότεινε το bot το πρωί να μένει το ίδιο όλη μέρα."""
         with self.tx() as c:
             c.execute(
-                """INSERT OR REPLACE INTO slips(slip_id,created_at,list_name,total_odds,model_prob,stake,status,payout,legs_json)
+                f"""INSERT OR {'IGNORE' if keep_first else 'REPLACE'} INTO slips(slip_id,created_at,list_name,total_odds,model_prob,stake,status,payout,legs_json)
                    VALUES(?,?,?,?,?,?,'open',0,?)""",
                 (slip_id, created_at, list_name, total_odds, model_prob, stake, json.dumps(legs, ensure_ascii=False)),
             )

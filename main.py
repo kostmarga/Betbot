@@ -78,7 +78,8 @@ def build_models(db, cfg, ctx, now, notes):
 
 def save_lists(db, cfg, now, lists):
     """Καταγράφει κάθε λίστα «στα χαρτιά» (1 μονάδα) για το ιστορικό ανά λίστα."""
-    day = now.astimezone().strftime("%Y-%m-%d")
+    from zoneinfo import ZoneInfo
+    day = now.astimezone(ZoneInfo(cfg["timezone"])).strftime("%Y-%m-%d")    # ώρα Ελλάδας (όχι UTC): η «μέρα» είναι ίδια παντού
     stake = 1.0
     created = iso(now)
 

@@ -127,11 +127,12 @@ rules:
 
 # ---------- Λίστες / dashboards ----------
 lists:
-  # Προτεινόμενο = ΥΨΗΛΗ πιθανότητα να βγει (όχι μεγάλη απόδοση). Backtest 13 μηνών: μονό σε φαβορί με p≥70% βγήκε στο 79–88%·
-  # διπλό με p≥65% στο ~62–64%. Δεν είναι «σίγουρο»: το διάστημα ROI περιλαμβάνει πάντα το 0 (βλ. docs/backtest.md).
-  recommended: {min_total: 1.35, max_total: 2.40, min_legs: 2, max_legs: 2, min_leg_prob: 0.68,
-                max_leg_odds: 1.70, max_basketball_legs: 1, single_min_odds: 1.12, single_max_odds: 1.70,
-                single_min_prob: 0.72}
+  # Προτεινόμενο = δελτίο που ΑΞΙΖΕΙ να παίξεις: συνολική απόδοση ~2.0–3.2 (όχι 1.47: με 2€ κερδίζεις 0.94€ και δεν αξίζει),
+  # με όσο το δυνατόν μεγαλύτερη πιθανότητα μέσα σε αυτό το εύρος. Αντιστάθμισμα: πιθανότητα ~40–50% (όχι 63%).
+  # Η αναμενόμενη ζημιά ανά 1€ είναι παρόμοια (~−3…−8%) – η υψηλότερη απόδοση δεν κάνει το στοίχημα πιο κερδοφόρο.
+  recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.60,
+                max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.60, single_max_odds: 2.30,
+                single_min_prob: 0.55}
   safe:        {count: 10, min_odds: 1.15}
   x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
   x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}

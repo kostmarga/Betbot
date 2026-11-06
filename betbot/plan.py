@@ -53,9 +53,11 @@ def week_state(db, cfg, now):
         d = parse_iso(sl["created_at"]).astimezone(tz).date()
         if not (monday <= d < today):
             continue
-        st, profit = _slip_money(sl, br)
         if sl["list_name"] == "x30":
+            if d.weekday() < 5:        # το λαχείο προτείνεται μόνο Σάββατο/Κυριακή· τις άλλες μέρες δεν μετράει
+                continue
             lottery_played = True
+        st, profit = _slip_money(sl, br)
         if profit is None:
             open_stake += st
         else:

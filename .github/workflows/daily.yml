@@ -47,4 +47,5 @@ jobs:
           git config user.email "betbot@users.noreply.github.com"
           git add data/betbot.sqlite docs/ || true
           git commit -m "BetBot $(date -u +%Y-%m-%dT%H:%M)Z" || echo "Τίποτα νέο"
+          git pull --rebase --autostash -q || true   # το live workflow μπορεί να έχει κάνει push στο μεταξύ
           git push || echo "Push απέτυχε (δες README §10)"

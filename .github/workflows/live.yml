@@ -1,0 +1,49 @@
+# BetBot LIVE – ανανεώνει τη σελίδα docs/live.html με την πορεία των δελτίων (κάθε 10 λεπτά).
+# Ώρες σε UTC. Ελλάδα = UTC+2 (χειμώνας) / UTC+3 (καλοκαίρι).
+#   Καθημερινά 14:00–21:50 UTC  = 16:00–23:50 Ελλάδας (χειμώνας)
+#   Σαβ/Κυρ ακόμα 11:00–13:50 UTC = 13:00–15:50 Ελλάδας (πρωινά ματς)
+# ΚΟΣΤΟΣ: κάθε εκτέλεση χρεώνεται ~1 λεπτό. Σε private repo το όριο είναι 2.000 λεπτά/μήνα
+#   (≈1.440 για καθημερινά + ≈140 για Σαβ/Κυρ + η καθημερινή εκτέλεση). Αν περνάει το όριο:
+#   μίκρυνε τις ώρες ή βάλε "*/15". Σε public repo δεν υπάρχει όριο.
+# Δεν αγγίζει τη βάση: κάνει commit ΜΟΝΟ το docs/live.html.
+name: BetBot live
+
+on:
+  schedule:
+    - cron: "*/10 14-21 * * *"
+    - cron: "*/10 11-13 * * 0,6"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: betbot-live
+  cancel-in-progress: true
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Live σελίδα
+        run: python main.py --live
+
+      - name: Αποθήκευση docs/live.html
+        run: |
+          git config user.name "betbot"
+          git config user.email "betbot@users.noreply.github.com"
+          git add docs/live.html
+          git diff --cached --quiet && { echo "Καμία αλλαγή"; exit 0; }
+          git commit -m "Live $(date -u +%H:%M)Z"
+          for i in 1 2 3; do git pull --rebase --autostash -q && git push && exit 0; sleep 5; done
+          echo "Push απέτυχε"

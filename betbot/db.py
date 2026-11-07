@@ -436,9 +436,16 @@ class DB:
             c.execute("INSERT OR REPLACE INTO fetch_cache VALUES(?,?,?)", (key, at, int(ok)))
 
     # ---------- slips ----------
-    def save_slip(self, slip_id, created_at, list_name, total_odds, model_prob, stake, legs, keep_first=False):
+    def save_slip(self, slip_id, created_at, list_name, total_odds, model_prob, stake, legs, keep_first=False, fresh_after=None):
         """keep_first=True: αν υπάρχει ήδη δελτίο με αυτό το id (π.χ. από την πρωινή εκτέλεση), ΔΕΝ αντικαθίσταται –
-        ώστε αυτό που πρότεινε το bot το πρωί να μένει το ίδιο όλη μέρα."""
+        ώστε αυτό που πρότεινε το bot το πρωί να μένει το ίδιο όλη μέρα.
+        fresh_after: αν το υπάρχον δελτίο φτιάχτηκε ΠΡΙΝ από αυτή τη στιγμή (ISO UTC), π.χ. από νυχτερινή εκτέλεση πριν τις 06:00,
+        θεωρείται ξεπερασμένο και αντικαθίσταται."""
+        if keep_first:
+            row = self.conn.execute("SELECT created_at FROM slips WHERE slip_id=?", (slip_id,)).fetchone()
+            if row and (fresh_after is None or row["created_at"] >= fresh_after):
+                return
+            keep_first = False
         with self.tx() as c:
             c.execute(
                 f"""INSERT OR {'IGNORE' if keep_first else 'REPLACE'} INTO slips(slip_id,created_at,list_name,total_odds,model_prob,stake,status,payout,legs_json)

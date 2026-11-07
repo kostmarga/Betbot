@@ -378,7 +378,11 @@ def build_lists(cands: dict, cfg) -> dict:
         safe_list.append(c)
         if len(safe_list) >= sc["count"]:
             break
-    out["safe"] = {"picks": safe_list}
+    # Safe ΔΕΛΤΙΟ: ένα δελτίο με τις πιο πιθανές επιλογές (ο χρήστης παίζει μόνο δελτία, όχι μονά)
+    spool = [c for c in ok if not_blocked(c, "safe") and c["odds"] >= sc["min_odds"] and c["p"] >= sc.get("min_leg_prob", 0)]
+    out["safe"] = {"picks": safe_list,
+                   "slip": build_slip(spool, sc["min_total"], sc["max_total"], sc["min_legs"], sc["max_legs"], cfg,
+                                      max_basket=sc.get("max_basketball_legs", 1)) if "min_total" in sc else None}
 
     # 🎯 10+ · 🔥 30+ · 🎰 100+
     for lid in ("x10", "x30", "x100"):
@@ -405,9 +409,17 @@ def build_lists(cands: dict, cfg) -> dict:
         if fam == "players":
             priced = [c for c in priced if c["extra"].get("confirmed") or x["allow_probable"]]
         allp = _one_per_match_line(sorted(priced + unpriced, key=lambda c: -c["p"]), fam)
-        out[lid] = {"picks": allp[:x["count"]],
-                    "slip": build_slip(priced, x["min_total"], x["max_total"], x["min_legs"], x["max_legs"], cfg)
-                    if len(priced) >= x["min_legs"] else None}
+        slip = (build_slip(priced, x["min_total"], x["max_total"], x["min_legs"], x["max_legs"], cfg)
+                if len(priced) >= x["min_legs"] else None)
+        if slip is None and unpriced:
+            # Χωρίς αποδόσεις πρακτορείου: δελτίο με «δίκαιες» αποδόσεις (η ελάχιστη απόδοση «παίξ' το αν ≥» κάθε επιλογής).
+            fair_pool = [dict(c, odds=c["play_if"], edge=None, fair=True) for c in _one_per_match_line(
+                sorted(unpriced, key=lambda c: -c["p"]), fam) if c.get("play_if") and c["p"] >= x.get("min_leg_prob", 0.55)]
+            if len(fair_pool) >= x["min_legs"]:
+                slip = build_slip(fair_pool, x.get("fair_min_total", 1.5), x["max_total"], x["min_legs"], x["max_legs"], cfg)
+                if slip:
+                    slip["fair"] = True
+        out[lid] = {"picks": allp[:x["count"]], "slip": slip}
 
     # 🔀 Συνδυαστικό: διαφορετικές αγορές
     cc = L["combo"]

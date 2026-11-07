@@ -133,7 +133,8 @@ lists:
   recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.60,
                 max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.60, single_max_odds: 2.30,
                 single_min_prob: 0.55}
-  safe:        {count: 10, min_odds: 1.15}
+  safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.70, min_total: 1.60, max_total: 2.60, min_legs: 2, max_legs: 4,
+                max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)
   x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
   x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
   x100:        {min_leg_prob: 0.50, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}

@@ -114,6 +114,9 @@ class Page:
         stake_txt = f"<div class='tile'><div class='k'>Ποντάρισμα</div><div class='v'>{stake:.2f}€</div></div>" if stake else ""
         ret = f"<div class='tile'><div class='k'>Αν κερδίσει</div><div class='v pos'>{stake * sl['total_odds']:.2f}€</div></div>" if stake else ""
         pm = f"{sl['p_market'] * 100:.1f}%" if sl.get("p_market") else "—"
+        # Δελτίο χωρίς απόδοση πρακτορείου («δίκαιη» ελάχιστη απόδοση): το αναμενόμενο κέρδος δεν έχει νόημα
+        ev_tile = "" if sl.get("fair") else (f"<div class=\"tile\"><div class=\"k\">Αναμενόμενο ανά 1€</div><div class=\"v "
+                                            f"{'pos' if sl['p_win'] * sl['total_odds'] >= 1 else ''}\">{(sl['p_win'] * sl['total_odds'] - 1) * 100:+.0f}%</div></div>")
         lbl = [f"{l['home'][:12]}–{l['away'][:12]}" for l in sl["legs"]]
         ch = self.chart({
             "type": "bar",
@@ -129,7 +132,7 @@ class Page:
 <div class="tile"><div class="k">Επιλογές</div><div class="v">{len(sl['legs'])}</div></div>
 <div class="tile"><div class="k">Πιθανότητα (εκτίμηση)</div><div class="v">{sl['p_win'] * 100:.1f}%</div></div>
 <div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>
-<div class="tile"><div class="k">Αναμενόμενο ανά 1€</div><div class="v {'pos' if sl['p_win'] * sl['total_odds'] >= 1 else ''}">{(sl['p_win'] * sl['total_odds'] - 1) * 100:+.0f}%</div></div>{stake_txt}{ret}
+{ev_tile}{stake_txt}{ret}
 </div>{self.pick_table(sl['legs'])}
 <details><summary>Διάγραμμα: μοντέλο vs αγορά ανά επιλογή</summary>{ch}</details></div>"""
 
@@ -185,44 +188,36 @@ td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
 """
 
 
-def _plan_html(plan, cfg, tz) -> str:
-    if not plan:
-        return "<div class='card'><p class='muted'>Το πλάνο δεν είναι διαθέσιμο.</p></div>"
-    from .plan import SRC
-    ws = plan["week"]
-    head = (f"<div class='card'><h3>🎯 Τι να παίξεις σήμερα</h3><div class='tiles'>"
-            f"<div class='tile'><div class='k'>Σύνολο σήμερα</div><div class='v'>{plan['total']:.2f}€</div></div>"
-            f"<div class='tile'><div class='k'>Διαθέσιμο εβδομάδας</div><div class='v'>{ws['remaining']:.2f}€</div></div>"
-            f"<div class='tile'><div class='k'>Ζημιά εβδομάδας</div><div class='v'>{ws['settled_loss']:.2f}€ / {ws['loss_limit']:.0f}€</div></div>"
-            f"<div class='tile'><div class='k'>Ανοιχτά</div><div class='v'>{ws['open_stake']:.2f}€</div></div></div>"
-            + "".join(f"<p>{E(n)}</p>" for n in plan["notes"])
-            + "<p class='muted'>Τα ποσά είναι ΑΝΩΤΑΤΑ όρια, όχι υποχρέωση. Το αναμενόμενο μακροπρόθεσμο αποτέλεσμα είναι μικρή ζημιά "
-              "(περίπου −3% του ποσού, βλ. backtest)· παίζεις μόνο ό,τι μπορείς να χάσεις. Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></div>")
-    cards = []
-    for it in plan["items"]:
-        rows = []
-        for l in it["legs"]:
-            ko = _when(l["kickoff"], cfg["timezone"]) if l.get("kickoff") else "—"
-            src = SRC.get(l.get("best_source") or "", l.get("best_source") or "")
-            rows.append(f"<tr><td>{E(ko)}</td><td><b>{E(l['home'])} – {E(l['away'])}</b><div class='muted'>{E(l.get('league_name') or '')}</div></td>"
-                        f"<td>{E(str(l['label']))}</td><td><b>{l['odds']:.2f}</b></td><td class='muted'>{E(src)}</td></tr>")
-        ev = it["ev"] * 100
-        cards.append(
-            f"<div class='card'><h3>{E(it['title'])}: <b>{it['stake']:.2f}€</b></h3><div class='tiles'>"
-            f"<div class='tile'><div class='k'>Ποντάρισμα</div><div class='v'>{it['stake']:.2f}€</div></div>"
-            f"<div class='tile'><div class='k'>Συνολική απόδοση</div><div class='v'>{it['total_odds']:.2f}</div></div>"
-            f"<div class='tile'><div class='k'>Πιθανότητα</div><div class='v'>{it['p_win'] * 100:.0f}%</div></div>"
-            f"<div class='tile'><div class='k'>Αν κερδίσει</div><div class='v pos'>{it['ret']:.2f}€</div></div>"
-            f"<div class='tile'><div class='k'>Αναμενόμενο ανά 1€</div><div class='v'>{ev:+.0f}%</div></div></div>"
-            "<div class='tbl'><table><thead><tr><th>Ώρα</th><th>Αγώνας</th><th>Επιλογή</th><th>Απόδοση</th><th>Τιμή από</th></tr></thead><tbody>"
-            + "".join(rows) + "</tbody></table></div>"
-            "<p class='muted'>Ψάξε την ίδια επιλογή στο πρακτορείο σου. Αν η απόδοση εκεί είναι αισθητά χαμηλότερη από αυτή που φαίνεται, "
-            "προτίμησε να μην παίξεις.</p></div>")
-    return head + "".join(cards)
+ENRICH = ("why", "form_home", "form_away", "warnings", "move")
+RESIC = {"won": "✅", "lost": "❌", "void": "↩️", "open": "⏳"}
+EXTRA_CSS = """
+.tk{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--grid);align-items:flex-start}.tk:first-of-type{border-top:0}
+.tk .ic{width:26px;font-size:19px;line-height:1.2}.tk .sc{font-variant-numeric:tabular-nums}
+.grid td,.grid th{text-align:center;padding:6px 4px}.grid td.d{text-align:left;white-space:nowrap}
+.ok{color:var(--goodtxt)}.ko{color:var(--bad)}h4{margin:14px 0 6px;font-size:15px}
+"""
 
 
 def _pkey(c):
     return (c.get("match_id"), c.get("market"), c.get("selection"), c.get("line"))
+
+
+def _enrich(legs, cidx, fair=False):
+    """Προσθέτει «Γιατί;», φόρμα, κινήσεις από τις τωρινές επιλογές (όπου υπάρχουν) στα κλειδωμένα σκέλη της βάσης."""
+    out = []
+    for l in legs:
+        d = dict(l)
+        c = (cidx or {}).get(_pkey(l)) or {}
+        for k in ENRICH:
+            if c.get(k) is not None and not d.get(k):
+                d[k] = c[k]
+        d.setdefault("league_name", l.get("league"))
+        if fair and d.get("odds"):                 # σκέλος χωρίς απόδοση: «παίξ' το αν ≥»
+            d["play_if"] = d["odds"]
+            d["fair_odds"] = (1 / d["p"]) if d.get("p") else d["odds"]
+            d["odds"] = None
+        out.append(d)
+    return out
 
 
 def _lot_note(sl) -> str:
@@ -235,53 +230,204 @@ def _lot_note(sl) -> str:
             f"Αναμενόμενο ανά 1€: <b>{ev:+.0f}%</b>. Παίζεται μόνο για πλάκα, με το ποσό του λαχείου.</p>")
 
 
-def _alternatives_html(P, lists, plan, cfg) -> str:
-    """Επιλογές που επίσης θα μπορούσες να παίξεις σήμερα (από όλες τις κατηγορίες), εκτός όσων είναι ήδη στο πλάνο."""
+def _tiles(items) -> str:
+    return "<div class='tiles'>" + "".join(f"<div class='tile'><div class='k'>{k}</div><div class='v {c}'>{v}</div></div>"
+                                           for k, v, c in items) + "</div>"
+
+
+def _plan_html(P, plan, cfg, tz, cidx) -> str:
+    if not plan:
+        return "<div class='card'><p class='muted'>Το πλάνο δεν είναι διαθέσιμο.</p></div>"
+    ws = plan["week"]
+    head = ("<div class='card'><h3>🎯 Τι να παίξεις σήμερα</h3>"
+            + _tiles([("Σύνολο σήμερα", f"{plan['total']:.2f}€", ""), ("Διαθέσιμο εβδομάδας", f"{ws['remaining']:.2f}€", ""),
+                      ("Ζημιά εβδομάδας", f"{ws['settled_loss']:.2f}€ / {ws['loss_limit']:.0f}€", ""),
+                      ("Ανοιχτά", f"{ws['open_stake']:.2f}€", "")])
+            + "".join(f"<p>{E(n)}</p>" for n in plan["notes"])
+            + "<p class='muted'>Παίζεις ΜΟΝΟ δελτία (όχι μονά). Τα ποσά είναι ΑΝΩΤΑΤΑ όρια, όχι υποχρέωση. Το αναμενόμενο μακροπρόθεσμο "
+              "αποτέλεσμα είναι μικρή ζημιά (περίπου −3% του ποσού, βλ. backtest)· παίζεις μόνο ό,τι μπορείς να χάσεις. "
+              "Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></div>")
+    cards = []
+    for it in plan["items"]:
+        legs = _enrich(it["legs"], cidx)
+        ev = it["ev"] * 100
+        srcs = sorted({SRC_NAME.get(l.get("best_source") or "", "") for l in it["legs"]} - {""})
+        cards.append(
+            f"<div class='card'><h3>{E(it['title'])}: <b>{it['stake']:.2f}€</b></h3>"
+            + _tiles([("Ποντάρισμα", f"{it['stake']:.2f}€", ""), ("Συνολική απόδοση", f"{it['total_odds']:.2f}", ""),
+                      ("Πιθανότητα", f"{it['p_win'] * 100:.0f}%", ""), ("Αν κερδίσει", f"{it['ret']:.2f}€", "pos"),
+                      ("Αναμενόμενο ανά 1€", f"{ev:+.0f}%", "")])
+            + P.pick_table(legs)
+            + f"<p class='muted'>Τιμές: {E(', '.join(srcs) or 'αγοράς')}. Πάτα «Γιατί;» σε κάθε επιλογή για τους λόγους. "
+              "Ψάξε την ίδια επιλογή στο πρακτορείο σου· αν η απόδοση εκεί είναι αισθητά χαμηλότερη, προτίμησε να μην παίξεις.</p></div>")
+    return head + "".join(cards)
+
+
+SRC_NAME = {"espn": "ESPN", "espn_max": "ESPN", "fdco": "μέσος όρος πρακτορείων", "fdco_max": "καλύτερη τιμή πρακτορείων",
+            "oddsapi": "μέσος όρος πρακτορείων", "oddsapi_max": "καλύτερη τιμή πρακτορείων"}
+
+
+def _slip_compact(P, title, sl, cidx, fair=False) -> str:
+    legs = _enrich(sl["legs"], cidx, fair=fair)
+    if fair:
+        stats = _tiles([("Ελάχιστη απόδοση", f"{sl['total_odds']:.2f}", ""), ("Πιθανότητα", f"{sl['p_win'] * 100:.0f}%", "")])
+        note = "<p class='muted'>Δεν βρέθηκε απόδοση πρακτορείου: παίζεις μόνο αν σου δίνει τουλάχιστον την «ελάχιστη απόδοση».</p>"
+    else:
+        ev = (sl["p_win"] * sl["total_odds"] - 1) * 100
+        stats = _tiles([("Απόδοση", f"{sl['total_odds']:.2f}", ""), ("Πιθανότητα", f"{sl['p_win'] * 100:.0f}%", ""),
+                        ("Αναμενόμενο ανά 1€", f"{ev:+.0f}%", "")])
+        note = ""
+    return f"<h4>{E(title)}</h4>{stats}{note}{P.pick_table(legs)}"
+
+
+def _alternatives_html(P, lists, plan, cfg, cidx) -> str:
+    """Άλλα δελτία (από όλες τις κατηγορίες) που θα μπορούσες να παίξεις σήμερα αντί/εκτός των προτεινόμενων."""
     if plan and plan.get("week", {}).get("stop"):
         return ""
-    used = {_pkey(l) for it in (plan or {}).get("items", []) for l in it["legs"]}
-    fresh = lambda picks, n: [c for c in picks if _pkey(c) not in used][:n]
+    in_plan = {it.get("list") for it in (plan or {}).get("items", [])}
     unit = cfg["bankroll"]["unit"]
     blocks = []
-    for title, picks, n in (("🛡️ Μονά με υψηλή πιθανότητα", lists["safe"]["picks"], 6),
-                            ("⚽ Over γκολ", lists["overs"]["picks"], 3),
-                            ("🚩 Κόρνερ", lists["corners"]["picks"], 3),
-                            ("🟨 Κάρτες", lists["cards"]["picks"], 3)):
-        rows = fresh(picks, n)
-        if rows:
-            blocks.append(f"<h4>{title}</h4>{P.pick_table(rows)}")
-    cb = lists["combo"]["slip"]
-    if cb and cb["total_odds"] <= 6:
-        blocks.append(f"<h4>🔀 Συνδυαστικό: απόδοση {cb['total_odds']:.2f}, πιθανότητα {cb['p_win'] * 100:.0f}%</h4>"
-                      + P.pick_table(cb["legs"]))
+    for lid, key, title in (("safe", "safe", "🛡️ Safe δελτίο"), ("overs", "overs", "⚽ Over δελτίο"),
+                            ("combo", "combo", "🔀 Συνδυαστικό"), ("fair_corners", "corners", "🚩 Δελτίο κόρνερ"),
+                            ("fair_cards", "cards", "🟨 Δελτίο καρτών"), ("fair_throw_ins", "throw_ins", "↔️ Δελτίο πλάγιων"),
+                            ("fair_players", "players", "👤 Δελτίο παικτών")):
+        if lid in in_plan or (lid == "safe" and "safe" in in_plan):
+            continue
+        sl = lists[key].get("slip")
+        if sl and (sl["total_odds"] <= 8):
+            blocks.append(_slip_compact(P, title, sl, cidx, fair=bool(sl.get("fair"))))
     if not blocks:
         return ""
-    return ("<div class='card'><h3>➕ Επιλογές που επίσης θα μπορούσες να παίξεις σήμερα</h3>"
-            "<p class='muted'>Από όλες τις κατηγορίες, με σειρά πιθανότητας. Δεν προστίθενται στο πλάνο ποσών: αν προτιμάς κάποια "
-            f"<b>αντί</b> για τα προτεινόμενα, κράτα το ίδιο ποσό ({unit:.2f}€) και το όριο των στοιχημάτων της ημέρας. "
-            "Όπου γράφει «παίξ' το αν ≥», δεν βρέθηκε απόδοση: παίζεις μόνο αν το πρακτορείο δίνει τόση ή περισσότερη.</p>"
+    return ("<div class='card'><h3>➕ Δελτία που επίσης θα μπορούσες να παίξεις σήμερα</h3>"
+            "<p class='muted'>Ένα δελτίο ανά κατηγορία. Δεν προστίθενται στο πλάνο ποσών: αν προτιμάς κάποιο "
+            f"<b>αντί</b> για τα προτεινόμενα, κράτα το ίδιο ποσό ({unit:.2f}€) και το όριο των στοιχημάτων της ημέρας.</p>"
             + "".join(blocks) + "</div>")
 
 
-def _lottery_html(P, lists, cfg) -> str:
+def _lottery_html(P, lists, cfg, cidx) -> str:
     """Δελτία μεγάλης απόδοσης (10+/30+/100+): ΜΟΝΟ ως λαχεία, στο τέλος, με ειλικρινή πιθανότητα."""
     parts = []
     for lid, title in (("x10", "🎯 Δελτίο 10+"), ("x30", "🔥 Δελτίο 30+"), ("x100", "🎰 Δελτίο 100+")):
         sl = lists[lid]["slip"]
         if sl:
-            parts.append(f"<h4>{title}: απόδοση {sl['total_odds']:.1f}</h4>{_lot_note(sl)}{P.pick_table(sl['legs'])}")
+            parts.append(f"<h4>{title}: απόδοση {sl['total_odds']:.1f}</h4>{_lot_note(sl)}{P.pick_table(_enrich(sl['legs'], cidx))}")
     if not parts:
         return ""
     return ("<details class='card'><summary><b>🎰 Λαχεία</b> <span class='muted'>· μόνο για πλάκα · πιθανότητα κάτω από ~10%</span></summary>"
-            "<p class='muted'>Δελτία με μεγάλη απόδοση βγαίνουν σπάνια και έχουν τη μεγαλύτερη αναμενόμενη ζημιά. Δεν είναι προτάσεις "
-            f"για παιχνίδι· αν θες ένα, παίζεις το πολύ {cfg['bankroll']['lottery_stake']:.2f}€ τη βδομάδα.</p>"
-            + "".join(parts) + "</details>")
+            "<p class='muted'>Δελτία με μεγάλη απόδοση βγαίνουν σπάνια και έχουν τη μεγαλύτερη αναμενόμενη ζημιά. "
+            f"Αν θες ένα, παίζεις το πολύ {cfg['bankroll']['lottery_stake']:.2f}€ τη βδομάδα.</p>" + "".join(parts) + "</details>")
 
 
-def _top3(P, picks, title="⭐ Οι 3 καλύτερες επιλογές") -> str:
+def _picks_details(P, picks, title="Όλες οι επιλογές της κατηγορίας (για αναφορά)") -> str:
     if not picks:
         return ""
-    return f"<div class='card'><h3>{title}</h3>{P.pick_table(picks[:3])}</div>"
+    return f"<details class='card'><summary>{E(title)}</summary>{P.pick_table(picks)}</details>"
+
+
+def _leg_ticks(legs, scores, fair=False) -> str:
+    rows = []
+    for l in legs:
+        ic = RESIC.get(l.get("result") or "open", "⏳")
+        sc = scores.get(l["match_id"])
+        stxt = f"{sc[0]}-{sc[1]}" if sc and sc[0] is not None else ""
+        price = (f"≥ {l['odds']:.2f}" if fair else f"@ {l['odds']:.2f}") if l.get("odds") else ""
+        rows.append(f"<div class='tk'><span class='ic'>{ic}</span><div><b>{E(l['home'])} – {E(l['away'])}</b> "
+                    f"<span class='sc'>{stxt}</span><div class='muted'>{E(str(l.get('label') or ''))} {price}</div></div></div>")
+    return "".join(rows)
+
+
+def _yesterday_card(st, lid) -> str:
+    """📅 Το δελτίο της προηγούμενης ημέρας αυτής της κατηγορίας, με ✅/❌ ανά αγώνα."""
+    if not st:
+        return ""
+    sl = st["yesterday"].get(lid)
+    name = NAMES_HIST.get(lid, lid)
+    if not sl:
+        return f"<div class='card'><h3>📅 Χθες · {E(name)}</h3><p class='muted'>Δεν υπήρχε δελτίο σε αυτή την κατηγορία.</p></div>"
+    res = [l.get("result") or "open" for l in sl["legs"]]
+    done = sum(1 for r in res if r in ("won", "lost", "void"))
+    verdict = {"won": "<span class='ok'>✅ ΠΕΡΑΣΕ</span>", "lost": "<span class='ko'>❌ ΔΕΝ ΠΕΡΑΣΕ</span>",
+               "void": "↩️ Άκυρο"}.get(sl["status"], f"⏳ Σε εξέλιξη ({done}/{len(res)} κρίθηκαν)")
+    fair = lid.startswith("fair_")
+    price = f"ελάχιστη απόδοση {sl['total_odds']:.2f}" if fair else f"απόδοση {sl['total_odds']:.2f}"
+    return (f"<div class='card'><h3>📅 Χθες ({sl['day']:%d/%m}) · {E(name)}: {verdict}</h3>"
+            f"<p class='muted'>{price} · πιθανότητα που είχαμε εκτιμήσει {sl['model_prob'] * 100:.0f}% · "
+            f"{sum(1 for r in res if r == 'won')}/{len(res)} επιλογές βγήκαν</p>" + _leg_ticks(sl["legs"], st["scores"], fair) + "</div>")
+
+
+NAMES_HIST = {"recommended": "⭐ Προτεινόμενο", "safe": "🛡️ Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
+              "overs": "⚽ Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
+              "fair_throw_ins": "↔️ Πλάγια", "fair_players": "👤 Παίκτες"}
+
+
+def _pct1(x):
+    return "—" if x is None else f"{x * 100:.0f}%"
+
+
+def _history_stats_html(st) -> str:
+    """Στατιστικά ιστορικού: ποια δελτία πέρασαν, ημερολόγιο, ανάλυση επιλογών."""
+    if not st or not st["n_slips"]:
+        return ("<div class='card'><h3>📊 Στατιστικά δελτίων</h3><p class='muted'>Δεν υπάρχει ακόμα ιστορικό. Από αύριο κάθε πρωί "
+                "καταγράφεται ΕΝΑ δελτίο ανά κατηγορία και την επόμενη μέρα φαίνεται αν πέρασε.</p></div>")
+    rows, rows2 = [], []
+    for lid, h in st["summary"].items():
+        if not h["n"]:
+            continue
+        pl = "—" if h["pl"] is None else f"{h['pl']:+.2f}"
+        nm = E(NAMES_HIST[lid])
+        rows.append(f"<tr><td>{nm}</td><td class='n'>{h['n']}</td><td class='n ok'>{h['won']}</td>"
+                    f"<td class='n ko'>{h['lost']}</td><td class='n'>{h['open']}</td><td class='n'><b>{_pct1(h['pass'])}</b></td></tr>")
+        rows2.append(f"<tr><td>{nm}</td><td class='n'>{_pct1(h['avg_p'])}</td><td class='n'>{_pct1(h['leg_hit'])}</td>"
+                     f"<td class='n'>{h['avg_odds']:.2f}</td><td class='n'>{pl}</td></tr>")
+    summ = ("<div class='card'><h3>📊 Πόσα δελτία πέρασαν ανά κατηγορία</h3><p class='muted'>«Πέρασε» = βγήκαν ΟΛΕΣ οι επιλογές.</p>"
+            "<div class='tbl'><table><thead><tr><th>Κατηγορία</th><th>Δελτία</th><th>✅</th><th>❌</th><th>⏳</th><th>Επιτυχία</th></tr></thead>"
+            "<tbody>" + "".join(rows) + "</tbody></table></div>"
+            "<h4>Ακρίβεια και απόδοση</h4><p class='muted'>«Αναμενόταν» = η πιθανότητα που είχαμε εκτιμήσει για τα δελτία που κρίθηκαν· αν η πραγματική "
+            "επιτυχία είναι σταθερά πιο χαμηλή, το bot είναι υπερβολικά αισιόδοξο. Κ/Ζ σε μονάδες του 1 (όχι για κατηγορίες χωρίς απόδοση).</p>"
+            "<div class='tbl'><table><thead><tr><th>Κατηγορία</th><th>Αναμενόταν</th><th>Επιτ. επιλογών</th><th>Μέση απόδ.</th><th>Κ/Ζ</th></tr></thead>"
+            "<tbody>" + "".join(rows2) + "</tbody></table></div></div>")
+    # ημερολόγιο
+    cols = [l for l in st["summary"] if st["summary"][l]["n"]]
+    grid_rows = []
+    for d, cells in st["grid"].items():
+        tds = "".join(f"<td>{RESIC.get(cells.get(l), '·')}</td>" for l in cols)
+        n_ok = sum(1 for c in cells.values() if c == "won")
+        n_ko = sum(1 for c in cells.values() if c == "lost")
+        grid_rows.append(f"<tr><td class='d'>{d:%d/%m}</td>{tds}<td><b class='ok'>{n_ok}</b> / <b class='ko'>{n_ko}</b></td></tr>")
+    grid = ("<div class='card'><h3>🗓️ Ημερολόγιο: ποια δελτία πέρασαν κάθε μέρα</h3><p class='muted'>✅ πέρασε · ❌ δεν πέρασε · ⏳ σε εξέλιξη · "
+            "· δεν υπήρχε. Τελευταία στήλη: πόσα πέρασαν / πόσα όχι εκείνη τη μέρα.</p><div class='tbl'><table class='grid'><thead><tr><th></th>"
+            + "".join(f"<th>{E(NAMES_HIST[l].split(' ')[0])}</th>" for l in cols) + "<th>✅/❌</th></tr></thead><tbody>"
+            + "".join(grid_rows) + "</tbody></table></div></div>") if grid_rows else ""
+
+    def table(title, rows_, keyname, note=""):
+        if not rows_:
+            return ""
+        tr = "".join(f"<tr><td>{E(str(r['key']))}</td><td class='n'>{r['n']}</td><td class='n'>{r['won']}</td>"
+                     f"<td class='n'><b>{r['hit'] * 100:.0f}%</b></td><td class='n'>{_pct1(r['p'])}</td></tr>" for r in rows_)
+        return (f"<h4>{title}</h4>{note}<div class='tbl'><table><thead><tr><th>{keyname}</th><th>Επιλογές</th><th>Βγήκαν</th>"
+                f"<th>Επιτυχία</th><th>Αναμενόταν</th></tr></thead><tbody>{tr}</tbody></table></div>")
+
+    lg = st["legs"]
+    legs = ""
+    if lg["n"]:
+        legs = ("<div class='card'><h3>🔬 Ανάλυση επιλογών (για να βελτιώνουμε το bot)</h3>"
+                f"<p class='muted'>{lg['n']} διακριτές επιλογές που έχουν κριθεί (η ίδια επιλογή σε πολλά δελτία μετράει μία φορά). "
+                "Με λίγες επιλογές τα ποσοστά είναι ασταθή· χρειάζονται δεκάδες για συμπέρασμα.</p>"
+                + table("Ανά πιθανότητα (βαθμονόμηση)", lg["by_p"], "Πιθανότητα")
+                + table("Ανά άθλημα", lg["by_sport"], "Άθλημα") + table("Ανά αγορά", lg["by_market"], "Αγορά")
+                + table("Ανά διοργάνωση", lg["by_league"], "Διοργάνωση", "<p class='muted'>Μόνο διοργανώσεις με ≥5 επιλογές.</p>") + "</div>")
+    # αναλυτικά τελευταίων ημερών
+    byday = {}
+    for sl in st["recent"]:
+        byday.setdefault(sl["created_at"][:10], []).append(sl)
+    det = []
+    for day, ss in list(byday.items())[:7]:
+        inner = "".join(f"<h4>{E(NAMES_HIST[s['list_name']])}: {RESIC.get(s['status'], '⏳')}</h4>"
+                        f"{_leg_ticks(s['legs'], st['scores'], s['list_name'].startswith('fair_'))}" for s in ss)
+        det.append(f"<details><summary><b>{day[8:10]}/{day[5:7]}</b> · "
+                   f"✅ {sum(1 for s in ss if s['status'] == 'won')} · ❌ {sum(1 for s in ss if s['status'] == 'lost')}</summary>{inner}</details>")
+    detail = ("<div class='card'><h3>📅 Αναλυτικά οι τελευταίες μέρες (✅/❌ σε κάθε αγώνα)</h3>" + "".join(det) + "</div>") if det else ""
+    return summ + grid + legs + detail
 
 
 def _goals_card(g) -> str:
@@ -327,7 +473,7 @@ def _clv_card(clv) -> str:
             f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None) -> str:
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
     P = Page(cfg)
     tz = cfg["timezone"]
     loc = now.astimezone(ZoneInfo(tz))
@@ -354,17 +500,18 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <li>Ποτέ διπλασιασμός για να «πάρουμε πίσω» τη χθεσινή μέρα</li></ul></div>
 {P.slip_block(rec['slip'], '⭐ Το δελτίο που προτείνω να παίξεις', br['unit'],
               "<p class='muted'>2–3 επιλογές, μόνο όσες περνούν όλους τους κανόνες (φόρμα, απουσίες, κινήσεις αποδόσεων, το πολύ 1 μπάσκετ).</p>")}
-<div class="card"><h3>⭐ Μονό της ημέρας ({br['unit']:.2f}€)</h3>{P.pick_table([single] if single else [])}</div>"""
+"""
 
-    sec["safe"] = ("<div class='card'><h3>🛡️ Οι πιο σίγουρες επιλογές της ημέρας (μονά)</h3>"
-                   "<p class='muted'>Ταξινομημένες κατά πιθανότητα. Χαμηλές αποδόσεις – καλές για «δέσιμο».</p>"
-                   + P.pick_table(lists["safe"]["picks"]) + "</div>")
+    sl_safe = lists["safe"].get("slip")
+    sec["safe"] = (P.slip_block(sl_safe, "🛡️ Safe δελτίο", br["unit"],
+                                "<p class='muted'>Οι πιο πιθανές επιλογές της ημέρας σε ΕΝΑ δελτίο (χαμηλές αποδόσεις, υψηλή πιθανότητα ανά επιλογή).</p>")
+                   + _picks_details(P, lists["safe"]["picks"], "Όλες οι σίγουρες επιλογές (αναφορά)"))
     sec["x10"] = P.slip_block(lists["x10"]["slip"], f"🎯 Δελτίο {L['x10']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x10"]["slip"]))
     sec["x30"] = P.slip_block(lists["x30"]["slip"], f"🔥 Δελτίο {L['x30']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x30"]["slip"]))
     sec["x100"] = P.slip_block(lists["x100"]["slip"], f"🎰 Λαχείο {L['x100']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x100"]["slip"]))
     ov = lists["overs"]
-    sec["overs"] = (_top3(P, ov["picks"]) + P.slip_block(ov["slip"], "⚽ Δελτίο μόνο με γκολ", br["unit"])
-                    + "<div class='card'><h3>Όλες οι επιλογές γκολ</h3>" + P.pick_table(ov["picks"]) + "</div>")
+    sec["overs"] = (P.slip_block(ov["slip"], "⚽ Over δελτίο (γκολ)", br["unit"])
+                    + _picks_details(P, ov["picks"], "Όλες οι επιλογές γκολ (αναφορά)"))
     for lid, title, what in (("corners", "🚩 Κόρνερ", "κόρνερ"), ("cards", "🟨 Κάρτες", "κάρτες"),
                              ("throw_ins", "↔️ Πλάγια", "πλάγια"), ("players", "👤 Παίκτες", "παίκτες")):
         x = lists[lid]
@@ -374,8 +521,18 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
             note += "<p class='muted'>⚠️ Παίκτες: παίζεις ΜΟΝΟ αφού βγει η ενδεκάδα (~1 ώρα πριν).</p>"
         if lid == "throw_ins":
             note += "<p class='muted'>Τα πλάγια έρχονται μόνο από το Sofascore. Αν σήμερα δεν απάντησε, η λίστα μένει άδεια (δες ⚙️ Πηγές).</p>"
-        body = _top3(P, x["picks"]) + (P.slip_block(x["slip"], f"{title}: δελτίο", br["unit"]) if x.get("slip") else "") + \
-            f"<div class='card'><h3>{title}: επιλογές</h3>{note}{P.pick_table(x['picks'], f'Δεν υπάρχουν αρκετά δεδομένα για {what} στα σημερινά ματς.')}</div>"
+        sl = x.get("slip")
+        if sl and sl.get("fair"):
+            sl = dict(sl, legs=_enrich(sl["legs"], cidx, fair=True))
+            slip_html = P.slip_block(sl, f"{title}: δελτίο", None,
+                                     "<p class='muted'>Δεν βρέθηκε απόδοση πρακτορείου: η «Συνολική απόδοση» είναι η ΕΛΑΧΙΣΤΗ για να αξίζει. "
+                                     "Παίζεις μόνο αν το πρακτορείο σου δίνει τουλάχιστον τόση.</p>")
+        elif sl:
+            slip_html = P.slip_block(sl, f"{title}: δελτίο", br["unit"])
+        else:
+            slip_html = ("<div class='card'><h3>" + E(title) + ": δελτίο</h3><p class='muted'>Σήμερα δεν υπάρχουν αρκετές "
+                         "επιλογές για δελτίο σε αυτή την κατηγορία.</p></div>")
+        body = slip_html + f"<div class='card'><h3>{title}: οδηγίες</h3>{note}</div>" + _picks_details(P, x["picks"], f"Όλες οι επιλογές {what} (αναφορά)")
         sec[lid] = body
     sec["combo"] = P.slip_block(lists["combo"]["slip"], "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"])
 
@@ -438,8 +595,12 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         hist_chart = "<div class='card'><h3>Σωρευτικό κέρδος/ζημιά ανά λίστα (μονάδες)</h3>" + P.chart(
             {"type": "line", "data": {"labels": labels, "datasets": ds},
              "options": {"scales": {"y": {"title": {"display": True, "text": "μονάδες"}}}}}) + "</div>"
-    sec["today"] = _plan_html(plan, cfg, tz) + _alternatives_html(P, lists, plan, cfg) + _lottery_html(P, lists, cfg)
-    sec["history"] = (_goals_card(goals) + "<div class='card'><h3>📊 Πώς πάει κάθε λίστα</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
+    sec["today"] = _plan_html(P, plan, cfg, tz, cidx) + _alternatives_html(P, lists, plan, cfg, cidx) + _lottery_html(P, lists, cfg, cidx)
+    from .stats import TAB_LIST
+    for tid, lname in TAB_LIST.items():
+        if tid in sec:
+            sec[tid] = _yesterday_card(st, lname) + sec[tid]
+    sec["history"] = (_goals_card(goals) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
                       "με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. "
                       "«Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p>"
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"
@@ -468,7 +629,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     js = json.dumps([[cid, c] for cid, c in P.charts], ensure_ascii=False)
     return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>BetBot Δελτίο</title>
-<style>{CSS}</style></head><body><main>
+<style>{CSS}{EXTRA_CSS}</style></head><body><main>
 <header><h1>BetBot · {GR_DAYS[loc.weekday()]} {loc:%d/%m/%Y}</h1>
 <p class="sub">Ενημέρωση {loc:%H:%M} · {n_matches} αγώνες · {n_with} επιλογές με απόδοση · {n_fair} με «δίκαιη απόδοση»</p></header>
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}

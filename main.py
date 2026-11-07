@@ -29,7 +29,7 @@ from betbot.models import BasketballModel, CountModel, FootballModel, PlayerMode
 from betbot.util import iso, log
 
 SLIM_KEYS = ("match_id", "league", "league_name", "sport", "kickoff", "home", "away", "market",
-             "selection", "line", "label", "odds", "p_model", "p_market", "p", "edge", "family", "best_source")
+             "selection", "line", "label", "odds", "p_model", "p_market", "p", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
 
 
 def load_cfg(path="config.yaml"):
@@ -79,13 +79,16 @@ def build_models(db, cfg, ctx, now, notes):
 def save_lists(db, cfg, now, lists):
     """Καταγράφει κάθε λίστα «στα χαρτιά» (1 μονάδα) για το ιστορικό ανά λίστα."""
     from zoneinfo import ZoneInfo
-    day = now.astimezone(ZoneInfo(cfg["timezone"])).strftime("%Y-%m-%d")    # ώρα Ελλάδας (όχι UTC): η «μέρα» είναι ίδια παντού
+    tz_ = ZoneInfo(cfg["timezone"])
+    day = now.astimezone(tz_).strftime("%Y-%m-%d")    # ώρα Ελλάδας (όχι UTC): η «μέρα» είναι ίδια παντού
+    # Το πρωινό δελτίο κλειδώνει όλη μέρα· ό,τι φτιάχτηκε πριν τις 06:00 (νυχτερινή εκτέλεση) θεωρείται ξεπερασμένο.
+    fresh_after = iso(now.astimezone(tz_).replace(hour=6, minute=0, second=0, microsecond=0))
     stake = 1.0
     created = iso(now)
 
     def put(lid, legs_full, total, p, odds_override=None):
         legs = [slim(l, (odds_override or {}).get(id(l))) for l in legs_full]
-        db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True)
+        db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True, fresh_after=fresh_after)
 
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
@@ -94,18 +97,16 @@ def save_lists(db, cfg, now, lists):
     rec = lists["recommended"]
     if rec["slip"]:
         put("recommended", rec["slip"]["legs"], rec["slip"]["total_odds"], rec["slip"]["p_win"])
-    if rec["single"]:
-        put("single", [rec["single"]], rec["single"]["odds"], rec["single"]["p"])
-    if lists["overs"]["slip"]:
-        sl = lists["overs"]["slip"]
-        put("overs", sl["legs"], sl["total_odds"], sl["p_win"])
-    for i, c in enumerate(lists["safe"]["picks"][:5]):
-        db.save_slip(f"{day}#safe1-{i + 1}", created, "safe1", c["odds"], c["p"], stake, [slim(c)], keep_first=True)
-    # επιλογές χωρίς απόδοση: καταγραφή με την ελάχιστη αποδεκτή απόδοση («παίξ' το αν ≥»)
+    # Ένα δελτίο ανά κατηγορία (ο χρήστης παίζει ΜΟΝΟ δελτία): safe, over, κόρνερ, κάρτες, πλάγια, παίκτες
+    for lid in ("safe", "overs"):
+        sl = lists[lid].get("slip")
+        if sl:
+            put(lid, sl["legs"], sl["total_odds"], sl["p_win"])
+    # Κατηγορίες χωρίς απόδοση πρακτορείου: η «απόδοση» του δελτίου είναι η ελάχιστη (δίκαιη) απόδοση «παίξ' το αν ≥»
     for fam in ("corners", "cards", "throw_ins", "players"):
-        for i, c in enumerate([c for c in lists[fam]["picks"] if c.get("play_if")][:3]):
-            db.save_slip(f"{day}#fair_{fam}-{i + 1}", created, f"fair_{fam}", c["play_if"], c["p"], stake,
-                         [slim(c, c["play_if"])], keep_first=True)
+        sl = lists[fam].get("slip")
+        if sl:
+            put(f"fair_{fam}" if sl.get("fair") else fam, sl["legs"], sl["total_odds"], sl["p_win"])
 
 
 def run_live(cfg, loop=False):
@@ -219,7 +220,14 @@ def main(argv=None):
     except Exception as e:     # το πλάνο δεν πρέπει να ρίχνει τη σελίδα
         log.warning("Πλάνο: %s", e)
         plan = goals = None
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals)
+    try:
+        from betbot import stats as stats_mod
+        st = stats_mod.build(db, cfg, now)
+    except Exception as e:     # τα στατιστικά δεν πρέπει να ρίχνουν τη σελίδα
+        log.warning("Στατιστικά: %s", e)
+        st = None
+    cidx = {(c["match_id"], c["market"], c["selection"], c["line"]): c for c in cands["with_odds"] + cands["fair"]}
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
 

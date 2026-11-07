@@ -17,7 +17,8 @@ from zoneinfo import ZoneInfo
 
 from .util import parse_iso
 
-PLAN_LISTS = ("recommended", "single", "x30")
+PLAN_LISTS = ("recommended", "single", "safe", "x30")     # για τη λογιστική της εβδομάδας («single» = παλιά δελτία)
+TODAY_LISTS = ("recommended", "safe")                      # τα δελτία (όχι μονά) που προτείνονται καθημερινά
 SRC = {"espn": "ESPN", "espn_max": "ESPN", "fdco": "μέσος όρος", "fdco_max": "καλύτερη τιμή",
        "oddsapi": "μέσος όρος", "oddsapi_max": "καλύτερη τιμή"}
 
@@ -87,7 +88,7 @@ def build_plan(db, cfg, now) -> dict:
     reserve = 0.0 if ws["lottery_played"] else lot       # κρατάμε το ποσό του λαχείου
     avail = max(0.0, ws["remaining"] - reserve)
     n_max = int(br["max_bets_per_day"])
-    regular = [todays[k] for k in ("recommended", "single") if k in todays][:n_max]
+    regular = [todays[k] for k in TODAY_LISTS if k in todays][:n_max]
     for sl in regular:
         stake = min(unit, avail)
         if stake < 1.0:
@@ -107,8 +108,8 @@ def build_plan(db, cfg, now) -> dict:
 
 
 def _item(sl, stake, tz, lottery=False):
-    return {"title": "🔥 Λαχείο (για πλάκα)" if lottery else ("⭐ Δελτίο της ημέρας" if sl["list_name"] == "recommended" else "⭐ Μονό της ημέρας"),
-            "stake": stake, "total_odds": sl["total_odds"], "p_win": sl["model_prob"],
+    return {"title": "🔥 Λαχείο (για πλάκα)" if lottery else ("⭐ Δελτίο της ημέρας" if sl["list_name"] == "recommended" else "🛡️ Safe δελτίο"),
+            "list": sl["list_name"], "stake": stake, "total_odds": sl["total_odds"], "p_win": sl["model_prob"],
             "ret": stake * sl["total_odds"], "ev": sl["model_prob"] * sl["total_odds"] - 1,
             "legs": sl["legs"], "lottery": lottery}
 

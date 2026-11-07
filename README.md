@@ -1,5 +1,16 @@
 # BetBot – Οδηγός χρήσης και συντήρησης
 
+## 🔗 Τα links μου
+
+| | |
+|---|---|
+| 🎯 **Η σελίδα με τα δελτία της ημέρας** | **https://kostmarga.github.io/Betbot/** |
+| 🔴 Live (πορεία των δελτίων, ανανέωση κάθε ~10 λεπτά) | https://kostmarga.github.io/Betbot/live.html |
+| 📊 Backtest (πώς πήγαιναν τα μοντέλα στο παρελθόν) | https://kostmarga.github.io/Betbot/backtest.md |
+| ▶️ Χειροκίνητο τρέξιμο του bot (κουμπί «Run workflow») | https://github.com/kostmarga/Betbot/actions/workflows/daily.yml |
+
+Η σελίδα ανανεώνεται αυτόματα κάθε πρωί (~07:40) και απόγευμα (~17:20) ώρα Ελλάδας. Αν θες νεότερη τώρα: άνοιξε το τελευταίο link → **Run workflow**.
+
 Προσωπικό bot που **κάθε μέρα** μαζεύει δεδομένα για ποδόσφαιρο και μπάσκετ, υπολογίζει πιθανότητες
 με στατιστικά μοντέλα και βγάζει **μία σελίδα με καρτέλες** (dashboards):
 

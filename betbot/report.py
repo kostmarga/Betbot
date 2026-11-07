@@ -475,6 +475,7 @@ def _clv_card(clv) -> str:
 
 def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
     P = Page(cfg)
+    hist_by_list = {k: v for k, v in hist_by_list.items() if k not in ("single", "safe1")}   # παλιά μονά: δεν παίζονται πια
     tz = cfg["timezone"]
     loc = now.astimezone(ZoneInfo(tz))
     L = cfg["lists"]

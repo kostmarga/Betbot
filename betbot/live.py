@@ -3,7 +3,7 @@
 Πώς δουλεύει:
   - Το bot (σε κάθε εκτέλεση) γράφει στη σελίδα τα δελτία της ημέρας (και όσων ακόμα παίζονται) από τη βάση, μαζί με το
     αποτέλεσμα που ήδη ξέρει (✅/❌ από την τελευταία εκτέλεση).
-  - Ο BROWSER σου ρωτά το ESPN (δημόσιο API, επιτρέπει σελίδες) κάθε ~30 δευτερόλεπτα για τους αγώνες που παίζονται τώρα
+  - Ο BROWSER σου ρωτά το ESPN (δημόσιο API, επιτρέπει σελίδες) ΜΟΝΟ για αγώνες που παίζονται τώρα, κάθε 2 λεπτά
     και ενημερώνει τα ✅/❌/🟢 χωρίς να περιμένει το GitHub (που καθυστερεί τα προγραμματισμένα τρεξίματα).
   - Σε κάθε δελτίο: πόσες επιλογές κέρδισαν, πόσες έχασαν, πόσες παίζονται, πόσες δεν ξεκίνησαν. Στην κορυφή: σύνολο για όλα.
 
@@ -61,7 +61,7 @@ def add_live_states(data: list[dict], now, fetch=fetch_state) -> int:
             if not (l["eid"] and l["lg"] and SPORT.get(l["sport"]) and l.get("ko")):
                 continue
             ko = parse_iso(l["ko"])
-            if not (ko - timedelta(minutes=20) <= now <= ko + timedelta(hours=4)):
+            if not (ko <= now <= ko + timedelta(hours=4)):
                 continue
             k = (l["sport"], l["lg"], l["eid"])
             if k not in cache:
@@ -256,22 +256,32 @@ function render() {
   days.forEach(d => { out += '<h2>' + (d === today ? 'Σήμερα' : 'Προηγούμενη μέρα (ακόμα σε εξέλιξη)') + ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</h2>' + byDay[d].join(''); });
   app.innerHTML = out;
   const stEl = document.getElementById('status');
-  stEl.textContent = browserOk ? ('🔴 Live από ESPN · τελευταία ενημέρωση ' + lastOk.toLocaleTimeString('el-GR') + (lastErr ? ' · ⚠️ ' + lastErr : '')) :
+  const playing = Object.keys(neededEvents()).length, nk = nextKickoff();
+  const info = playing ? (playing + ' αγώνες παίζονται· ενημερώνεται κάθε 2 λεπτά') : (nk ? ('Δεν παίζεται κάτι τώρα· επόμενη έναρξη ' + hhmm(new Date(nk).toISOString())) : 'Δεν παίζεται κάτι τώρα');
+  stEl.textContent = browserOk ? ('🔴 ' + info + (lastOk ? ' · τελευταία ενημέρωση ' + lastOk.toLocaleTimeString('el-GR') : '') + (lastErr ? ' · ⚠️ ' + lastErr : '')) :
     (lastErr ? ('⚠️ Ο browser δεν μπόρεσε να ρωτήσει το ESPN (' + lastErr + ') — δείχνω ό,τι ήξερε το bot στην εκτέλεση των ' + genTxt + '. Ανανέωσε σε λίγο.') : 'Φόρτωση…');
 }
 
+// Ποιοι αγώνες χρειάζονται ερώτηση: ΜΟΝΟ όσοι έχουν ήδη ξεκινήσει και δεν έχουν τελειώσει (όχι πριν την έναρξη, όχι μετά το τέλος).
 function neededEvents() {
   const now = Date.now(), need = {};
   DATA.forEach(s => s.legs.forEach(l => {
-    if (!trackable(l)) return;
-    const k = key(l), st = cache[k], ko = l.ko ? Date.parse(l.ko) : null;
+    if (!trackable(l) || !l.ko) return;
+    const k = key(l), st = cache[k], ko = Date.parse(l.ko);
     if (st && st.state === 'post') return;                           // τελείωσε: δεν ξαναρωτάμε
-    if (!st && (l.res === 'won' || l.res === 'lost' || l.res === 'void') && ['CORNERS','CARDS','CORNERS_MORE'].indexOf(l.market) < 0) return;
-    if (ko && now < ko - 20 * 60 * 1000) return;                     // δεν ξεκίνησε ακόμα
-    if (ko && now > ko + 4 * 3600 * 1000 && st) return;
+    if (now < ko) return;                                            // δεν ξεκίνησε ακόμα: δεν ρωτάμε
+    if (now > ko + 4 * 3600 * 1000 && st) return;                    // πολύ παλιός αγώνας
+    if (!st && (l.res === 'won' || l.res === 'lost' || l.res === 'void') && ['CORNERS','CARDS','CORNERS_MORE'].indexOf(l.market) < 0) return;  // ήδη κριμένος στη βάση
     need[k] = l;
   }));
   return need;
+}
+
+// Πότε ο επόμενος αγώνας που δεν έχει ξεκινήσει (για να ξυπνήσει η σελίδα ακριβώς τότε)
+function nextKickoff() {
+  const now = Date.now(); let best = null;
+  DATA.forEach(s => s.legs.forEach(l => { if (trackable(l) && l.ko) { const ko = Date.parse(l.ko), st = cache[key(l)]; if (ko > now && !(st && st.state === 'post') && (best === null || ko < best)) best = ko; } }));
+  return best;
 }
 
 async function tick() {
@@ -290,9 +300,16 @@ async function tick() {
   render();
   schedule();
 }
+let timer = null;
 function schedule() {
-  const anyLive = Object.keys(cache).some(k => cache[k].state === 'in');
-  setTimeout(tick, anyLive ? 30000 : 120000);
+  clearTimeout(timer);
+  let delay;
+  if (Object.keys(neededEvents()).length) delay = 120000;            // παίζεται αγώνας: κάθε 2 λεπτά
+  else {
+    const nk = nextKickoff();
+    delay = nk ? Math.min(Math.max(nk - Date.now() + 5000, 5000), 600000) : 600000;   // ξύπνημα στην επόμενη έναρξη (έλεγχος το πολύ κάθε 10')
+  }
+  timer = setTimeout(tick, delay);
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { tick(); } });
 render(); tick();
@@ -322,7 +339,7 @@ def render(cfg, now, data: list[dict]) -> str:
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των {loc:%H:%M} ({loc:%d/%m}). Πηγή αποτελεσμάτων: ESPN (ανανέωση κάθε ~30 δευτερόλεπτα όσο παίζεται αγώνας).
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των {loc:%H:%M} ({loc:%d/%m}). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
 Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
 </main>
 <script id="data" type="application/json" data-gen="{iso(now)}">{payload}</script>

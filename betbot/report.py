@@ -20,7 +20,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from .util import parse_iso
+from .live import CORE_JS
+from .util import iso, parse_iso
 
 BLUE, ORANGE, MUTED = "#2a78d6", "#eb6834", "#898781"
 SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"]
@@ -91,8 +92,19 @@ class Page:
         if c.get("form_home") or c.get("form_away"):
             form = f"<p class='muted'>{E(c['home'])}: {_badges(c.get('form_home', []))} &nbsp; " \
                    f"{E(c['away'])}: {_badges(c.get('form_away', []))}</p>"
-        return f"""<tr>
-<td class="t">{_when(c['kickoff'], self.tz)}</td>
+        tk, scr, attr = "", "", ""
+        if "res" in c:        # σκέλος καταγεγραμμένου δελτίου: ✅/❌/⏳ + σκορ (ενημερώνεται και ζωντανά από τον browser)
+            ic = {"won": "✅", "lost": "❌", "void": "↩️"}.get(c.get("res"), "⏳")
+            sc = c.get("sc")
+            tk = f"<span class='tk'>{ic}</span> "
+            scr = f"<div class='scr'>{(str(sc[0]) + '-' + str(sc[1]) + ' ΤΕΛΟΣ') if sc else ''}</div>"
+            if c.get("eid") and c.get("lg"):
+                leg = {k: c.get(k) for k in ("eid", "lg", "sport", "market", "ko", "res", "sc", "fair")}
+                leg["sel"] = c.get("selection")
+                leg["line"] = c.get("line")
+                attr = f' data-leg="{E(json.dumps(leg, ensure_ascii=False))}"'
+        return f"""<tr{attr}>
+<td class="t">{tk}{_when(c['kickoff'], self.tz)}{scr}</td>
 <td><b>{E(c['home'])}</b> – <b>{E(c['away'])}</b><br><span class="muted">{E(c['league_name'])}</span></td>
 <td>{E(c['label'])} {mv_cell}{warn}
 <details><summary>Γιατί;</summary><ul class="why">{why}</ul>{form}</details></td>
@@ -133,7 +145,7 @@ class Page:
 <div class="tile"><div class="k">Πιθανότητα (εκτίμηση)</div><div class="v">{sl['p_win'] * 100:.1f}%</div></div>
 <div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>
 {ev_tile}{stake_txt}{ret}
-</div>{self.pick_table(sl['legs'])}
+</div>{_cnt_html(sl['legs'])}{self.pick_table(sl['legs'])}
 <details><summary>Διάγραμμα: μοντέλο vs αγορά ανά επιλογή</summary>{ch}</details></div>"""
 
 
@@ -195,6 +207,56 @@ EXTRA_CSS = """
 .tk .ic{width:26px;font-size:19px;line-height:1.2}.tk .sc{font-variant-numeric:tabular-nums}
 .grid td,.grid th{text-align:center;padding:6px 4px}.grid td.d{text-align:left;white-space:nowrap}
 .ok{color:var(--goodtxt)}.ko{color:var(--bad)}h4{margin:14px 0 6px;font-size:15px}
+.tk{font-size:18px}.scr{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.cnt{font-size:14px;margin:6px 0}
+.banner{background:#fff1c2;color:#5c4400;border:1px solid #e6c34d;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px}
+.banner a{color:inherit;font-weight:700}
+@media(prefers-color-scheme:dark){.banner{background:#3a3000;color:#ffe9a0;border-color:#7a6500}}
+"""
+
+INDEX_JS = r"""
+(function(){
+const B = window.BetbotLive;
+// 1) ✅/❌ + σκορ σε κάθε αγώνα των δελτίων (ζωντανά, μόνο όσο παίζεται αγώνας)
+const rows = [];
+document.querySelectorAll('tr[data-leg]').forEach(tr => { try { rows.push({tr, leg: JSON.parse(tr.dataset.leg)}); } catch (e) {} });
+function update() {
+  rows.forEach(r => {
+    const l = r.leg, st = B.trackable(l) ? B.cache[B.key(l)] : null, c = B.judge(l, st)[0];
+    const tk = r.tr.querySelector('.tk'); if (tk) tk.textContent = B.IC[c];
+    const scr = r.tr.querySelector('.scr');
+    if (scr) { let t = ''; if (st && st.state !== 'pre') t = st.hs + '-' + st.as + (st.state === 'in' ? ' ' + st.clock : ' ΤΕΛΟΣ'); else if (l.sc) t = l.sc[0] + '-' + l.sc[1] + ' ΤΕΛΟΣ'; scr.textContent = t; }
+  });
+  document.querySelectorAll('.slipcnt').forEach(el => {
+    const card = el.closest('.card'); if (!card) return;
+    const ic = Array.from(card.querySelectorAll('.tk')).map(x => x.textContent);
+    const w = ic.filter(x => x === '✅').length, k = ic.filter(x => x === '❌').length, p = ic.filter(x => x === '🟢' || x === '🔴').length;
+    el.innerHTML = '✅ <b>' + w + '</b> · ❌ <b>' + k + '</b> · 🟢 <b>' + p + '</b> σε εξέλιξη · ⏳ <b>' + (ic.length - w - k - p) + '</b>';
+  });
+}
+const legs = rows.map(r => r.leg);
+if (legs.length) B.start(legs, update);
+
+// 2) Προειδοποίηση όταν η σελίδα είναι ξεπερασμένη (το GitHub καθυστερεί τα προγραμματισμένα τρεξίματα)
+const GEN = new Date(document.querySelector('meta[name=generated]').content), NOW = new Date();
+const day = d => d.toLocaleDateString('el-GR', {timeZone: 'Europe/Athens'});
+const ageH = (NOW - GEN) / 3600000;
+const ban = document.getElementById('stale');
+if (ban && (day(GEN) !== day(NOW) || ageH > 10)) {
+  const when = GEN.toLocaleString('el-GR', {timeZone: 'Europe/Athens', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false});
+  ban.hidden = false;
+  ban.innerHTML = '⚠️ <b>Η σελίδα είναι ξεπερασμένη</b>: ενημερώθηκε ' + when + ' (πριν ' + Math.round(ageH) + ' ώρες). Το GitHub καθυστερεί τα προγραμματισμένα τρεξίματα. ' +
+    '<a href="https://github.com/kostmarga/Betbot/actions/workflows/daily.yml">▶️ Πάτα εδώ → Run workflow για να τρέξει τώρα</a>';
+}
+// 3) Κάθε 5' ελέγχουμε αν υπάρχει νεότερη έκδοση και ΜΟΝΟ τότε ανανεώνουμε
+async function checkNew() {
+  try {
+    const t = await (await fetch(location.pathname + '?t=' + Date.now())).text();
+    const m = t.match(/<meta name="generated" content="([^"]+)"/);
+    if (m && m[1] !== document.querySelector('meta[name=generated]').content) location.reload();
+  } catch (e) { /* χωρίς δίκτυο: αγνοείται */ }
+}
+setInterval(checkNew, 5 * 60 * 1000);
+})();
 """
 
 
@@ -202,11 +264,31 @@ def _pkey(c):
     return (c.get("match_id"), c.get("market"), c.get("selection"), c.get("line"))
 
 
-def _enrich(legs, cidx, fair=False):
-    """Προσθέτει «Γιατί;», φόρμα, κινήσεις από τις τωρινές επιλογές (όπου υπάρχουν) στα κλειδωμένα σκέλη της βάσης."""
+def _cnt_html(legs) -> str:
+    """Μέτρηση ✅/❌/⏳ ενός δελτίου (όταν τα σκέλη έχουν αποτέλεσμα). Ενημερώνεται και ζωντανά από τον browser."""
+    if not any("res" in l for l in legs):
+        return ""
+    w = sum(1 for l in legs if l.get("res") == "won")
+    k = sum(1 for l in legs if l.get("res") == "lost")
+    n = len(legs) - w - k
+    return f"<div class='cnt slipcnt'>✅ <b>{w}</b> · ❌ <b>{k}</b> · 🟢 <b>0</b> σε εξέλιξη · ⏳ <b>{n}</b></div>"
+
+
+def _enrich(legs, cidx, fair=False, tctx=None):
+    """Προσθέτει «Γιατί;», φόρμα, κινήσεις από τις τωρινές επιλογές (όπου υπάρχουν) στα κλειδωμένα σκέλη της βάσης.
+    Με tctx = {"scores":…, "lgmap":…}: προσθέτει και τα πεδία παρακολούθησης (αποτέλεσμα, σκορ, id αγώνα ESPN) για ✅/❌."""
     out = []
     for l in legs:
         d = dict(l)
+        if tctx is not None:
+            mid = l.get("match_id")
+            sc = (tctx["scores"] or {}).get(mid)
+            d["res"] = l.get("result")
+            d["sc"] = [sc[0], sc[1]] if sc and sc[0] is not None else None
+            d["eid"] = mid[5:] if isinstance(mid, str) and mid.startswith("espn:") else None
+            d["lg"] = tctx["lgmap"].get(l.get("league"))
+            d["ko"] = l.get("kickoff")
+            d["fair"] = fair
         c = (cidx or {}).get(_pkey(l)) or {}
         for k in ENRICH:
             if c.get(k) is not None and not d.get(k):
@@ -235,7 +317,7 @@ def _tiles(items) -> str:
                                            for k, v, c in items) + "</div>"
 
 
-def _plan_html(P, plan, cfg, tz, cidx) -> str:
+def _plan_html(P, plan, cfg, tz, cidx, tctx=None) -> str:
     if not plan:
         return "<div class='card'><p class='muted'>Το πλάνο δεν είναι διαθέσιμο.</p></div>"
     ws = plan["week"]
@@ -249,7 +331,7 @@ def _plan_html(P, plan, cfg, tz, cidx) -> str:
               "Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></div>")
     cards = []
     for it in plan["items"]:
-        legs = _enrich(it["legs"], cidx)
+        legs = _enrich(it["legs"], cidx, tctx=tctx)
         ev = it["ev"] * 100
         srcs = sorted({SRC_NAME.get(l.get("best_source") or "", "") for l in it["legs"]} - {""})
         cards.append(
@@ -257,7 +339,7 @@ def _plan_html(P, plan, cfg, tz, cidx) -> str:
             + _tiles([("Ποντάρισμα", f"{it['stake']:.2f}€", ""), ("Συνολική απόδοση", f"{it['total_odds']:.2f}", ""),
                       ("Πιθανότητα", f"{it['p_win'] * 100:.0f}%", ""), ("Αν κερδίσει", f"{it['ret']:.2f}€", "pos"),
                       ("Αναμενόμενο ανά 1€", f"{ev:+.0f}%", "")])
-            + P.pick_table(legs)
+            + _cnt_html(legs) + P.pick_table(legs)
             + f"<p class='muted'>Τιμές: {E(', '.join(srcs) or 'αγοράς')}. Πάτα «Γιατί;» σε κάθε επιλογή για τους λόγους. "
               "Ψάξε την ίδια επιλογή στο πρακτορείο σου· αν η απόδοση εκεί είναι αισθητά χαμηλότερη, προτίμησε να μην παίξεις.</p></div>")
     return head + "".join(cards)
@@ -267,8 +349,8 @@ SRC_NAME = {"espn": "ESPN", "espn_max": "ESPN", "fdco": "μέσος όρος π�
             "oddsapi": "μέσος όρος πρακτορείων", "oddsapi_max": "καλύτερη τιμή πρακτορείων"}
 
 
-def _slip_compact(P, title, sl, cidx, fair=False) -> str:
-    legs = _enrich(sl["legs"], cidx, fair=fair)
+def _slip_compact(P, title, sl, cidx, fair=False, tctx=None) -> str:
+    legs = _enrich(sl["legs"], cidx, fair=fair, tctx=tctx)
     if fair:
         stats = _tiles([("Ελάχιστη απόδοση", f"{sl['total_odds']:.2f}", ""), ("Πιθανότητα", f"{sl['p_win'] * 100:.0f}%", "")])
         note = "<p class='muted'>Δεν βρέθηκε απόδοση πρακτορείου: παίζεις μόνο αν σου δίνει τουλάχιστον την «ελάχιστη απόδοση».</p>"
@@ -280,7 +362,7 @@ def _slip_compact(P, title, sl, cidx, fair=False) -> str:
     return f"<h4>{E(title)}</h4>{stats}{note}{P.pick_table(legs)}"
 
 
-def _alternatives_html(P, lists, plan, cfg, cidx) -> str:
+def _alternatives_html(P, lists, plan, cfg, cidx, tctx=None, view=None) -> str:
     """Άλλα δελτία (από όλες τις κατηγορίες) που θα μπορούσες να παίξεις σήμερα αντί/εκτός των προτεινόμενων."""
     if plan and plan.get("week", {}).get("stop"):
         return ""
@@ -293,9 +375,9 @@ def _alternatives_html(P, lists, plan, cfg, cidx) -> str:
                             ("fair_players", "players", "👤 Δελτίο παικτών")):
         if lid in in_plan or (lid == "safe" and "safe" in in_plan):
             continue
-        sl = lists[key].get("slip")
+        sl = view(lid, lists[key].get("slip"), fair=lid.startswith("fair_")) if view else lists[key].get("slip")
         if sl and (sl["total_odds"] <= 8):
-            blocks.append(_slip_compact(P, title, sl, cidx, fair=bool(sl.get("fair"))))
+            blocks.append(_slip_compact(P, title, sl, cidx, fair=bool(sl.get("fair")), tctx=tctx))
     if not blocks:
         return ""
     return ("<div class='card'><h3>➕ Δελτία που επίσης θα μπορούσες να παίξεις σήμερα</h3>"
@@ -304,13 +386,13 @@ def _alternatives_html(P, lists, plan, cfg, cidx) -> str:
             + "".join(blocks) + "</div>")
 
 
-def _lottery_html(P, lists, cfg, cidx) -> str:
+def _lottery_html(P, lists, cfg, cidx, tctx=None, view=None) -> str:
     """Δελτία μεγάλης απόδοσης (10+/30+/100+): ΜΟΝΟ ως λαχεία, στο τέλος, με ειλικρινή πιθανότητα."""
     parts = []
     for lid, title in (("x10", "🎯 Δελτίο 10+"), ("x30", "🔥 Δελτίο 30+"), ("x100", "🎰 Δελτίο 100+")):
-        sl = lists[lid]["slip"]
+        sl = view(lid, lists[lid]["slip"]) if view else lists[lid]["slip"]
         if sl:
-            parts.append(f"<h4>{title}: απόδοση {sl['total_odds']:.1f}</h4>{_lot_note(sl)}{P.pick_table(_enrich(sl['legs'], cidx))}")
+            parts.append(f"<h4>{title}: απόδοση {sl['total_odds']:.1f}</h4>{_lot_note(sl)}{P.pick_table(_enrich(sl['legs'], cidx, tctx=tctx))}")
     if not parts:
         return ""
     return ("<details class='card'><summary><b>🎰 Λαχεία</b> <span class='muted'>· μόνο για πλάκα · πιθανότητα κάτω από ~10%</span></summary>"
@@ -475,6 +557,24 @@ def _clv_card(clv) -> str:
 
 def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
     P = Page(cfg)
+    tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}}
+    today_slips = (st or {}).get("today_slips") or {}
+
+    def view(listname, current, fair=False):
+        """Το δελτίο που ΚΑΤΑΓΡΑΦΕΤΑΙ στο ιστορικό σήμερα (κλειδωμένο), με ✅/❌ ανά αγώνα· αλλιώς το τωρινό (μη καταγεγραμμένο)."""
+        fz = today_slips.get(listname)
+        if fz:
+            return {"legs": _enrich(fz["legs"], cidx, fair=fair, tctx=tctx), "total_odds": fz["total_odds"], "p_win": fz["model_prob"],
+                    "p_market": None, "fair": fair, "locked": fz["created_at"]}
+        if current:
+            return dict(current, legs=_enrich(current["legs"], cidx, fair=fair, tctx=tctx), fair=fair)
+        return None
+
+    def lock_note(sl):
+        if sl and sl.get("locked"):
+            hh = parse_iso(sl["locked"]).astimezone(ZoneInfo(cfg["timezone"])).strftime("%H:%M")
+            return f"<p class='muted'>🔒 Κλειδώθηκε στις {hh} και καταγράφεται στο ιστορικό. Τα ✅/❌ ενημερώνονται καθώς τελειώνουν οι αγώνες.</p>"
+        return "<p class='muted'>Δεν καταγράφεται στο ιστορικό (δεν υπήρχε κλειδωμένο δελτίο σήμερα).</p>" if sl else ""
     hist_by_list = {k: v for k, v in hist_by_list.items() if k not in ("single", "safe1")}   # παλιά μονά: δεν παίζονται πια
     tz = cfg["timezone"]
     loc = now.astimezone(ZoneInfo(tz))
@@ -487,6 +587,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 
     # ⭐ Προτεινόμενο
     rec = lists["recommended"]
+    _rec_view = view("recommended", rec["slip"])
     single = rec["single"]
     sec["recommended"] = f"""
 <div class="card"><h3>Τι να περιμένεις (backtest 13 μηνών, 6.100 αγώνες)</h3><ul class="rules">
@@ -499,19 +600,23 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <li>Stop: αν το ταμείο πέσει στα <b>{br['stop_at']:.0f}€</b>, σταματάμε για την εβδομάδα</li>
 <li>Λαχεία (30+ / 100+): <b>{br['lottery_stake']:.2f}€</b>, μία φορά τη βδομάδα</li>
 <li>Ποτέ διπλασιασμός για να «πάρουμε πίσω» τη χθεσινή μέρα</li></ul></div>
-{P.slip_block(rec['slip'], '⭐ Το δελτίο που προτείνω να παίξεις', br['unit'],
-              "<p class='muted'>2–3 επιλογές, μόνο όσες περνούν όλους τους κανόνες (φόρμα, απουσίες, κινήσεις αποδόσεων, το πολύ 1 μπάσκετ).</p>")}
+{P.slip_block(_rec_view, '⭐ Το δελτίο που προτείνω να παίξεις', br['unit'],
+              "<p class='muted'>2–3 επιλογές, μόνο όσες περνούν όλους τους κανόνες (φόρμα, απουσίες, κινήσεις αποδόσεων, το πολύ 1 μπάσκετ).</p>" + lock_note(_rec_view))}
 """
 
-    sl_safe = lists["safe"].get("slip")
+    sl_safe = view("safe", lists["safe"].get("slip"))
     sec["safe"] = (P.slip_block(sl_safe, "🛡️ Safe δελτίο", br["unit"],
-                                "<p class='muted'>Οι πιο πιθανές επιλογές της ημέρας σε ΕΝΑ δελτίο (χαμηλές αποδόσεις, υψηλή πιθανότητα ανά επιλογή).</p>")
+                                "<p class='muted'>Οι πιο πιθανές επιλογές της ημέρας σε ΕΝΑ δελτίο (χαμηλές αποδόσεις, υψηλή πιθανότητα ανά επιλογή).</p>" + lock_note(sl_safe))
                    + _picks_details(P, lists["safe"]["picks"], "Όλες οι σίγουρες επιλογές (αναφορά)"))
-    sec["x10"] = P.slip_block(lists["x10"]["slip"], f"🎯 Δελτίο {L['x10']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x10"]["slip"]))
-    sec["x30"] = P.slip_block(lists["x30"]["slip"], f"🔥 Δελτίο {L['x30']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x30"]["slip"]))
-    sec["x100"] = P.slip_block(lists["x100"]["slip"], f"🎰 Λαχείο {L['x100']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x100"]["slip"]))
+    _v = view("x10", lists["x10"]["slip"])
+    sec["x10"] = P.slip_block(_v, f"🎯 Δελτίο {L['x10']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x10"]["slip"]) + lock_note(_v))
+    _v = view("x30", lists["x30"]["slip"])
+    sec["x30"] = P.slip_block(_v, f"🔥 Δελτίο {L['x30']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x30"]["slip"]) + lock_note(_v))
+    _v = view("x100", lists["x100"]["slip"])
+    sec["x100"] = P.slip_block(_v, f"🎰 Λαχείο {L['x100']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x100"]["slip"]) + lock_note(_v))
     ov = lists["overs"]
-    sec["overs"] = (P.slip_block(ov["slip"], "⚽ Over δελτίο (γκολ)", br["unit"])
+    _ov = view("overs", ov["slip"])
+    sec["overs"] = (P.slip_block(_ov, "⚽ Over δελτίο (γκολ)", br["unit"], lock_note(_ov))
                     + _picks_details(P, ov["picks"], "Όλες οι επιλογές γκολ (αναφορά)"))
     for lid, title, what in (("corners", "🚩 Κόρνερ", "κόρνερ"), ("cards", "🟨 Κάρτες", "κάρτες"),
                              ("throw_ins", "↔️ Πλάγια", "πλάγια"), ("players", "👤 Παίκτες", "παίκτες")):
@@ -522,20 +627,22 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
             note += "<p class='muted'>⚠️ Παίκτες: παίζεις ΜΟΝΟ αφού βγει η ενδεκάδα (~1 ώρα πριν).</p>"
         if lid == "throw_ins":
             note += "<p class='muted'>Τα πλάγια έρχονται μόνο από το Sofascore. Αν σήμερα δεν απάντησε, η λίστα μένει άδεια (δες ⚙️ Πηγές).</p>"
-        sl = x.get("slip")
+        cur = x.get("slip")
+        fz_name = ("fair_" + lid) if (today_slips.get("fair_" + lid) or (cur and cur.get("fair"))) else lid
+        sl = view(fz_name, cur, fair=fz_name.startswith("fair_"))
         if sl and sl.get("fair"):
-            sl = dict(sl, legs=_enrich(sl["legs"], cidx, fair=True))
             slip_html = P.slip_block(sl, f"{title}: δελτίο", None,
                                      "<p class='muted'>Δεν βρέθηκε απόδοση πρακτορείου: η «Συνολική απόδοση» είναι η ΕΛΑΧΙΣΤΗ για να αξίζει. "
-                                     "Παίζεις μόνο αν το πρακτορείο σου δίνει τουλάχιστον τόση.</p>")
+                                     "Παίζεις μόνο αν το πρακτορείο σου δίνει τουλάχιστον τόση.</p>" + lock_note(sl))
         elif sl:
-            slip_html = P.slip_block(sl, f"{title}: δελτίο", br["unit"])
+            slip_html = P.slip_block(sl, f"{title}: δελτίο", br["unit"], lock_note(sl))
         else:
             slip_html = ("<div class='card'><h3>" + E(title) + ": δελτίο</h3><p class='muted'>Σήμερα δεν υπάρχουν αρκετές "
                          "επιλογές για δελτίο σε αυτή την κατηγορία.</p></div>")
         body = slip_html + f"<div class='card'><h3>{title}: οδηγίες</h3>{note}</div>" + _picks_details(P, x["picks"], f"Όλες οι επιλογές {what} (αναφορά)")
         sec[lid] = body
-    sec["combo"] = P.slip_block(lists["combo"]["slip"], "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"])
+    _cb = view("combo", lists["combo"]["slip"])
+    sec["combo"] = P.slip_block(_cb, "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"], lock_note(_cb))
 
     # 📉 Κινήσεις
     drops, rises = moves
@@ -596,7 +703,8 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         hist_chart = "<div class='card'><h3>Σωρευτικό κέρδος/ζημιά ανά λίστα (μονάδες)</h3>" + P.chart(
             {"type": "line", "data": {"labels": labels, "datasets": ds},
              "options": {"scales": {"y": {"title": {"display": True, "text": "μονάδες"}}}}}) + "</div>"
-    sec["today"] = _plan_html(P, plan, cfg, tz, cidx) + _alternatives_html(P, lists, plan, cfg, cidx) + _lottery_html(P, lists, cfg, cidx)
+    sec["today"] = (_plan_html(P, plan, cfg, tz, cidx, tctx) + _alternatives_html(P, lists, plan, cfg, cidx, tctx, view)
+                    + _lottery_html(P, lists, cfg, cidx, tctx, view))
     from .stats import TAB_LIST
     for tid, lname in TAB_LIST.items():
         if tid in sec:
@@ -630,7 +738,8 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     js = json.dumps([[cid, c] for cid, c in P.charts], ensure_ascii=False)
     return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>BetBot Δελτίο</title>
-<style>{CSS}{EXTRA_CSS}</style></head><body><main>
+<meta name="generated" content="{iso(now)}"><style>{CSS}{EXTRA_CSS}</style></head><body><main>
+<div id="stale" class="banner" hidden></div>
 <header><h1>BetBot · {GR_DAYS[loc.weekday()]} {loc:%d/%m/%Y}</h1>
 <p class="sub">Ενημέρωση {loc:%H:%M} · {n_matches} αγώνες · {n_with} επιλογές με απόδοση · {n_fair} με «δίκαιη απόδοση» · <a href="live.html"><b>🔴 Live: ✅/❌ σε κάθε αγώνα τώρα</b></a></p></header>
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
@@ -671,7 +780,9 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
  try {{ const v = (localStorage.getItem('betbot_tab') || '').split('|'); if (v[0] === new Date().toDateString() && document.getElementById('t-'+v[1])) start = v[1]; }} catch(e) {{}}
  show(start);
 }})();
-</script></body></html>"""
+</script>
+<script>{CORE_JS}</script>
+<script>{INDEX_JS}</script></body></html>"""
 
 
 # ---------------------------------------------------------------- ΙΣΤΟΡΙΚΟ

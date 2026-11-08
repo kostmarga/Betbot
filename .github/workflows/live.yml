@@ -6,16 +6,26 @@
 #   (≈1.440 για καθημερινά + ≈140 για Σαβ/Κυρ + η καθημερινή εκτέλεση). Αν περνάει το όριο:
 #   μίκρυνε τις ώρες ή βάλε "*/15". Σε public repo δεν υπάρχει όριο.
 # Διαβάζει τη βάση από το branch data (δεν τη γράφει) και κάνει commit ΜΟΝΟ το docs/live.html.
+# ΕΠΙΠΛΕΟΝ «φύλακας»: το GitHub καθυστερεί/χάνει τα προγραμματισμένα τρεξίματα του «BetBot daily». Αυτό το workflow τρέχει συχνά
+# (και το πρωί, 04:00–10:59 UTC κάθε 20'), οπότε σε κάθε εκτέλεση ρωτά «έτρεξε σήμερα το daily;» (betbot/freshness.py)
+# και, αν όχι, το ξεκινά με workflow_dispatch (όχι πιο συχνά από μία φορά ανά 45'). Αρκεί να τρέξει ΕΝΑ από τα πολλά.
 name: BetBot live
 
 on:
   schedule:
     - cron: "*/10 14-21 * * *"
     - cron: "*/10 11-13 * * 0,6"
-  workflow_dispatch: {}
+    - cron: "*/20 4-10 * * *"      # πρωινός φύλακας: ξεκινά το daily αν δεν έχει τρέξει
+  workflow_dispatch:
+    inputs:
+      force_daily:
+        description: "Δοκιμή: ξεκίνα το BetBot daily ανεξάρτητα από το αν η σελίδα είναι ξεπερασμένη"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write                   # για να ξεκινά το «BetBot daily» (workflow_dispatch)
 
 concurrency:
   group: betbot-live
@@ -32,6 +42,22 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      - name: Φύλακας – έτρεξε σήμερα το «BetBot daily»; Αν όχι, ξεκίνα το
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force_daily }}
+        run: |
+          if [ "$FORCE" != "true" ] && python -m betbot.freshness docs/last_run.json; then exit 0; fi
+          last=$(gh run list --workflow daily.yml --limit 1 --json createdAt --jq '.[0].createdAt // ""')
+          age=999999
+          if [ -n "$last" ]; then age=$(( $(date +%s) - $(date -d "$last" +%s) )); fi
+          if [ "$age" -gt 2700 ]; then
+            echo "Ξεκινά το BetBot daily (τελευταίο run πριν από $age δευτερόλεπτα)"
+            gh workflow run daily.yml --ref main
+          else
+            echo "Το BetBot daily ξεκίνησε πρόσφατα ($age δευτερόλεπτα πριν) – δεν το ξαναξεκινάμε"
+          fi
 
       - run: pip install -r requirements.txt
 

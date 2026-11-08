@@ -515,4 +515,19 @@ def settle_slips(db):
             db.update_slip(sl["slip_id"], status, sl["stake"] * mult, legs); done += 1
         else:
             db.update_slip(sl["slip_id"], "open", 0.0, legs)
+    # Δελτία που έχουν ήδη κλείσει (π.χ. «χαμένα» μόλις έχασε ένα σκέλος): τα υπόλοιπα σκέλη τους συνεχίζουν να κρίνονται όσο
+    # παίζονται οι αγώνες, ώστε το ιστορικό να δείχνει ✅/❌ σε ΚΑΘΕ αγώνα. Η κατάσταση και η πληρωμή του δελτίου δεν αλλάζουν.
+    for sl in db.slips():
+        if sl["status"] == "open":
+            continue
+        legs = sl["legs"]
+        changed = False
+        for l in legs:
+            if l.get("result") in (None, "open"):
+                r = settle_leg(l, db.get_match(l["match_id"]), db)
+                if r != "open":
+                    l["result"] = r
+                    changed = True
+        if changed:
+            db.update_slip(sl["slip_id"], sl["status"], sl["payout"], legs)
     return done

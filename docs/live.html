@@ -1,19 +1,213 @@
 <!doctype html><html lang="el"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="300">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BetBot Live</title><style>
-:root{--bg:#f9f9f7;--card:#fcfcfb;--ink:#0b0b0b;--muted:#6b6a66;--line:#e1e0d9;--ok:#0a7a0a;--bad:#c62f2f}
-@media(prefers-color-scheme:dark){:root{--bg:#0d0d0d;--card:#1a1a19;--ink:#f0efec;--muted:#a8a79f;--line:#2c2c2a;--ok:#35c035;--bad:#ef6a6a}}
+:root{--bg:#f9f9f7;--card:#fcfcfb;--ink:#0b0b0b;--muted:#6b6a66;--line:#e1e0d9;--ok:#0a7a0a;--bad:#c62f2f;--live:#1a6fd4}
+@media(prefers-color-scheme:dark){:root{--bg:#0d0d0d;--card:#1a1a19;--ink:#f0efec;--muted:#a8a79f;--line:#2c2c2a;--ok:#35c035;--bad:#ef6a6a;--live:#5aa0f0}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:860px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0 0 2px}.sub{color:var(--muted);margin:0 0 14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0}
-.card h3{margin:0 0 6px;font-size:16px}.tot{color:var(--muted);font-weight:400;font-size:14px}
-.leg{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:8px 0;border-top:1px solid var(--line);align-items:start}
-.leg:first-of-type{border-top:0}.m{font-size:13px;color:var(--muted)}.p{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
-.won,.sure,.ok{color:var(--ok)}.lost,.dead,.bad{color:var(--bad)}.n{color:var(--muted);padding:20px 0}
-a{color:inherit}
-details.fair{margin:18px 0 6px}details.fair summary{cursor:pointer;padding:6px 0;font-size:16px}
+main{max-width:860px;margin:0 auto;padding:14px}h1{font-size:22px;margin:0 0 2px}.sub{color:var(--muted);margin:0 0 10px}
+h2{font-size:16px;margin:20px 0 6px;color:var(--muted);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:8px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.tile .k{font-size:12px;color:var(--muted)}.tile .v{font-size:20px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}
+.card h3{margin:0;font-size:16px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.tot{color:var(--muted);font-weight:400;font-size:13px}
+.cnt{font-size:14px;margin:4px 0 2px}.cnt b{font-variant-numeric:tabular-nums}
+.leg{display:grid;grid-template-columns:30px 1fr auto;gap:8px;padding:8px 0;border-top:1px solid var(--line);align-items:start}
+.leg:first-of-type{border-top:0}.ic{font-size:21px;line-height:1.1}.m{font-size:13px;color:var(--muted)}.p{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
+.sc{font-variant-numeric:tabular-nums;font-weight:600}.won,.sure,.ok{color:var(--ok)}.lost,.dead,.bad{color:var(--bad)}.live{color:var(--live)}.n{color:var(--muted)}
+.badge{font-size:13px;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.b-won{color:var(--ok);border-color:var(--ok)}.b-lost{color:var(--bad);border-color:var(--bad)}.b-live{color:var(--live);border-color:var(--live)}
+#status{font-size:13px;color:var(--muted)}a{color:inherit}
 </style></head><body><main>
-<h1>🔴 BetBot Live</h1><p class="sub">Ενημερώθηκε 08/11 18:59 · η σελίδα ανανεώνεται κάθε ~10 λεπτά ·
-<a href="index.html">← Κύρια σελίδα</a></p><div class="card"><h3>⚽ Over <span class="tot">· απόδοση 9.39 · 1.00€</span></h3><div class="ok"><b>🟢 Σε εξέλιξη</b></div><div class="leg"><div>✅</div><div><b>VfL Bochum – Karlsruher SC</b><div class="m">Over 2.5 γκολ @ 1.56</div></div><div class="p won">3-2</div></div><div class="leg"><div>✅</div><div><b>Çorum FK – Fenerbahce</b><div class="m">Over 2.5 γκολ @ 1.56</div></div><div class="p won">0-5</div></div><div class="leg"><div>✅</div><div><b>Crystal Palace – Liverpool</b><div class="m">Over 2.5 γκολ @ 1.57</div></div><div class="p won">1-3</div></div><div class="leg"><div>🟢</div><div><b>Real Sociedad – Rayo Vallecano</b><div class="m">Over 2.5 γκολ @ 1.57 · 1-0 82&#x27;</div></div><div class="p ok">γκολ 1 / 2.5</div></div><div class="leg"><div>✅</div><div><b>Manchester United – Aston Villa</b><div class="m">Over 2.5 γκολ @ 1.57 · 1-2 27&#x27;</div></div><div class="p sure">γκολ 3 / 2.5</div></div></div><div class="card"><h3>🎯 10+ <span class="tot">· απόδοση 9.17 · 1.00€</span></h3><div class="ok"><b>🟢 Σε εξέλιξη</b></div><div class="leg"><div>✅</div><div><b>Crystal Palace – Liverpool</b><div class="m">2 · Νίκη Liverpool @ 1.57</div></div><div class="p won">1-3</div></div><div class="leg"><div>🟢</div><div><b>Real Sociedad – Rayo Vallecano</b><div class="m">Over 2.5 γκολ @ 1.57 · 1-0 82&#x27;</div></div><div class="p ok">γκολ 1 / 2.5</div></div><div class="leg"><div>✅</div><div><b>Manchester United – Aston Villa</b><div class="m">Over 2.5 γκολ @ 1.57 · 1-2 27&#x27;</div></div><div class="p sure">γκολ 3 / 2.5</div></div><div class="leg"><div>⏳</div><div><b>Villarreal – Getafe</b><div class="m">19:30 · 1 · Νίκη Villarreal @ 1.49</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Detroit Pistons – Los Angeles Lakers</b><div class="m">01:00 · Νίκη Detroit Pistons @ 1.59</div></div><div class="p pending"></div></div></div><div class="card"><h3>⭐ Προτεινόμενο <span class="tot">· απόδοση 2.02 · 1.00€</span></h3><div class="pending"><b>⏳ Δεν ξεκίνησε</b></div><div class="leg"><div>⏳</div><div><b>Vitória de Guimaraes – FC Porto</b><div class="m">20:00 · 2 · Νίκη FC Porto @ 1.54</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Sacramento Kings – Miami Heat</b><div class="m">04:00 · Νίκη Miami Heat @ 1.31</div></div><div class="p pending"></div></div></div><div class="card"><h3>🔀 Συνδυαστικό <span class="tot">· απόδοση 4.01 · 1.00€</span></h3><div class="lost"><b>❌ Χαμένο</b></div><div class="leg"><div>❌</div><div><b>Brighton &amp; Hove Albion – Brentford</b><div class="m">Over 2.5 γκολ @ 1.61</div></div><div class="p lost">2-0</div></div><div class="leg"><div>✅</div><div><b>Crystal Palace – Liverpool</b><div class="m">2 · Νίκη Liverpool @ 1.57</div></div><div class="p won">1-3</div></div><div class="leg"><div>⏳</div><div><b>Detroit Pistons – Los Angeles Lakers</b><div class="m">01:00 · Νίκη Detroit Pistons @ 1.59</div></div><div class="p pending"></div></div></div><div class="card"><h3>🎰 100+ <span class="tot">· απόδοση 100.72 · 1.00€</span></h3><div class="lost"><b>❌ Χαμένο</b></div><div class="leg"><div>✅</div><div><b>Crystal Palace – Liverpool</b><div class="m">2 · Νίκη Liverpool @ 1.57</div></div><div class="p won">1-3</div></div><div class="leg"><div>✅</div><div><b>Ipswich Town – AFC Bournemouth</b><div class="m">Over 2.5 γκολ @ 1.74</div></div><div class="p won">1-2</div></div><div class="leg"><div>❌</div><div><b>Sunderland – Chelsea</b><div class="m">Over 2.5 γκολ @ 1.77</div></div><div class="p lost">1-0</div></div><div class="leg"><div>🟢</div><div><b>Real Sociedad – Rayo Vallecano</b><div class="m">Over 2.5 γκολ @ 1.57 · 1-0 82&#x27;</div></div><div class="p ok">γκολ 1 / 2.5</div></div><div class="leg"><div>🟢</div><div><b>Le Mans – AS Monaco</b><div class="m">2 · Νίκη AS Monaco @ 1.69 · 0-1 44&#x27;</div></div><div class="p ok">0-1</div></div><div class="leg"><div>⏳</div><div><b>Chicago Bulls – Philadelphia 76ers</b><div class="m">22:30 · Philadelphia 76ers -9.5 χάντικαπ @ 2.00</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Detroit Pistons – Los Angeles Lakers</b><div class="m">01:00 · Over 220.5 πόντοι @ 1.97</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Minnesota Timberwolves – Utah Jazz</b><div class="m">02:00 · Over 224.5 πόντοι @ 1.99</div></div><div class="p pending"></div></div></div><div class="card"><h3>🔥 30+ <span class="tot">· απόδοση 28.10 · 1.00€</span></h3><div class="lost"><b>❌ Χαμένο</b></div><div class="leg"><div>❌</div><div><b>Crystal Palace – Liverpool</b><div class="m">Under 3.5 γκολ @ 1.69</div></div><div class="p lost">1-3</div></div><div class="leg"><div>🟢</div><div><b>Le Mans – AS Monaco</b><div class="m">2 · Νίκη AS Monaco @ 1.69 · 0-1 44&#x27;</div></div><div class="p ok">0-1</div></div><div class="leg"><div>🟢</div><div><b>SC Freiburg – 1. FC Union Berlin</b><div class="m">Over 2.5 γκολ @ 1.67 · 0-0 29&#x27;</div></div><div class="p ok">γκολ 0 / 2.5</div></div><div class="leg"><div>⏳</div><div><b>Lens – Marseille</b><div class="m">21:45 · Under 3.5 γκολ @ 1.67</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Detroit Pistons – Los Angeles Lakers</b><div class="m">01:00 · Νίκη Detroit Pistons @ 1.59</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Minnesota Timberwolves – Utah Jazz</b><div class="m">02:00 · Minnesota Timberwolves -10.5 χάντικαπ @ 1.70</div></div><div class="p pending"></div></div><div class="leg"><div>⏳</div><div><b>Sacramento Kings – Miami Heat</b><div class="m">04:00 · Νίκη Miami Heat @ 1.31</div></div><div class="p pending"></div></div></div><details class="fair" open><summary><b>📐 Δίκαιες επιλογές (5)</b> <span class="tot">· χωρίς απόδοση πρακτορείου</span></summary><p class="sub">Δεν βρέθηκε απόδοση για αυτές. Η τιμή είναι η ελάχιστη που τις κάνει να αξίζουν: τις παίζεις μόνο αν το πρακτορείο δίνει τόση ή περισσότερη.</p><div class="card"><h3>🟨 Κάρτες (δίκαιη)</h3><div class="ok"><b>🟢 Σε εξέλιξη</b></div><div class="leg"><div>✅</div><div><b>Çorum FK – Fenerbahce</b><div class="m">Under 5.5 κάρτες παίξ' το αν ≥ 1.37</div></div><div class="p won">0-5</div></div><div class="leg"><div>⏳</div><div><b>Vicenza – Cremonese</b><div class="m">20:30 · Under 5.5 κάρτες παίξ' το αν ≥ 1.37</div></div><div class="p pending"></div></div></div><div class="card"><h3>🚩 Κόρνερ (δίκαιη)</h3><div class="ok"><b>🟢 Σε εξέλιξη</b></div><div class="leg"><div>✅</div><div><b>Çorum FK – Fenerbahce</b><div class="m">Under 12.5 κόρνερ παίξ' το αν ≥ 1.37</div></div><div class="p won">0-5</div></div><div class="leg"><div>🟢</div><div><b>Angers – Nice</b><div class="m">Over 7.5 κόρνερ παίξ' το αν ≥ 1.37 · 0-1 44&#x27;</div></div><div class="p ok">κόρνερ 3 / 7.5</div></div></div><div class="card"><h3>👤 Παίκτες (δίκαιη)</h3><div class="pending"><b>⏳ Δεν ξεκίνησε</b></div><div class="leg"><div>➖</div><div><b>Osasuna – Athletic Club</b><div class="m">Iker Muñoz 1+ φάουλ παίξ' το αν ≥ 1.37</div></div><div class="p na">δεν παρακολουθείται live</div></div><div class="leg"><div>➖</div><div><b>Elche – Real Betis</b><div class="m">Fer Niño 1+ σουτ παίξ' το αν ≥ 1.37</div></div><div class="p na">δεν παρακολουθείται live</div></div></div><div class="card"><h3>👤 Παίκτες (δίκαιη)</h3><div class="pending"><b>⏳ Δεν ξεκίνησε</b></div><div class="leg"><div>➖</div><div><b>Villarreal – Getafe</b><div class="m">Nathan Saliba 1+ φάουλ παίξ' το αν ≥ 1.37</div></div><div class="p na">δεν παρακολουθείται live</div></div><div class="leg"><div>➖</div><div><b>Atlético Madrid – Barcelona</b><div class="m">Raphinha σκόρερ παίξ' το αν ≥ 1.37</div></div><div class="p na">δεν παρακολουθείται live</div></div></div><div class="card"><h3>🟨 Κάρτες (δίκαιη)</h3><div class="won"><b>✅ Κερδισμένο</b></div><div class="leg"><div>✅</div><div><b>St Johnstone – Dundee</b><div class="m">Under 4.5 κάρτες παίξ' το αν ≥ 1.37</div></div><div class="p won"></div></div><div class="leg"><div>✅</div><div><b>Çorum FK – Fenerbahce</b><div class="m">Under 5.5 κάρτες παίξ' το αν ≥ 1.37</div></div><div class="p won">0-5</div></div></div></details>
-<p class="sub">Πηγή: ESPN. Οι αποδόσεις δεν ανανεώνονται live. Παίκτες και πλάγια δεν παρακολουθούνται.</p>
-</main></body></html>
+<h1>🔴 BetBot Live</h1>
+<p class="sub">✅ βγήκε · ❌ έχασε · 🟢 πάει καλά · 🔴 πάει άσχημα · ⏳ δεν ξεκίνησε · ➖ χωρίς live ·
+<a href="index.html">← Κύρια σελίδα</a></p>
+<p id="status">Φόρτωση…</p>
+<div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 20:09 (08/11). Πηγή αποτελεσμάτων: ESPN (ανανέωση κάθε ~30 δευτερόλεπτα όσο παίζεται αγώνας).
+Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
+</main>
+<script id="data" type="application/json" data-gen="2026-11-08T18:09:08Z">[{"id": "2026-11-08#recommended", "list": "recommended", "name": "⭐ Προτεινόμενο", "odds": 2.01871, "p": 0.4562425813891483, "fair": false, "day": "2026-11-08", "status": "open", "legs": [{"eid": "401885394", "lg": "por.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Vitória de Guimaraes", "away": "FC Porto", "label": "2 · Νίκη FC Porto", "odds": 1.541, "ko": "2026-11-08T18:00:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "9'", "hs": 0, "as": 0, "stats": {"home": {"corners": 0.0, "yellow": 0.0}, "away": {"corners": 0.0, "yellow": 0.0}}}}, {"eid": "401909951", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Sacramento Kings", "away": "Miami Heat", "label": "Νίκη Miami Heat", "odds": 1.31, "ko": "2026-11-09T02:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#x10", "list": "x10", "name": "🎯 10+", "odds": 9.17336366103312, "p": 0.08782213857289425, "fair": false, "day": "2026-11-08", "status": "lost", "legs": [{"eid": "401879243", "lg": "eng.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Crystal Palace", "away": "Liverpool", "label": "2 · Νίκη Liverpool", "odds": 1.571, "ko": "2026-11-08T14:00:00Z", "res": "won", "sc": [1, 3], "dbst": "finished"}, {"eid": "401882810", "lg": "esp.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Real Sociedad", "away": "Rayo Vallecano", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T15:15:00Z", "res": "lost", "sc": [1, 0], "dbst": "finished", "st": {"state": "post", "clock": "FT", "hs": 1, "as": 0, "stats": {"home": {"corners": 7.0, "yellow": 2.0}, "away": {"corners": 6.0, "yellow": 2.0}}}}, {"eid": "401879240", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Manchester United", "away": "Aston Villa", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T16:30:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "80'", "hs": 2, "as": 4, "stats": {"home": {"corners": 7.0, "yellow": 1.0}, "away": {"corners": 1.0, "yellow": 0.0}}}}, {"eid": "401882807", "lg": "esp.1", "sport": "football", "market": "1X2", "sel": "1", "line": null, "home": "Villarreal", "away": "Getafe", "label": "1 · Νίκη Villarreal", "odds": 1.488, "ko": "2026-11-08T17:30:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "40'", "hs": 0, "as": 0, "stats": {"home": {"corners": 1.0, "yellow": 0.0}, "away": {"corners": 1.0, "yellow": 1.0}}}}, {"eid": "401909946", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Detroit Pistons", "away": "Los Angeles Lakers", "label": "Νίκη Detroit Pistons", "odds": 1.59, "ko": "2026-11-08T23:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#x30", "list": "x30", "name": "🔥 30+", "odds": 28.103599659997798, "p": 0.02654569816460206, "fair": false, "day": "2026-11-08", "status": "lost", "legs": [{"eid": "401879243", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "UNDER", "line": 3.5, "home": "Crystal Palace", "away": "Liverpool", "label": "Under 3.5 γκολ", "odds": 1.69, "ko": "2026-11-08T14:00:00Z", "res": "lost", "sc": [1, 3], "dbst": "finished"}, {"eid": "401876408", "lg": "fra.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Le Mans", "away": "AS Monaco", "label": "2 · Νίκη AS Monaco", "odds": 1.69, "ko": "2026-11-08T16:15:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "90'+8'", "hs": 1, "as": 1, "stats": {"home": {"corners": 7.0, "yellow": 0.0}, "away": {"corners": 7.0, "yellow": 0.0}}}}, {"eid": "401884741", "lg": "ger.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "SC Freiburg", "away": "1. FC Union Berlin", "label": "Over 2.5 γκολ", "odds": 1.667, "ko": "2026-11-08T16:30:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "83'", "hs": 2, "as": 0, "stats": {"home": {"corners": 3.0, "yellow": 2.0}, "away": {"corners": 1.0, "yellow": 1.0}}}}, {"eid": "401876404", "lg": "fra.1", "sport": "football", "market": "OU", "sel": "UNDER", "line": 3.5, "home": "Lens", "away": "Marseille", "label": "Under 3.5 γκολ", "odds": 1.667, "ko": "2026-11-08T19:45:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909946", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Detroit Pistons", "away": "Los Angeles Lakers", "label": "Νίκη Detroit Pistons", "odds": 1.59, "ko": "2026-11-08T23:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909947", "lg": "nba", "sport": "basketball", "market": "SPREAD", "sel": "HOME", "line": -10.5, "home": "Minnesota Timberwolves", "away": "Utah Jazz", "label": "Minnesota Timberwolves -10.5 χάντικαπ", "odds": 1.7, "ko": "2026-11-09T00:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909951", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Sacramento Kings", "away": "Miami Heat", "label": "Νίκη Miami Heat", "odds": 1.31, "ko": "2026-11-09T02:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#x100", "list": "x100", "name": "🎰 100+", "odds": 100.71982834867067, "p": 0.007713855124337709, "fair": false, "day": "2026-11-08", "status": "lost", "legs": [{"eid": "401879243", "lg": "eng.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Crystal Palace", "away": "Liverpool", "label": "2 · Νίκη Liverpool", "odds": 1.571, "ko": "2026-11-08T14:00:00Z", "res": "won", "sc": [1, 3], "dbst": "finished"}, {"eid": "401878759", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Ipswich Town", "away": "AFC Bournemouth", "label": "Over 2.5 γκολ", "odds": 1.741, "ko": "2026-11-08T14:00:00Z", "res": "won", "sc": [1, 2], "dbst": "finished"}, {"eid": "401879239", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Sunderland", "away": "Chelsea", "label": "Over 2.5 γκολ", "odds": 1.769, "ko": "2026-11-08T14:00:00Z", "res": "lost", "sc": [1, 0], "dbst": "finished"}, {"eid": "401882810", "lg": "esp.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Real Sociedad", "away": "Rayo Vallecano", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T15:15:00Z", "res": "lost", "sc": [1, 0], "dbst": "finished", "st": {"state": "post", "clock": "FT", "hs": 1, "as": 0, "stats": {"home": {"corners": 7.0, "yellow": 2.0}, "away": {"corners": 6.0, "yellow": 2.0}}}}, {"eid": "401876408", "lg": "fra.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Le Mans", "away": "AS Monaco", "label": "2 · Νίκη AS Monaco", "odds": 1.69, "ko": "2026-11-08T16:15:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "90'+8'", "hs": 1, "as": 1, "stats": {"home": {"corners": 7.0, "yellow": 0.0}, "away": {"corners": 7.0, "yellow": 0.0}}}}, {"eid": "401909945", "lg": "nba", "sport": "basketball", "market": "SPREAD", "sel": "AWAY", "line": 9.5, "home": "Chicago Bulls", "away": "Philadelphia 76ers", "label": "Philadelphia 76ers -9.5 χάντικαπ", "odds": 2.0, "ko": "2026-11-08T20:30:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909946", "lg": "nba", "sport": "basketball", "market": "TOTAL", "sel": "OVER", "line": 220.5, "home": "Detroit Pistons", "away": "Los Angeles Lakers", "label": "Over 220.5 πόντοι", "odds": 1.97, "ko": "2026-11-08T23:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909947", "lg": "nba", "sport": "basketball", "market": "TOTAL", "sel": "OVER", "line": 224.5, "home": "Minnesota Timberwolves", "away": "Utah Jazz", "label": "Over 224.5 πόντοι", "odds": 1.99, "ko": "2026-11-09T00:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#overs", "list": "overs", "name": "⚽ Over", "odds": 9.387452238798895, "p": 0.07991076910654864, "fair": false, "day": "2026-11-08", "status": "lost", "legs": [{"eid": "401885062", "lg": "ger.2", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "VfL Bochum", "away": "Karlsruher SC", "label": "Over 2.5 γκολ", "odds": 1.556, "ko": "2026-11-08T12:30:00Z", "res": "won", "sc": [3, 2], "dbst": "finished"}, {"eid": "401888372", "lg": "tur.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Çorum FK", "away": "Fenerbahce", "label": "Over 2.5 γκολ", "odds": 1.556, "ko": "2026-11-08T13:00:00Z", "res": "won", "sc": [0, 5], "dbst": "finished"}, {"eid": "401879243", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Crystal Palace", "away": "Liverpool", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T14:00:00Z", "res": "won", "sc": [1, 3], "dbst": "finished"}, {"eid": "401882810", "lg": "esp.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Real Sociedad", "away": "Rayo Vallecano", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T15:15:00Z", "res": "lost", "sc": [1, 0], "dbst": "finished", "st": {"state": "post", "clock": "FT", "hs": 1, "as": 0, "stats": {"home": {"corners": 7.0, "yellow": 2.0}, "away": {"corners": 6.0, "yellow": 2.0}}}}, {"eid": "401879240", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Manchester United", "away": "Aston Villa", "label": "Over 2.5 γκολ", "odds": 1.571, "ko": "2026-11-08T16:30:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "80'", "hs": 2, "as": 4, "stats": {"home": {"corners": 7.0, "yellow": 1.0}, "away": {"corners": 1.0, "yellow": 0.0}}}}]}, {"id": "2026-11-08#combo", "list": "combo", "name": "🔀 Συνδυαστικό", "odds": 4.011611340000001, "p": 0.22381590512109667, "fair": false, "day": "2026-11-08", "status": "lost", "legs": [{"eid": "401879244", "lg": "eng.1", "sport": "football", "market": "OU", "sel": "OVER", "line": 2.5, "home": "Brighton & Hove Albion", "away": "Brentford", "label": "Over 2.5 γκολ", "odds": 1.606, "ko": "2026-11-08T14:00:00Z", "res": "lost", "sc": [2, 0], "dbst": "finished"}, {"eid": "401879243", "lg": "eng.1", "sport": "football", "market": "1X2", "sel": "2", "line": null, "home": "Crystal Palace", "away": "Liverpool", "label": "2 · Νίκη Liverpool", "odds": 1.571, "ko": "2026-11-08T14:00:00Z", "res": "won", "sc": [1, 3], "dbst": "finished"}, {"eid": "401909946", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Detroit Pistons", "away": "Los Angeles Lakers", "label": "Νίκη Detroit Pistons", "odds": 1.59, "ko": "2026-11-08T23:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#fair_corners", "list": "fair_corners", "name": "🚩 Κόρνερ", "odds": 1.8769000000000002, "p": 0.5889364461910455, "fair": true, "day": "2026-11-08", "status": "open", "legs": [{"eid": "401888372", "lg": "tur.1", "sport": "football", "market": "CORNERS", "sel": "UNDER", "line": 12.5, "home": "Çorum FK", "away": "Fenerbahce", "label": "Under 12.5 κόρνερ", "odds": 1.37, "ko": "2026-11-08T13:00:00Z", "res": "won", "sc": [0, 5], "dbst": "finished"}, {"eid": "401876412", "lg": "fra.1", "sport": "football", "market": "CORNERS", "sel": "OVER", "line": 7.5, "home": "Angers", "away": "Nice", "label": "Over 7.5 κόρνερ", "odds": 1.37, "ko": "2026-11-08T16:15:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "post", "clock": "FT", "hs": 0, "as": 2, "stats": {"home": {"corners": 6.0, "yellow": 3.0}, "away": {"corners": 4.0, "yellow": 1.0}}}}]}, {"id": "2026-11-08#fair_cards", "list": "fair_cards", "name": "🟨 Κάρτες", "odds": 1.8769000000000002, "p": 0.5876613519590033, "fair": true, "day": "2026-11-08", "status": "open", "legs": [{"eid": "401888372", "lg": "tur.1", "sport": "football", "market": "CARDS", "sel": "UNDER", "line": 5.5, "home": "Çorum FK", "away": "Fenerbahce", "label": "Under 5.5 κάρτες", "odds": 1.37, "ko": "2026-11-08T13:00:00Z", "res": "won", "sc": [0, 5], "dbst": "finished"}, {"eid": "401899554", "lg": "ita.2", "sport": "football", "market": "CARDS", "sel": "UNDER", "line": 5.5, "home": "Vicenza", "away": "Cremonese", "label": "Under 5.5 κάρτες", "odds": 1.37, "ko": "2026-11-08T18:30:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}, {"id": "2026-11-08#fair_players", "list": "fair_players", "name": "👤 Παίκτες", "odds": 1.8769000000000002, "p": 0.5911538021693712, "fair": true, "day": "2026-11-08", "status": "open", "legs": [{"eid": "401882807", "lg": "esp.1", "sport": "football", "market": "PLAYER", "sel": "Nathan Saliba|FOULS", "line": 1.0, "home": "Villarreal", "away": "Getafe", "label": "Nathan Saliba 1+ φάουλ", "odds": 1.37, "ko": "2026-11-08T17:30:00Z", "res": "open", "sc": null, "dbst": "live", "st": {"state": "in", "clock": "40'", "hs": 0, "as": 0, "stats": {"home": {"corners": 1.0, "yellow": 0.0}, "away": {"corners": 1.0, "yellow": 1.0}}}}, {"eid": "401882816", "lg": "esp.1", "sport": "football", "market": "PLAYER", "sel": "Raphinha|GOAL", "line": 1.0, "home": "Atlético Madrid", "away": "Barcelona", "label": "Raphinha σκόρερ", "odds": 1.37, "ko": "2026-11-08T20:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}]</script>
+<script>
+(function(){
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/';
+const SPORT = {football: 'soccer', basketball: 'basketball'};
+const IC = {won:'✅', lost:'❌', void:'↩️', sure:'✅', dead:'❌', ok:'🟢', bad:'🔴', pending:'⏳', na:'➖'};
+const cache = {};            // κλειδί αγώνα -> κατάσταση από ESPN
+let lastOk = null, lastErr = null, browserOk = false;
+const GEN = new Date(document.getElementById('data').dataset.gen);
+const genTxt = GEN.toLocaleTimeString('el-GR', {timeZone:'Europe/Athens', hour:'2-digit', minute:'2-digit', hour12:false});
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const key = l => l.sport + '|' + l.lg + '|' + l.eid;
+const trackable = l => !!(l.eid && l.lg && SPORT[l.sport]);
+const hhmm = iso => { try { return new Date(iso).toLocaleTimeString('el-GR', {timeZone:'Europe/Athens', hour:'2-digit', minute:'2-digit', hour12:false}); } catch(e) { return ''; } };
+const pick = (o, names) => { for (const n of names) { if (o[n] != null && o[n] !== '') { const v = parseFloat(String(o[n]).replace('%','')); if (!isNaN(v)) return v; } } return null; };
+
+// Σπόρος: η κατάσταση που έγραψε ο server του bot στην τελευταία εκτέλεση (αν ο browser δεν φτάσει στο ESPN, δείχνουμε αυτή)
+DATA.forEach(s => s.legs.forEach(l => { if (l.st && l.eid && l.lg) cache[l.sport + '|' + l.lg + '|' + l.eid] = Object.assign({srv: true}, l.st); }));
+
+function parseSummary(d) {
+  const comp = d.header.competitions[0], t = (comp.status || {}).type || {}, by = {};
+  comp.competitors.forEach(c => by[c.homeAway] = c);
+  const num = x => { const v = parseInt(x, 10); return isNaN(v) ? 0 : v; };
+  const st = {state: t.state || 'pre', clock: t.detail || t.shortDetail || '', hs: num(by.home && by.home.score),
+              as: num(by.away && by.away.score), stats: {}, ts: Date.now()};
+  ((d.boxscore && d.boxscore.teams) || []).forEach(tm => {
+    const s = {}; (tm.statistics || []).forEach(x => s[x.name] = (x.displayValue !== undefined ? x.displayValue : x.value));
+    st.stats[tm.homeAway] = {corners: pick(s, ['wonCorners','cornerKicks','corners']), yellow: pick(s, ['yellowCards'])};
+  });
+  return st;
+}
+
+// Κρίση επιλογής: [κωδικός, κείμενο προόδου]. Ίδια λογική με το selector.settle_leg + live (sure/dead/ok/bad).
+function judge(l, st) {
+  const m = l.market, s = l.sel, L = l.line;
+  if (m === 'THROWINS' || m === 'PLAYER') return (l.res === 'won' || l.res === 'lost' || l.res === 'void') ? [l.res, ''] : ['na', 'δεν παρακολουθείται live'];
+  if (!st) {
+    if (l.res === 'won' || l.res === 'lost' || l.res === 'void') return [l.res, l.sc ? l.sc[0] + '-' + l.sc[1] : ''];
+    return ['pending', ''];
+  }
+  if (st.state === 'pre') return ['pending', ''];
+  const h = st.hs, a = st.as, fin = st.state === 'post', sc = h + '-' + a;
+  const res = h > a ? '1' : (h === a ? 'X' : '2');
+  const tot = col => { const x = st.stats.home && st.stats.home[col], y = st.stats.away && st.stats.away[col]; return (x == null || y == null) ? null : x + y; };
+  const ou = (cur, what) => {
+    if (cur == null) return ['na', what + ': χωρίς στοιχεία'];
+    if (fin) { if (cur === L) return ['void', what + ' ' + cur]; return [((cur > L) === (s === 'OVER')) ? 'won' : 'lost', what + ' ' + cur]; }
+    if (s === 'OVER') return [cur > L ? 'sure' : 'ok', what + ' ' + cur + ' / ' + L];
+    return [cur > L ? 'dead' : 'ok', what + ' ' + cur + ' / κάτω από ' + L];
+  };
+  const now = (good) => fin ? [good ? 'won' : 'lost', sc] : [good ? 'ok' : 'bad', sc];
+  if (m === 'OU') return ou(h + a, 'γκολ');
+  if (m === 'TOTAL') return ou(h + a, 'πόντοι');
+  if (m === 'CORNERS') return ou(tot('corners'), 'κόρνερ');
+  if (m === 'CARDS') return ou(tot('yellow'), 'κίτρινες');
+  if (m === 'CORNERS_MORE') {
+    const x = st.stats.home && st.stats.home.corners, y = st.stats.away && st.stats.away.corners;
+    if (x == null || y == null) return ['na', 'κόρνερ: χωρίς στοιχεία'];
+    const good = x !== y && ((x > y) === (s === 'HOME'));
+    return [fin ? (good ? 'won' : 'lost') : (good ? 'ok' : 'bad'), 'κόρνερ ' + x + '-' + y];
+  }
+  if (m === 'BTTS') {
+    const both = h > 0 && a > 0;
+    if (fin) return [(both === (s === 'YES')) ? 'won' : 'lost', sc];
+    if (s === 'YES') return [both ? 'sure' : 'ok', sc];
+    return [both ? 'dead' : 'ok', sc];
+  }
+  if (m === '1X2') return now(res === s);
+  if (m === 'DC') return now(s.indexOf(res) >= 0);
+  if (m === 'ML') return fin ? [((h > a) === (s === 'HOME')) ? 'won' : 'lost', sc] : now(h !== a && ((h > a) === (s === 'HOME')));
+  if (m === 'SPREAD') { const v = (h - a) + L; if (fin && v === 0) return ['void', sc]; return now(v !== 0 && ((v > 0) === (s === 'HOME'))); }
+  return ['na', sc];
+}
+
+function slipVerdict(codes) {
+  if (codes.some(c => c === 'lost' || c === 'dead')) return ['lost', '❌ Χάθηκε'];
+  if (codes.every(c => c === 'won' || c === 'void')) return ['won', '✅ Πέρασε'];
+  if (codes.every(c => c === 'won' || c === 'void' || c === 'sure')) return ['won', '✅ Σχεδόν σίγουρο'];
+  if (codes.some(c => c === 'ok' || c === 'bad' || c === 'won' || c === 'sure')) return ['live', '🟢 Σε εξέλιξη'];
+  return ['pending', '⏳ Δεν ξεκίνησε'];
+}
+const grp = c => (c === 'won' || c === 'sure') ? 'w' : (c === 'lost' || c === 'dead') ? 'l' : (c === 'ok' || c === 'bad') ? 'p' : 'n';
+
+function legRow(l, st, code, txt) {
+  const live = st && st.state === 'in', fin = st && st.state === 'post';
+  const score = st && st.state !== 'pre' ? '<span class="sc">' + st.hs + '-' + st.as + '</span> ' + (live ? '<span class="live">' + esc(st.clock) + '</span>' : (fin ? 'ΤΕΛΟΣ' : '')) : (l.sc ? '<span class="sc">' + l.sc[0] + '-' + l.sc[1] + '</span> ΤΕΛΟΣ' : '');
+  const when = code === 'pending' && l.ko ? hhmm(l.ko) + ' · ' : '';
+  const price = l.odds ? (l.fair ? '≥ ' : '@ ') + Number(l.odds).toFixed(2) : '';
+  return '<div class="leg"><div class="ic">' + IC[code] + '</div><div><b>' + esc(l.home) + ' – ' + esc(l.away) + '</b> ' + score +
+         '<div class="m">' + when + esc(l.label) + ' ' + price + '</div></div><div class="p ' + code + '">' + esc(txt) + '</div></div>';
+}
+
+function render() {
+  const app = document.getElementById('app');
+  const seen = {}, tot = {w: 0, l: 0, p: 0, n: 0}, sl = {won: 0, lost: 0, live: 0, pending: 0};
+  const byDay = {};
+  const TODAY = DATA.reduce((m, s) => s.day > m ? s.day : m, '');      // οι μετρητές πάνω-πάνω αφορούν ΜΟΝΟ τη σημερινή ημέρα
+  DATA.forEach(s => {
+    const codes = [], rows = [];
+    s.legs.forEach(l => {
+      l.fair = s.fair;
+      const st = trackable(l) ? cache[key(l)] : null;
+      const [code, txt] = judge(l, st);
+      codes.push(code); rows.push(legRow(l, st, code, txt));
+      const k = [l.eid || l.home, l.market, l.sel, l.line].join('|');
+      if (s.day === TODAY && !seen[k]) { seen[k] = 1; tot[grp(code)]++; }
+    });
+    const [v, vt] = slipVerdict(codes);
+    if (s.day === TODAY) sl[v]++;
+    const c = {w: 0, l: 0, p: 0, n: 0}; codes.forEach(x => c[grp(x)]++);
+    const badge = '<span class="badge b-' + v + '">' + vt + '</span>';
+    const card = '<div class="card"><h3><span>' + esc(s.name) + ' <span class="tot">· ' + (s.fair ? 'ελάχιστη απόδοση ' : 'απόδοση ') + Number(s.odds).toFixed(2) + ' · εκτίμηση ' + Math.round((s.p || 0) * 100) + '%</span></span>' + badge + '</h3>' +
+      '<div class="cnt">✅ <b>' + c.w + '</b> · ❌ <b>' + c.l + '</b> · 🟢 <b>' + c.p + '</b> σε εξέλιξη · ⏳ <b>' + c.n + '</b> δεν ξεκίνησαν</div>' + rows.join('') + '</div>';
+    (byDay[s.day] = byDay[s.day] || []).push(card);
+  });
+  const days = Object.keys(byDay).sort().reverse();
+  const today = days.length ? days[0] : '';
+  let out = '<div class="tiles">' +
+    '<div class="tile"><div class="k">Σήμερα: δελτία που πέρασαν</div><div class="v ok">✅ ' + sl.won + '</div></div>' +
+    '<div class="tile"><div class="k">Δελτία που χάθηκαν</div><div class="v lost">❌ ' + sl.lost + '</div></div>' +
+    '<div class="tile"><div class="k">Σε εξέλιξη</div><div class="v live">🟢 ' + sl.live + '</div></div>' +
+    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + sl.pending + '</div></div></div>' +
+    '<div class="tiles"><div class="tile"><div class="k">Επιλογές που βγήκαν</div><div class="v ok">✅ ' + tot.w + '</div></div>' +
+    '<div class="tile"><div class="k">Επιλογές που έχασαν</div><div class="v lost">❌ ' + tot.l + '</div></div>' +
+    '<div class="tile"><div class="k">Παίζονται τώρα</div><div class="v live">🟢 ' + tot.p + '</div></div>' +
+    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + tot.n + '</div></div></div>';
+  if (!DATA.length) out += '<div class="card n">Δεν υπάρχουν δελτία ακόμα. Δημιουργούνται στην πρωινή εκτέλεση.</div>';
+  days.forEach(d => { out += '<h2>' + (d === today ? 'Σήμερα' : 'Προηγούμενη μέρα (ακόμα σε εξέλιξη)') + ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</h2>' + byDay[d].join(''); });
+  app.innerHTML = out;
+  const stEl = document.getElementById('status');
+  stEl.textContent = browserOk ? ('🔴 Live από ESPN · τελευταία ενημέρωση ' + lastOk.toLocaleTimeString('el-GR') + (lastErr ? ' · ⚠️ ' + lastErr : '')) :
+    (lastErr ? ('⚠️ Ο browser δεν μπόρεσε να ρωτήσει το ESPN (' + lastErr + ') — δείχνω ό,τι ήξερε το bot στην εκτέλεση των ' + genTxt + '. Ανανέωσε σε λίγο.') : 'Φόρτωση…');
+}
+
+function neededEvents() {
+  const now = Date.now(), need = {};
+  DATA.forEach(s => s.legs.forEach(l => {
+    if (!trackable(l)) return;
+    const k = key(l), st = cache[k], ko = l.ko ? Date.parse(l.ko) : null;
+    if (st && st.state === 'post') return;                           // τελείωσε: δεν ξαναρωτάμε
+    if (!st && (l.res === 'won' || l.res === 'lost' || l.res === 'void') && ['CORNERS','CARDS','CORNERS_MORE'].indexOf(l.market) < 0) return;
+    if (ko && now < ko - 20 * 60 * 1000) return;                     // δεν ξεκίνησε ακόμα
+    if (ko && now > ko + 4 * 3600 * 1000 && st) return;
+    need[k] = l;
+  }));
+  return need;
+}
+
+async function tick() {
+  if (document.visibilityState === 'hidden') return schedule();
+  const need = neededEvents(), keys = Object.keys(need);
+  if (keys.length) {
+    const results = await Promise.allSettled(keys.map(k => {
+      const l = need[k];
+      // ΧΩΡΙΣ επιπλέον επικεφαλίδες/επιλογές (π.χ. cache:'no-store'): αλλιώς ο browser στέλνει preflight και το ESPN το απορρίπτει
+      return fetch(ESPN + SPORT[l.sport] + '/' + l.lg + '/summary?event=' + l.eid)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => { cache[k] = parseSummary(d); });
+    }));
+    const bad = results.filter(r => r.status === 'rejected').length;
+    if (bad < keys.length) { browserOk = true; lastOk = new Date(); lastErr = bad ? bad + ' αγώνες δεν απάντησαν' : null; } else { lastErr = 'το ESPN δεν απαντά'; }
+  } else { lastOk = new Date(); lastErr = null; browserOk = true; }
+  render();
+  schedule();
+}
+function schedule() {
+  const anyLive = Object.keys(cache).some(k => cache[k].state === 'in');
+  setTimeout(tick, anyLive ? 30000 : 120000);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { tick(); } });
+render(); tick();
+// Νέα δελτία/δεδομένα από την τελευταία εκτέλεση του bot: κάθε 5' ελέγχουμε αν υπάρχει νεότερη έκδοση της σελίδας και ΜΟΝΟ τότε ανανεώνουμε
+// (ώστε να μη χάνεις τη θέση που κοιτάς).
+async function checkNew() {
+  try {
+    const t = await (await fetch(location.pathname + '?t=' + Date.now())).text();
+    const m = t.match(/data-gen="([^"]+)"/);
+    if (m && m[1] !== document.getElementById('data').dataset.gen) location.reload();
+  } catch (e) { /* τοπικό αρχείο ή χωρίς δίκτυο: αγνοείται */ }
+}
+setInterval(checkNew, 5 * 60 * 1000);
+window.__betbot = {judge, parseSummary, cache, DATA};
+})();
+</script></body></html>

@@ -632,7 +632,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>BetBot Δελτίο</title>
 <style>{CSS}{EXTRA_CSS}</style></head><body><main>
 <header><h1>BetBot · {GR_DAYS[loc.weekday()]} {loc:%d/%m/%Y}</h1>
-<p class="sub">Ενημέρωση {loc:%H:%M} · {n_matches} αγώνες · {n_with} επιλογές με απόδοση · {n_fair} με «δίκαιη απόδοση»</p></header>
+<p class="sub">Ενημέρωση {loc:%H:%M} · {n_matches} αγώνες · {n_with} επιλογές με απόδοση · {n_fair} με «δίκαιη απόδοση» · <a href="live.html"><b>🔴 Live: ✅/❌ σε κάθε αγώνα τώρα</b></a></p></header>
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
 <div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
 Παίζε μόνο το ποσό της εβδομάδας.</div>

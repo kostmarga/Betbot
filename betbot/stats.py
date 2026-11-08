@@ -131,5 +131,5 @@ def build(db, cfg, now):
             yesterday[lid] = dict(max(cand, key=lambda s: s["created_at"]), day=last_day)
     todays = {s["list_name"]: s for s in slips if _day(s, tz) == today}
     return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
-            "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips),
+            "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays,
             "recent": [s for s in sorted(slips, key=lambda s: s["created_at"], reverse=True) if _day(s, tz) < today][:60]}

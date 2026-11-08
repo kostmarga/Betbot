@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -230,6 +231,11 @@ def main(argv=None):
     page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
+    try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)
+        with open(os.path.join(cfg["reports_dir"], "last_run.json"), "w", encoding="utf-8") as f:
+            json.dump({"generated": iso(now)}, f)
+    except OSError as e:
+        log.warning("last_run.json: %s", e)
     try:    # live σελίδα (✅/❌ σε κάθε αγώνα) με τα δελτία της ημέρας
         from betbot import live
         log.info("Live σελίδα: %s", live.run(cfg, now))

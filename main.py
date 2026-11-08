@@ -230,6 +230,11 @@ def main(argv=None):
     page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
+    try:    # live σελίδα (✅/❌ σε κάθε αγώνα) με τα δελτία της ημέρας
+        from betbot import live
+        log.info("Live σελίδα: %s", live.run(cfg, now))
+    except Exception as e:
+        log.warning("Live σελίδα: %s", e)
 
     # 7) Email
     if cfg["email"]["enabled"] and not a.no_email and not a.demo:

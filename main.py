@@ -110,6 +110,31 @@ def save_lists(db, cfg, now, lists):
             put(f"fair_{fam}" if sl.get("fair") else fam, sl["legs"], sl["total_odds"], sl["p_win"])
 
 
+def results_due_iso(db, now):
+    """Πότε αναμένεται να τελειώσει ο πρώτος αγώνας δελτίου που ακόμα δεν έχει αποτέλεσμα (για τον φύλακα του live workflow)."""
+    from datetime import timedelta
+    from betbot.stats import real_slips
+    from betbot.util import parse_iso
+    end = {"football": 150, "basketball": 180}
+    best = None
+    for sl in real_slips(db.slips()):
+        for l in sl["legs"]:
+            if l.get("result") not in (None, "open"):
+                continue
+            m = db.get_match(l["match_id"])
+            if m and m["status"] in ("finished", "postponed"):
+                continue
+            try:
+                due = parse_iso(l["kickoff"]) + timedelta(minutes=end.get(l.get("sport"), 150))
+            except (KeyError, TypeError, ValueError):
+                continue
+            if now - due > timedelta(hours=12):      # παλιά/ξεχασμένα σκέλη δεν μετράνε
+                continue
+            if best is None or due < best:
+                best = due
+    return iso(best) if best else None
+
+
 def run_live(cfg, loop=False):
     import subprocess
     import time
@@ -233,7 +258,7 @@ def main(argv=None):
     log.info("Αναφορά: %s", path)
     try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)
         with open(os.path.join(cfg["reports_dir"], "last_run.json"), "w", encoding="utf-8") as f:
-            json.dump({"generated": iso(now)}, f)
+            json.dump({"generated": iso(now), "results_due": results_due_iso(db, now)}, f)
     except OSError as e:
         log.warning("last_run.json: %s", e)
     try:    # live σελίδα (✅/❌ σε κάθε αγώνα) με τα δελτία της ημέρας

@@ -358,8 +358,15 @@ def build_lists(cands: dict, cfg) -> dict:
     rc = L["recommended"]
     pool = [c for c in ok if not_blocked(c, "recommended") and c["p"] >= rc["min_leg_prob"]
             and c["odds"] <= rc["max_leg_odds"]]
-    slip = build_slip(pool, rc["min_total"], rc["max_total"], rc["min_legs"], rc["max_legs"], cfg,
-                      max_basket=rc["max_basketball_legs"])
+    # Μέρα με ΛΙΓΟ ποδόσφαιρο (π.χ. Δευτέρα: 2 ματς LaLiga 2 + 8 NBA): αλλιώς το δελτίο θα ήταν αδύνατο με 1 σκέλος μπάσκετ.
+    n_fb = len({c["match_id"] for c in pool if c["sport"] == "football"})
+    max_basket = rc["max_basketball_legs"]
+    thin = n_fb < rc.get("thin_football_matches", 4)
+    if thin:
+        max_basket = max(max_basket, rc.get("max_basketball_legs_thin", 2))
+    slip = build_slip(pool, rc["min_total"], rc["max_total"], rc["min_legs"], rc["max_legs"], cfg, max_basket=max_basket)
+    if slip:
+        slip["thin_day"] = thin and sum(1 for l in slip["legs"] if l["sport"] == "basketball") > rc["max_basketball_legs"]
     used = {l["match_id"] for l in slip["legs"]} if slip else set()
     spool = [c for c in ok if not_blocked(c, "recommended") and c["p"] >= rc["single_min_prob"]
              and rc["single_min_odds"] <= c["odds"] <= rc["single_max_odds"] and c["match_id"] not in used]

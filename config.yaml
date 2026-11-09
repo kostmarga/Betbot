@@ -174,7 +174,7 @@ lists:
 
 # ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
 bankroll:
-  weekly: 20.0
+  weekly: 21.0           # 3€ τη μέρα: 2€ δελτίο ~2 + 1€ δελτίο ~10
   unit: 2.0
   max_bets_per_day: 2
   stop_at: 10.0

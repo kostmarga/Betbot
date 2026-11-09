@@ -307,6 +307,10 @@ function update() {
 }
 const legs = rows.map(r => r.leg);
 if (legs.length) B.start(legs, update); else update();
+// Αυτοέλεγχος: φτάνει η συσκευή σου στο ESPN; (μία ερώτηση κατά το άνοιγμα)
+(function(){ var c = document.getElementById('espnchk'); if (!c) return;
+  B.probe().then(function(r){ c.innerHTML = r === 'ok' ? '📡 Σύνδεση με ESPN από τη συσκευή σου: ✅ λειτουργεί' :
+    '📡 Σύνδεση με ESPN από τη συσκευή σου: ⚠️ δεν απαντά (' + r + '). Τα αποτελέσματα θα φανούν μετά το επόμενο τρέξιμο του bot.'; }); })();
 
 // 2) Προειδοποίηση όταν η σελίδα είναι ξεπερασμένη (το GitHub καθυστερεί τα προγραμματισμένα τρεξίματα)
 const GEN = new Date(document.querySelector('meta[name=generated]').content), NOW = new Date();
@@ -932,7 +936,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
 <div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
 Παίζε μόνο το ποσό της εβδομάδας.</div>
-{daysum_html}<div class="livestat" id="livestat"></div>
+{daysum_html}<div class="livestat" id="livestat"></div><div class="livestat" id="espnchk"></div>
 <nav class="tabs" role="tablist">{tabs_html}</nav>{body}</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>

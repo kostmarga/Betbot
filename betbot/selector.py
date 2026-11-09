@@ -127,6 +127,35 @@ class MatchContext:
             if r["status"] in ("missing", "doubtful"):
                 self.absent.setdefault(r["team"], []).append(r)
 
+    def lineup_note(self):
+        """(κείμενο, προειδοποίηση|None): αν η ενδεκάδα ανακοινώθηκε και πόσες αλλαγές έκανε κάθε ομάδα από το προηγούμενο ματς (rotation)."""
+        starters = {t: {r["player"] for r in self.lineups if r["team"] == t and r["status"] == "starter" and r["source"] == "espn"}
+                    for t in (self.home, self.away)}
+        if not any(len(v) >= 9 for v in starters.values()):
+            return None, None
+        parts, warn = [], None
+        for t, cur in starters.items():
+            if len(cur) < 9:
+                continue
+            rows = self.db.conn.execute(
+                "SELECT l.match_id, l.player FROM lineups l JOIN matches mm ON mm.match_id=l.match_id "
+                "WHERE l.team=? AND l.status='starter' AND l.source='espn' AND l.match_id<>? AND mm.kickoff<? ORDER BY mm.kickoff DESC",
+                (t, self.m["match_id"], self.m["kickoff"])).fetchall()
+            prev = {}
+            for r in rows:
+                prev.setdefault(r["match_id"], set()).add(r["player"])
+                if len(prev) > 1:
+                    break
+            last = next(iter(prev.values()), None)
+            if last and len(last) >= 9:
+                ch = len(cur - last)
+                parts.append(f"{t}: {ch} αλλαγές στην ενδεκάδα")
+                if ch >= 6:
+                    warn = f"Μεγάλη ανανέωση ενδεκάδας ({t}: {ch} αλλαγές) — πιθανή rotation"
+            else:
+                parts.append(f"{t}: ενδεκάδα ανακοινώθηκε")
+        return ("Ενδεκάδα ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
+
     def absences(self, team):
         return self.absent.get(team, [])
 
@@ -182,6 +211,11 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,
         "warnings": [], "blocked": set(), "why": [],
     }
+    ln, lw = ctx.lineup_note() if market != "PLAYER" else (None, None)
+    if ln:
+        c["why"].append(ln)
+    if lw:
+        c["warnings"].append(lw)
     if cal_d > 0.004 and q is not None:
         c["why"].append(f"Πιθανότητα {p * 100:.0f}%: η αγορά δίνει {p_raw * 100:.0f}% και τα φαβορί αυτού του επιπέδου βγαίνουν στο ιστορικό "
                         f"λίγο συχνότερα (+{cal_d * 100:.1f} μονάδες)")

@@ -18,15 +18,15 @@ h2{font-size:16px;margin:20px 0 6px;color:var(--muted);font-weight:600}
 .b-won{color:var(--ok);border-color:var(--ok)}.b-lost{color:var(--bad);border-color:var(--bad)}.b-live{color:var(--live);border-color:var(--live)}
 #status{font-size:13px;color:var(--muted)}a{color:inherit}
 </style></head><body><main>
-<h1>🔴 BetBot Live</h1>
-<p class="sub">✅ βγήκε · ❌ έχασε · 🟢 πάει καλά · 🔴 πάει άσχημα · ⏳ δεν ξεκίνησε · ➖ χωρίς live ·
+<h1>BetBot Live</h1>
+<p class="sub">✅ βγήκε · ❌ έχασε · ▲ πάει καλά · ▼ πάει άσχημα · ○ δεν ξεκίνησε · – χωρίς live ·
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 23:27 (09/11). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 00:00 (10/11). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
 Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
 </main>
-<script id="data" type="application/json" data-gen="2026-11-09T21:27:46Z">[]</script>
+<script id="data" type="application/json" data-gen="2026-11-09T22:00:42Z">[]</script>
 <script>
 // Κοινός κώδικας live (live σελίδα + κύρια σελίδα): κρίση επιλογής, ρώτημα ESPN ΜΟΝΟ όσο παίζεται αγώνας, χρονοδιάγραμμα.
 window.BetbotLive = (function(){
@@ -54,7 +54,7 @@ function parseSummary(d) {
 }
 
 // Κρίση επιλογής: [κωδικός, κείμενο προόδου]. Ίδια λογική με το selector.settle_leg + live (sure/dead/ok/bad).
-// Χωρίς ζωντανά δεδομένα: εκτίμηση από την ώρα. ⏳ ΜΟΝΟ πριν την έναρξη· μετά ⚽ (παίζεται) ή 🏁 (τελείωσε, περιμένω αποτέλεσμα).
+// Χωρίς ζωντανά δεδομένα: εκτίμηση από την ώρα. ○ ΜΟΝΟ πριν την έναρξη· μετά ● (παίζεται) ή ◆ (τελείωσε, περιμένω αποτέλεσμα).
 const END_MIN = {football: 150, basketball: 180};
 function byTime(l) {
   const ko = l.ko ? Date.parse(l.ko) : NaN;
@@ -103,7 +103,7 @@ function judge(l, st) {
   return ['na', sc];
 }
 const grp = c => (c === 'won' || c === 'sure') ? 'w' : (c === 'lost' || c === 'dead') ? 'l' : (c === 'ok' || c === 'bad' || c === 'play') ? 'p' : (c === 'wait') ? 'q' : 'n';
-const IC = {won:'✅', lost:'❌', void:'↩️', sure:'✅', dead:'❌', ok:'🟢', bad:'🔴', play:'⚽', wait:'🏁', pending:'⏳', na:'➖'};
+const IC = {won:'✅', lost:'❌', void:'↺', sure:'✅', dead:'❌', ok:'▲', bad:'▼', play:'●', wait:'◆', pending:'○', na:'–'};
 
 // Ποιοι αγώνες χρειάζονται ερώτηση: ΜΟΝΟ όσοι έχουν ήδη ξεκινήσει και δεν έχουν τελειώσει (όχι πριν την έναρξη, όχι μετά το τέλος).
 function neededEvents() {
@@ -163,10 +163,10 @@ function slipVerdict(codes) {
   if (codes.some(c => c === 'lost' || c === 'dead')) return ['lost', '❌ ΔΕΝ ΠΕΡΑΣΕ'];
   if (codes.every(c => c === 'won' || c === 'void')) return ['won', '✅ ΠΕΡΑΣΕ'];
   if (codes.every(c => c === 'won' || c === 'void' || c === 'sure')) return ['won', '✅ Σχεδόν σίγουρο'];
-  if (codes.some(c => c === 'ok' || c === 'bad' || c === 'play')) return ['live', '⚽ Παίζεται'];
-  if (codes.some(c => c === 'wait')) return ['wait', '🏁 Περιμένω αποτελέσματα'];
-  if (codes.some(c => c === 'won' || c === 'sure')) return ['live', '🟢 Σε εξέλιξη'];
-  return ['pending', '⏳ Δεν ξεκίνησε'];
+  if (codes.some(c => c === 'ok' || c === 'bad' || c === 'play')) return ['live', '● Παίζεται'];
+  if (codes.some(c => c === 'wait')) return ['wait', '◆ Περιμένω αποτελέσματα'];
+  if (codes.some(c => c === 'won' || c === 'sure')) return ['live', '▲ Σε εξέλιξη'];
+  return ['pending', '○ Δεν ξεκίνησε'];
 }
 return {start, probe, judge, parseSummary, cache, key, trackable, hhmm, esc, grp, IC, status, slipVerdict, byTime};
 })();
@@ -205,28 +205,28 @@ function render() {
     if (s.day === TODAY) sl[v]++;
     const c = {w: 0, l: 0, p: 0, q: 0, n: 0}; codes.forEach(x => c[grp(x)]++);
     const card = '<div class="card"><h3><span>' + esc(s.name) + ' <span class="tot">· ' + (s.fair ? 'ελάχιστη απόδοση ' : 'απόδοση ') + Number(s.odds).toFixed(2) + ' · εκτίμηση ' + Math.round((s.p || 0) * 100) + '%</span></span><span class="badge b-' + v + '">' + vt + '</span></h3>' +
-      '<div class="cnt">✅ <b>' + c.w + '</b> · ❌ <b>' + c.l + '</b> · ⚽ <b>' + c.p + '</b> παίζονται · 🏁 <b>' + c.q + '</b> περιμένω αποτέλεσμα · ⏳ <b>' + c.n + '</b> δεν ξεκίνησαν</div>' + rows.join('') + '</div>';
+      '<div class="cnt">✅ <b>' + c.w + '</b> · ❌ <b>' + c.l + '</b> · ● <b>' + c.p + '</b> παίζονται · ◆ <b>' + c.q + '</b> περιμένω αποτέλεσμα · ○ <b>' + c.n + '</b> δεν ξεκίνησαν</div>' + rows.join('') + '</div>';
     (byDay[s.day] = byDay[s.day] || []).push(card);
   });
   const days = Object.keys(byDay).sort().reverse(), today = days.length ? days[0] : '';
   let out = '<div class="tiles">' +
     '<div class="tile"><div class="k">Σήμερα: δελτία που πέρασαν</div><div class="v ok">✅ ' + sl.won + '</div></div>' +
     '<div class="tile"><div class="k">Δελτία που ΔΕΝ πέρασαν</div><div class="v lost">❌ ' + sl.lost + '</div></div>' +
-    '<div class="tile"><div class="k">Παίζονται</div><div class="v live">⚽ ' + sl.live + '</div></div>' +
-    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">🏁 ' + sl.wait + '</div></div>' +
-    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + sl.pending + '</div></div></div>' +
+    '<div class="tile"><div class="k">Παίζονται</div><div class="v live">● ' + sl.live + '</div></div>' +
+    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">◆ ' + sl.wait + '</div></div>' +
+    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">○ ' + sl.pending + '</div></div></div>' +
     '<div class="tiles"><div class="tile"><div class="k">Επιλογές που βγήκαν</div><div class="v ok">✅ ' + tot.w + '</div></div>' +
     '<div class="tile"><div class="k">Επιλογές που έχασαν</div><div class="v lost">❌ ' + tot.l + '</div></div>' +
-    '<div class="tile"><div class="k">Παίζονται τώρα</div><div class="v live">⚽ ' + tot.p + '</div></div>' +
-    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">🏁 ' + tot.q + '</div></div>' +
-    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + tot.n + '</div></div></div>';
+    '<div class="tile"><div class="k">Παίζονται τώρα</div><div class="v live">● ' + tot.p + '</div></div>' +
+    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">◆ ' + tot.q + '</div></div>' +
+    '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">○ ' + tot.n + '</div></div></div>';
   if (!DATA.length) out += '<div class="card n">Δεν υπάρχουν δελτία ακόμα. Δημιουργούνται στην πρωινή εκτέλεση.</div>';
   days.forEach(d => { out += '<h2>' + (d === today ? 'Σήμερα' : 'Προηγούμενη μέρα (ακόμα σε εξέλιξη)') + ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</h2>' + byDay[d].join(''); });
   app.innerHTML = out;
   const S = B.status(), stEl = document.getElementById('status');
   const info = S.playing ? (S.playing + ' αγώνες παίζονται· ενημερώνεται κάθε 2 λεπτά') : (S.nk ? ('Δεν παίζεται κάτι τώρα· επόμενη έναρξη ' + B.hhmm(new Date(S.nk).toISOString())) : 'Δεν παίζεται κάτι τώρα');
-  stEl.textContent = S.browserOk ? ('🔴 ' + info + (S.lastOk ? ' · τελευταία ενημέρωση ' + S.lastOk.toLocaleTimeString('el-GR') : '') + (S.lastErr ? ' · ⚠️ ' + S.lastErr : '')) :
-    (S.lastErr ? ('⚠️ Ο browser δεν μπόρεσε να ρωτήσει το ESPN (' + S.lastErr + ') — δείχνω ό,τι ήξερε το bot στην εκτέλεση των ' + genTxt + '. Ανανέωσε σε λίγο.') : 'Φόρτωση…');
+  stEl.textContent = S.browserOk ? ('▼ ' + info + (S.lastOk ? ' · τελευταία ενημέρωση ' + S.lastOk.toLocaleTimeString('el-GR') : '') + (S.lastErr ? ' · ! ' + S.lastErr : '')) :
+    (S.lastErr ? ('! Ο browser δεν μπόρεσε να ρωτήσει το ESPN (' + S.lastErr + ') — δείχνω ό,τι ήξερε το bot στην εκτέλεση των ' + genTxt + '. Ανανέωσε σε λίγο.') : 'Φόρτωση…');
 }
 // Νέα δελτία/δεδομένα από την τελευταία εκτέλεση του bot: κάθε 5' ελέγχουμε αν υπάρχει νεότερη έκδοση της σελίδας και ΜΟΝΟ τότε ανανεώνουμε
 async function checkNew() {
@@ -239,8 +239,8 @@ async function checkNew() {
 setInterval(checkNew, 5 * 60 * 1000);
 const all = []; DATA.forEach(s => s.legs.forEach(l => all.push(l)));
 B.start(all, render);
-B.probe().then(function(r){ var c = document.getElementById('espnchk'); if (c) c.innerHTML = r === 'ok' ? '📡 Σύνδεση με ESPN από τη συσκευή σου: ✅ λειτουργεί' :
-  '📡 Σύνδεση με ESPN από τη συσκευή σου: ⚠️ δεν απαντά (' + r + ')'; });
+B.probe().then(function(r){ var c = document.getElementById('espnchk'); if (c) c.innerHTML = r === 'ok' ? 'Σύνδεση με ESPN από τη συσκευή σου: ✅ λειτουργεί' :
+  'Σύνδεση με ESPN από τη συσκευή σου: ! δεν απαντά (' + r + ')'; });
 window.__betbot = {judge: B.judge, parseSummary: B.parseSummary, cache: B.cache, DATA};
 })();
 </script></body></html>

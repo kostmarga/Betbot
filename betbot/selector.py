@@ -346,6 +346,25 @@ def build_slip(cands, lo, hi, min_legs, max_legs, cfg, exclude=frozenset(), max_
             "p_market": math.prod(pq) if len(pq) == len(legs) else None, "ev": p * total - 1}
 
 
+def tier_cfg(cfg, tier):
+    """Αντίγραφο του config για επίπεδο ρίσκου (strong/balanced/bold): μετατοπίζει το `min_leg_prob` κάθε λίστας
+    και εφαρμόζει τις ειδικές τιμές του `tiers.<tier>` (π.χ. άλλο εύρος απόδοσης). balanced = το config όπως είναι."""
+    import copy
+    t = (cfg.get("tiers") or {}).get(tier) or {}
+    if not t:
+        return cfg
+    c = copy.deepcopy(cfg)
+    d = float(t.get("leg_prob_delta", 0))
+    for lst in c["lists"].values():
+        if isinstance(lst, dict) and "min_leg_prob" in lst:
+            lst["min_leg_prob"] = round(min(0.92, max(0.45, lst["min_leg_prob"] + d)), 3)
+    c["lists"]["recommended"]["single_min_prob"] = round(min(0.92, c["lists"]["recommended"]["single_min_prob"] + d), 3)
+    for k, v in t.items():
+        if k != "leg_prob_delta" and k in c["lists"]:
+            c["lists"][k].update(v)
+    return c
+
+
 def build_lists(cands: dict, cfg) -> dict:
     """Όλες οι λίστες/δελτία της ημέρας. Επιστρέφει dict list_id -> περιεχόμενο."""
     L = cfg["lists"]

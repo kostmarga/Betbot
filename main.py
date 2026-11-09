@@ -77,7 +77,7 @@ def build_models(db, cfg, ctx, now, notes):
     return models
 
 
-def save_lists(db, cfg, now, lists):
+def save_lists(db, cfg, now, lists, suffix=""):
     """Καταγράφει κάθε λίστα «στα χαρτιά» (1 μονάδα) για το ιστορικό ανά λίστα."""
     from zoneinfo import ZoneInfo
     tz_ = ZoneInfo(cfg["timezone"])
@@ -88,6 +88,7 @@ def save_lists(db, cfg, now, lists):
     created = iso(now)
 
     def put(lid, legs_full, total, p, odds_override=None):
+        lid = lid + suffix
         legs = [slim(l, (odds_override or {}).get(id(l))) for l in legs_full]
         db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True, fresh_after=fresh_after)
 
@@ -225,6 +226,13 @@ def main(argv=None):
     log.info("Επιλογές με απόδοση: %d · χωρίς απόδοση: %d · αγώνες: %d",
              len(cands["with_odds"]), len(cands["fair"]), len(cands["contexts"]))
     save_lists(db, cfg, now, lists)
+    from betbot import paper as paper_mod
+    for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)
+        if suf:
+            try:
+                save_lists(db, cfg, now, selector.build_lists(cands, selector.tier_cfg(cfg, tier)), suffix=suf)
+            except Exception as e:
+                log.warning("Επίπεδο %s: %s", tier, e)
 
     # 5) Κινήσεις αποδόσεων
     leagues = {lg["id"]: lg for lg in cfg["leagues"]}
@@ -252,8 +260,13 @@ def main(argv=None):
     except Exception as e:     # τα στατιστικά δεν πρέπει να ρίχνουν τη σελίδα
         log.warning("Στατιστικά: %s", e)
         st = None
+    try:
+        paper = paper_mod.build(db, cfg, now)
+    except Exception as e:     # το paper trading δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("Paper trading: %s", e)
+        paper = None
     cidx = {(c["match_id"], c["market"], c["selection"], c["line"]): c for c in cands["with_odds"] + cands["fair"]}
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx)
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
     try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)

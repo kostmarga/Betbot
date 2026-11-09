@@ -646,7 +646,46 @@ def _clv_card(clv) -> str:
             f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
+def _ledger_html(pp) -> str:
+    """Paper trading: ταμείο ανά κατηγορία × επίπεδο ρίσκου (βλ. betbot/paper.py)."""
+    if not pp:
+        return ""
+    from .paper import CAT_NAME, CATS, TIER_NAME, TIERS
+    R = {(r["cat"], r["tier"]): r for r in pp["rows"]}
+    if not any(r["n"] for r in pp["rows"]):
+        return ("<div class='card'><h3>📒 Ταμεία (paper trading)</h3><p class='muted'>Κάθε κατηγορία × επίπεδο ρίσκου έχει δικό της "
+                f"εικονικό ταμείο {pp['weekly']:.0f}€ την εβδομάδα. Θα γεμίσει από την πρώτη εκτέλεση.</p></div>")
+    money = lambda v: f"{v:+.2f}€"
+    wk, tot = [], []
+    for cat in CATS:
+        for tier in TIERS:
+            r = R[(cat, tier)]
+            if not r["n"]:
+                continue
+            nm = f"{CAT_NAME[cat]} · {TIER_NAME[tier]}"
+            cls = "ok" if r["wk_pl"] > 0 else "ko" if r["wk_pl"] < 0 else ""
+            wk.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['wk_bets']}</td><td class='n'>{r['wk_spent']:.0f}€</td>"
+                      f"<td class='n {cls}'><b>{money(r['wk_pl'])}</b></td><td class='n'>{r['wk_open']:.0f}€</td>"
+                      f"<td class='n'>{r['wk_left']:.0f}€</td></tr>")
+            roi = "—" if r["roi"] is None else f"{r['roi']:+.0%}"
+            ci = "" if not r["ci"] else f" <span class='muted'>({r['ci'][0]:+.0%}…{r['ci'][1]:+.0%})</span>"
+            hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
+            c2 = "ok" if r["profit"] > 0 else "ko" if r["profit"] < 0 else ""
+            tot.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['n']}</td><td class='n'>{r['won']}/{r['lost']}</td>"
+                       f"<td class='n'>{hit}</td><td class='n {c2}'><b>{money(r['profit'])}</b></td><td class='n'>{roi}{ci}</td>"
+                       f"<td>{r['verdict_text']}</td></tr>")
+    return ("<div class='card'><h3>📒 Ταμεία: " f"{pp['weekly']:.0f}€ την εβδομάδα ανά κατηγορία και ρίσκο</h3>"
+            "<p class='muted'>Εικονικά στοιχήματα (paper trading), δεν παίζεται πραγματικό χρήμα. Κάθε συνδυασμός έχει δικό του ταμείο· "
+            "δείχνει πόσα θα είχαμε χάσει ή κερδίσει. Στόχος: να κρατήσουμε μόνο ό,τι αποδεδειγμένα αξίζει.</p>"
+            f"<h4>Αυτή την εβδομάδα (από {pp['monday']:%d/%m})</h4><div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th>"
+            "<th>Στοιχηματίστηκαν</th><th>Κ/Ζ έως τώρα</th><th>Εκκρεμή</th><th>Υπόλοιπο</th></tr></thead><tbody>" + "".join(wk) + "</tbody></table></div>"
+            "<h4>Συνολικά και κρίση</h4><p class='muted'>Κρίση μόνο μετά από " f"{pp['need']} δελτία που κρίθηκαν. «Αξίζει» = το κάτω όριο του 95% διαστήματος του ROI είναι "
+            "πάνω από 0· «να αφαιρεθεί» = το πάνω όριο είναι κάτω από 0.</p>"
+            "<div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>✅/❌</th><th>Επιτυχία</th><th>Κ/Ζ</th><th>ROI (95%)</th><th>Κρίση</th></tr></thead><tbody>"
+            + "".join(tot) + "</tbody></table></div></div>")
+
+
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None) -> str:
     P = Page(cfg)
     P.now = now
     tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
@@ -801,7 +840,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     for tid, lname in TAB_LIST.items():
         if tid in sec:
             sec[tid] = _yesterday_card(st, lname) + sec[tid]
-    sec["history"] = (_goals_card(goals) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
+    sec["history"] = (_goals_card(goals) + _ledger_html(paper) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
                       "με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. "
                       "«Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p>"
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"

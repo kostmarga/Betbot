@@ -32,7 +32,7 @@ TABS = [
     ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
     ("x100", "🎰 100+"), ("overs", "Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
     ("throw_ins", "↔️ Πλάγια"), ("players", "👤 Παίκτες"), ("combo", "🔀 Συνδυαστικό"),
-    ("moves", "📉 Κινήσεις"), ("analysis", "📊 Ανάλυση"), ("calendar", "📆 Ημερολόγιο"), ("sources", "⚙️ Πηγές"),
+    ("live", "Live αξία"), ("moves", "📉 Κινήσεις"), ("analysis", "📊 Ανάλυση"), ("calendar", "📆 Ημερολόγιο"), ("sources", "⚙️ Πηγές"),
 ]
 SLIP_TABS = ("recommended", "safe", "x10", "x30", "x100", "overs", "corners", "cards", "throw_ins", "players", "combo")
 GROUPS = [   # κάτω μπάρα: (id, ετικέτα, εικονίδιο SVG path, καρτέλες)
@@ -40,7 +40,7 @@ GROUPS = [   # κάτω μπάρα: (id, ετικέτα, εικονίδιο SVG 
     ("slips", "Δελτία", "M7 4h10a2 2 0 012 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V6a2 2 0 012-2zM9 9h6M9 13h6", SLIP_TABS),
     ("analysis", "Ανάλυση", "M4 20V10M10 20V4M16 20v-8M22 20H2", ("analysis",)),
     ("calendar", "Ημερολόγιο", "M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM4 10h16M8 3v4M16 3v4", ("calendar",)),
-    ("more", "Άλλα", "M5 12h.01M12 12h.01M19 12h.01", ("moves", "sources")),
+    ("more", "Άλλα", "M5 12h.01M12 12h.01M19 12h.01", ("live", "moves", "sources")),
 ]
 LIST_NAMES = dict(TABS) | {"single": "⭐ Μονό της ημέρας", "safe1": "Safe (μονά)",
                            "fair_corners": "🚩 Κόρνερ (δίκαιη)", "fair_cards": "🟨 Κάρτες (δίκαιη)",
@@ -694,6 +694,85 @@ def _ledger_html(pp) -> str:
             + "".join(tot) + "</tbody></table></div></div>")
 
 
+LIVE_JS = r"""
+document.addEventListener('DOMContentLoaded', function(){
+const el = document.getElementById('priors'); if (!el) return;
+const P = JSON.parse(el.textContent), box = document.getElementById('livebox'), B = window.BetbotLive;
+const fact = n => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
+const pois = (k, l) => Math.exp(-l) * Math.pow(l, k) / fact(k);
+const S = {};                       // eid -> {state, hs, as, min}
+function minute(st) {
+  if (!st || st.state === 'pre') return 0;
+  if (st.state === 'post') return 90;
+  const d = String(st.clock || ''); if (/half/i.test(d) || /^HT/i.test(d)) return 45;
+  const m = d.match(/(\d+)(?:\+(\d+))?/); return m ? Math.min(95, parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) : 0)) : 0;
+}
+function markets(p, st) {
+  const mn = Math.min(90, minute(st)), f = Math.max(0.02, (90 - mn) / 90), h = st ? st.hs : 0, a = st ? st.as : 0;
+  const lh = p.lh * f, la = p.la * f, N = 9; let p1 = 0, px = 0, p2 = 0, ov15 = 0, ov25 = 0, ov35 = 0, bt = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const q = pois(i, lh) * pois(j, la), H = h + i, A = a + j, T = H + A;
+    if (H > A) p1 += q; else if (H === A) px += q; else p2 += q;
+    if (T >= 2) ov15 += q; if (T >= 3) ov25 += q; if (T >= 4) ov35 += q; if (H > 0 && A > 0) bt += q;
+  }
+  const t = p1 + px + p2;
+  return [['Νίκη ' + p.home, p1 / t], ['Ισοπαλία', px / t], ['Νίκη ' + p.away, p2 / t], ['Over 1.5 γκολ', ov15 / t], ['Over 2.5 γκολ', ov25 / t],
+          ['Over 3.5 γκολ', ov35 / t], ['Under 2.5 γκολ', 1 - ov25 / t], ['Και οι δύο σκοράρουν', bt / t]];
+}
+function render() {
+  const now = Date.now(); let n = 0, html = '';
+  P.forEach((p, idx) => {
+    const ko = Date.parse(p.ko), st = S[p.eid], pre = now < ko, fin = st && st.state === 'post';
+    if (fin) return; n++;
+    const score = st && st.state !== 'pre' ? st.hs + '-' + st.as : '–', when = pre ? 'ξεκινά ' + B.hhmm(p.ko) : (st && st.state === 'in' ? (st.clock || 'παίζεται') : 'παίζεται');
+    const rows = markets(p, st).map((m, k) => {
+      const pr = m[1], fair = pr > 0.001 ? 1 / pr : 999;
+      return '<tr data-i="' + idx + '" data-k="' + k + '"><td>' + B.esc(m[0]) + '</td><td class="n">' + (pr * 100).toFixed(0) + '%</td><td class="n"><b>' + fair.toFixed(2) +
+        '</b></td><td class="n"><input class="od" inputmode="decimal" placeholder="απόδοση" value="' + (window.__odds && window.__odds[p.eid + '|' + k] || '') + '"></td><td class="vv"></td></tr>';
+    }).join('');
+    html += '<div class="card"><div class="slip-top"><div><div class="eyebrow">' + B.esc(p.league) + '</div><b>' + B.esc(p.home) + ' – ' + B.esc(p.away) + '</b>' +
+      '<div class="muted">' + B.esc(when) + '</div></div><div class="slip-odds"><small>Σκορ</small><b>' + score + '</b></div></div>' +
+      '<div class="tbl"><table><thead><tr><th>Αγορά</th><th>Πιθ.</th><th>Δίκαιη απόδ.</th><th>Η απόδοσή σου</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  });
+  if (!n) html = '<div class="card"><p class="muted">Δεν υπάρχουν ποδοσφαιρικοί αγώνες σήμερα με αρκετά δεδομένα αγοράς.</p></div>';
+  const keep = {}; box.querySelectorAll('input.od').forEach(i => { const tr = i.closest('tr'); keep[P[tr.dataset.i].eid + '|' + tr.dataset.k] = i.value; });
+  window.__odds = Object.assign(window.__odds || {}, keep);
+  box.innerHTML = html; box.querySelectorAll('input.od').forEach(i => { i.addEventListener('input', verdicts); }); verdicts();
+}
+function verdicts() {
+  box.querySelectorAll('tr[data-i]').forEach(tr => {
+    const p = P[tr.dataset.i], m = markets(p, S[p.eid])[tr.dataset.k], inp = tr.querySelector('input.od'), v = parseFloat(String(inp.value).replace(',', '.')), c = tr.querySelector('.vv');
+    window.__odds = window.__odds || {}; window.__odds[p.eid + '|' + tr.dataset.k] = inp.value;
+    if (!(v > 1)) { c.textContent = ''; return; }
+    const ev = m[1] * v - 1;
+    c.innerHTML = ev >= 0.03 ? '<span class="badge good">αξίζει +' + (ev * 100).toFixed(0) + '%</span>' : '<span class="badge bad">όχι (' + (ev * 100).toFixed(0) + '%)</span>';
+  });
+}
+async function poll() {
+  const now = Date.now(); let any = false;
+  for (const p of P) {
+    const ko = Date.parse(p.ko); if (now < ko - 5 * 60000 || now > ko + 4 * 3600000) continue;
+    const old = S[p.eid]; if (old && old.state === 'post') continue; any = true;
+    try { const r = await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/' + p.lg + '/summary?event=' + p.eid); if (r.ok) S[p.eid] = B.parseSummary(await r.json()); } catch (e) {}
+  }
+  render(); setTimeout(poll, any ? 120000 : 300000);
+}
+render(); poll();
+});
+"""
+
+
+def _live_html(pri) -> str:
+    if not pri:
+        return "<div class='card'><h3>Live αξία</h3><p class='muted'>Δεν υπάρχουν ποδοσφαιρικοί αγώνες με αρκετά δεδομένα αγοράς αυτή τη στιγμή.</p></div>"
+    import json as _j
+    data = _j.dumps(pri, ensure_ascii=False).replace('</', '<\\/')
+    return ("<div class='card'><h3>Live αξία: τι αξίζει να παίξεις τώρα</h3><p class='muted'>Δίνουμε τη <b>δίκαιη απόδοση</b> κάθε αγοράς για το σκορ και το λεπτό που βλέπεις. "
+            "Γράψε την απόδοση που βλέπεις στο πρακτορείο σου και η σελίδα λέει αν αξίζει (πάνω από +3% αξία). Δεν υπάρχουν δωρεάν ζωντανές αποδόσεις, γι' αυτό τις γράφεις εσύ.</p>"
+            "<p class='muted'>Προσοχή: υπολογισμός χωρίς δοκιμή στο παρελθόν· αγνοεί κόκκινες κάρτες και τραυματισμούς. Ενημερώνεται κάθε 2 λεπτά μόνο για αγώνες που παίζονται.</p></div>"
+            "<div id='livebox'></div>" + f"<script type='application/json' id='priors'>{data}</script><script>{LIVE_JS}</script>")
+
+
 def _hero_html(plan, cfg, loc, n_matches, n_with, paper) -> str:
     """Η αρχική κάρτα: τι αποφασίζει το bot για σήμερα, σε μία ματιά."""
     br = cfg["bankroll"]
@@ -822,7 +901,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
     return "".join(out)
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None, tier_lists=None) -> str:
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None, tier_lists=None, inplay=None) -> str:
     P = Page(cfg)
     P.now = now
     tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
@@ -994,6 +1073,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
                          + "".join(rows) + "</tbody></table></div>" if rows else "<p class='muted'>Δεν υπάρχει ακόμα ιστορικό.</p>")
                       + "</div>" + hist_chart + _clv_card(clv) + "</details>")
     sec["analysis"] = _analysis_html(P, cfg, paper, st, goals, clv, _details)
+    sec["live"] = _live_html(inplay)
     sec["calendar"] = _calendar_html(st) or "<div class='card'><p class='muted'>Το ημερολόγιο θα γεμίσει με τα πρώτα δελτία.</p></div>"
 
     # ⚙️ Πηγές + κανόνες

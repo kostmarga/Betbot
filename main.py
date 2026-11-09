@@ -267,8 +267,14 @@ def main(argv=None):
     except Exception as e:     # το paper trading δεν πρέπει να ρίχνει τη σελίδα
         log.warning("Paper trading: %s", e)
         paper = None
+    try:
+        from betbot import inplay as inplay_mod
+        inplay_pri = inplay_mod.priors(cands, cfg, now)
+    except Exception as e:     # το live δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("Live αξία: %s", e)
+        inplay_pri = []
     cidx = {(c["match_id"], c["market"], c["selection"], c["line"]): c for c in cands["with_odds"] + cands["fair"]}
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper, tier_lists)
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper, tier_lists, inplay_pri)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
     try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)

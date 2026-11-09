@@ -112,6 +112,10 @@ collectors:
     backfill_days: 60                   # πρώτη εκτέλεση: πόσες μέρες ιστορικό (~1 ώρα)
     daily_lookback_days: 3              # επόμενες εκτελέσεις: μόνο οι τελευταίες μέρες
     max_calls_per_run: 2500             # ασφάλεια: μέγιστες κλήσεις ανά εκτέλεση
+  espn_lineups:
+    enabled: true                       # ενδεκάδες από το ESPN (~1 ώρα πριν τον αγώνα) + διαιτητής όπου υπάρχει
+    window_hours: 3
+    max_calls_per_run: 40
   espn_stats:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120

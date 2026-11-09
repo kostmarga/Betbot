@@ -59,6 +59,37 @@ def summary_by_list(slips):
     return out
 
 
+def calendar_data(db, slips, tz, names, today, days=150):
+    """Όλα τα δελτία (και των επιπέδων ρίσκου) ανά ημέρα για το ημερολόγιο της σελίδας: {YYYY-MM-DD: [δελτίο]}."""
+    from .paper import SUFFIX, TIER_NAME
+    cut = today - timedelta(days=days)
+    out, ms = defaultdict(list), {}
+    for s in sorted(slips, key=lambda x: x["created_at"]):
+        ln = s.get("list_name") or ""
+        tier, base = "balanced", ln
+        for t, suf in SUFFIX.items():
+            if suf and ln.endswith(suf):
+                tier, base = t, ln[:-len(suf)]
+        if base not in names or _LEGACY.search(s["slip_id"]):
+            continue
+        d = _day(s, tz)
+        if d < cut:
+            continue
+        legs = []
+        for l in s["legs"]:
+            mid = l["match_id"]
+            if mid not in ms:
+                m = db.get_match(mid)
+                ms[mid] = (m["home_score"], m["away_score"]) if m and m["home_score"] is not None else None
+            sc = ms[mid]
+            legs.append({"h": l["home"], "a": l["away"], "lb": str(l.get("label") or ""), "o": l.get("odds"),
+                         "r": l.get("result") or "open", "sc": f"{sc[0]}-{sc[1]}" if sc else ""})
+        name = names[base] + ("" if tier == "balanced" else " · " + TIER_NAME[tier])
+        out[d.isoformat()].append({"n": name, "o": round(s["total_odds"], 2), "p": round(s["model_prob"] or 0, 3),
+                                   "s": s["status"], "f": base.startswith("fair_"), "L": legs})
+    return dict(out)
+
+
 def day_grid(slips, tz, today, days=14):
     """{ημέρα: {κατηγορία: won|lost|void|open}} για τις τελευταίες `days` μέρες (χωρίς σήμερα)."""
     grid = defaultdict(dict)
@@ -132,4 +163,5 @@ def build(db, cfg, now):
     todays = {s["list_name"]: s for s in slips if _day(s, tz) == today}
     return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
             "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays,
+            "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),
             "recent": [s for s in sorted(slips, key=lambda s: s["created_at"], reverse=True) if _day(s, tz) < today][:60]}

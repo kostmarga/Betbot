@@ -97,11 +97,21 @@ def build(db, cfg, now) -> dict:
             for b in bets:
                 if b["profit"] is not None:
                     weeks[b["wk"]] = weeks.get(b["wk"], 0.0) + b["profit"]
+            # Στόχος «5 στις 7»: σε πόσες μέρες της εβδομάδας πέρασε το δελτίο
+            wk_pass = sum(1 for b in wk_bets if b["status"] == "won")
+            wk_fail = sum(1 for b in wk_bets if b["status"] == "lost")
+            done_weeks = {}
+            for b in bets:
+                if b["wk"] < monday and b["status"] in ("won", "lost"):
+                    w = done_weeks.setdefault(b["wk"], [0, 0])
+                    w[0] += b["status"] == "won"
+                    w[1] += 1
+            avg_days = (sum(w[0] / w[1] * 7 for w in done_weeks.values()) / len(done_weeks)) if done_weeks else None
             rows.append({"cat": cat, "tier": tier, "n": len(bets), "settled": len(settled), "won": won,
                          "lost": len(settled) - won, "open": len(bets) - len([b for b in bets if b["profit"] is not None]),
                          "hit": (won / len(settled)) if settled else None, "staked": staked, "profit": profit, "roi": roi,
                          "ci": ci, "verdict": vkey, "verdict_text": vtxt, "avg_odds": (sum(b["odds"] for b in settled) / len(settled)) if settled else None,
                          "avg_p": (sum(b["p"] for b in settled) / len(settled)) if settled else None,
                          "wk_bets": len(wk_bets), "wk_spent": sum(b["stake"] for b in wk_bets), "wk_open": wk_open, "wk_pl": wk_pl,
-                         "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
+                         "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
     return {"rows": rows, "weekly": weekly, "need": need, "monday": monday}

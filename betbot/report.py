@@ -725,22 +725,23 @@ def _ledger_html(pp) -> str:
             cls = "ok" if r["wk_pl"] > 0 else "ko" if r["wk_pl"] < 0 else ""
             wk.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['wk_bets']}</td><td class='n'>{r['wk_spent']:.0f}€</td>"
                       f"<td class='n {cls}'><b>{money(r['wk_pl'])}</b></td><td class='n'>{r['wk_open']:.0f}€</td>"
-                      f"<td class='n'>{r['wk_left']:.0f}€</td></tr>")
+                      f"<td class='n'>{r['wk_left']:.0f}€</td>"
+                      f"<td class='n'>{r['wk_pass']}✅ {r['wk_fail']}❌ <span class='muted'>(στόχος 5/7)</span></td></tr>")
             roi = "—" if r["roi"] is None else f"{r['roi']:+.0%}"
             ci = "" if not r["ci"] else f" <span class='muted'>({r['ci'][0]:+.0%}…{r['ci'][1]:+.0%})</span>"
             hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
             c2 = "ok" if r["profit"] > 0 else "ko" if r["profit"] < 0 else ""
             tot.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['n']}</td><td class='n'>{r['won']}/{r['lost']}</td>"
                        f"<td class='n'>{hit}</td><td class='n {c2}'><b>{money(r['profit'])}</b></td><td class='n'>{roi}{ci}</td>"
-                       f"<td>{r['verdict_text']}</td></tr>")
+                       f"<td class='n'>{'—' if r['avg_days'] is None else format(r['avg_days'], '.1f') + '/7'}</td><td>{r['verdict_text']}</td></tr>")
     return ("<div class='card'><h3>📒 Ταμεία: " f"{pp['weekly']:.0f}€ την εβδομάδα ανά κατηγορία και ρίσκο</h3>"
             "<p class='muted'>Εικονικά στοιχήματα (paper trading), δεν παίζεται πραγματικό χρήμα. Κάθε συνδυασμός έχει δικό του ταμείο· "
             "δείχνει πόσα θα είχαμε χάσει ή κερδίσει. Στόχος: να κρατήσουμε μόνο ό,τι αποδεδειγμένα αξίζει.</p>"
             f"<h4>Αυτή την εβδομάδα (από {pp['monday']:%d/%m})</h4><div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th>"
-            "<th>Στοιχηματίστηκαν</th><th>Κ/Ζ έως τώρα</th><th>Εκκρεμή</th><th>Υπόλοιπο</th></tr></thead><tbody>" + "".join(wk) + "</tbody></table></div>"
+            "<th>Στοιχηματίστηκαν</th><th>Κ/Ζ έως τώρα</th><th>Εκκρεμή</th><th>Υπόλοιπο</th><th>Μέρες που πέρασε</th></tr></thead><tbody>" + "".join(wk) + "</tbody></table></div>"
             "<h4>Συνολικά και κρίση</h4><p class='muted'>Κρίση μόνο μετά από " f"{pp['need']} δελτία που κρίθηκαν. «Αξίζει» = το κάτω όριο του 95% διαστήματος του ROI είναι "
             "πάνω από 0· «να αφαιρεθεί» = το πάνω όριο είναι κάτω από 0.</p>"
-            "<div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>✅/❌</th><th>Επιτυχία</th><th>Κ/Ζ</th><th>ROI (95%)</th><th>Κρίση</th></tr></thead><tbody>"
+            "<div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>✅/❌</th><th>Επιτυχία</th><th>Κ/Ζ</th><th>ROI (95%)</th><th>Μέρες/εβδ.</th><th>Κρίση</th></tr></thead><tbody>"
             + "".join(tot) + "</tbody></table></div></div>")
 
 

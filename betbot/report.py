@@ -780,7 +780,9 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             roi = "—" if (r["roi"] is None or r["settled"] < 5) else f"{r['roi']:+.0%}"
             hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
             pl = f"{r['profit']:+.2f}€"
-            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div></div>"
+            gd = "—" if r["green_days"] is None else f"{r['green_days']:.0%}"
+            gw = "—" if r["green_weeks"] is None else f"{r['green_weeks']:.0%}"
+            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
                        f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
                        f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"
                        f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")

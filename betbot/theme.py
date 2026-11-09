@@ -28,8 +28,8 @@ backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) b
 @media (prefers-color-scheme:dark){.pill.live{background:#3a1a1d;color:#ff9aa0}}
 @keyframes pulse{50%{opacity:.35}}
 /* --- hero --- */
-.hero{background:linear-gradient(135deg,var(--hero1),var(--hero2));color:#fff;border-radius:22px;padding:20px 18px 16px;margin:14px 0 12px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.14),transparent)}
+.hero{background:var(--hero1);color:#fff;border-radius:22px;padding:20px 18px 16px;margin:14px 0 12px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;left:18px;top:0;width:38px;height:4px;border-radius:0 0 4px 4px;background:var(--accent)}
 .hero .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.7;font-weight:650}
 .hero .big{font-size:27px;line-height:1.15;font-weight:800;margin:6px 0 4px;letter-spacing:-.02em}
 .hero .why{font-size:14px;opacity:.82;max-width:34em}
@@ -120,4 +120,34 @@ td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
 .badge.mid{background:color-mix(in srgb,var(--warn) 24%,transparent);color:#8a5a00}.badge.wait{background:var(--chip);color:var(--muted)}
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
 .stat3 .tile{text-align:center}
+
+.tiersel{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px}
+.tiersel button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 11px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:14px;font:inherit;cursor:pointer;text-align:left;position:relative}
+.tiersel button b{font-size:13.5px}.tiersel button span{font-size:11px;color:var(--muted);line-height:1.25}
+.tiersel button[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-bottom:4px}.d-strong{background:var(--s3)}.d-balanced{background:var(--s4)}.d-bold{background:var(--s2)}
+
+/* --- δελτίο ως απόδειξη --- */
+.slip{padding:0;overflow:hidden}
+.slip-top{padding:16px 16px 4px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.slip .eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
+.slip-odds{text-align:right}.slip-odds small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.slip-odds b{font-size:38px;font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums;line-height:1}
+.slip-body{padding:0 16px}.slip-body .muted{margin:4px 0}
+.slip-stub{position:relative;border-top:2px dashed var(--grid);margin-top:10px;padding:14px 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--chip)}
+.slip-stub:before,.slip-stub:after{content:"";position:absolute;top:-9px;width:16px;height:16px;border-radius:50%;background:var(--plane);border:1px solid var(--border)}
+.slip-stub:before{left:-9px}.slip-stub:after{right:-9px}
+.slip-stub small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.slip-stub b{font-size:18px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.slip-more{padding:0 16px 12px;background:var(--chip)}.slip-more summary{padding:2px 0 6px}
+.slip table.picks tr{background:none;border-radius:0;margin:0;padding:12px 0;border-bottom:1px solid var(--grid)}
+.slip table.picks tr:last-child{border-bottom:0}
+
+.insight .ico{width:28px;height:28px;border-radius:50%;background:var(--chip);color:var(--ink);display:grid;place-items:center;font-weight:800;font-size:14px;flex:0 0 auto;line-height:1}
+
+/* γραμμή επιλογής πιο συμπαγής */
+table.picks td.t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+table.picks td.t .tk{display:inline;padding:0;border:0;font-size:17px}table.picks td.t .scr{display:inline;font-weight:650;color:var(--ink2)}
+.chip{font-size:12.5px}
+
+.daysum .line{font-size:12.5px;color:var(--ink2)}
 """

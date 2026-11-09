@@ -227,10 +227,12 @@ def main(argv=None):
              len(cands["with_odds"]), len(cands["fair"]), len(cands["contexts"]))
     save_lists(db, cfg, now, lists)
     from betbot import paper as paper_mod
+    tier_lists = {}
     for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)
         if suf:
             try:
-                save_lists(db, cfg, now, selector.build_lists(cands, selector.tier_cfg(cfg, tier)), suffix=suf)
+                tier_lists[tier] = selector.build_lists(cands, selector.tier_cfg(cfg, tier))
+                save_lists(db, cfg, now, tier_lists[tier], suffix=suf)
             except Exception as e:
                 log.warning("Επίπεδο %s: %s", tier, e)
 
@@ -266,7 +268,7 @@ def main(argv=None):
         log.warning("Paper trading: %s", e)
         paper = None
     cidx = {(c["match_id"], c["market"], c["selection"], c["line"]): c for c in cands["with_odds"] + cands["fair"]}
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper)
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper, tier_lists)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
     try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)

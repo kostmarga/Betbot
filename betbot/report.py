@@ -31,7 +31,15 @@ TABS = [
     ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "🛡️ Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
     ("x100", "🎰 100+"), ("overs", "⚽ Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
     ("throw_ins", "↔️ Πλάγια"), ("players", "👤 Παίκτες"), ("combo", "🔀 Συνδυαστικό"),
-    ("moves", "📉 Κινήσεις"), ("history", "📊 Ιστορικό"), ("sources", "⚙️ Πηγές"),
+    ("moves", "📉 Κινήσεις"), ("analysis", "📊 Ανάλυση"), ("calendar", "📆 Ημερολόγιο"), ("sources", "⚙️ Πηγές"),
+]
+SLIP_TABS = ("recommended", "safe", "x10", "x30", "x100", "overs", "corners", "cards", "throw_ins", "players", "combo")
+GROUPS = [   # κάτω μπάρα: (id, ετικέτα, εικονίδιο SVG path, καρτέλες)
+    ("today", "Σήμερα", "M3 11l9-8 9 8M5 10v10h14V10", ("today",)),
+    ("slips", "Δελτία", "M7 4h10a2 2 0 012 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V6a2 2 0 012-2zM9 9h6M9 13h6", SLIP_TABS),
+    ("analysis", "Ανάλυση", "M4 20V10M10 20V4M16 20v-8M22 20H2", ("analysis",)),
+    ("calendar", "Ημερολόγιο", "M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM4 10h16M8 3v4M16 3v4", ("calendar",)),
+    ("more", "Άλλα", "M5 12h.01M12 12h.01M19 12h.01", ("moves", "sources")),
 ]
 LIST_NAMES = dict(TABS) | {"single": "⭐ Μονό της ημέρας", "safe1": "🛡️ Safe (μονά)",
                            "fair_corners": "🚩 Κόρνερ (δίκαιη)", "fair_cards": "🟨 Κάρτες (δίκαιη)",
@@ -154,55 +162,7 @@ class Page:
 <details><summary>Διάγραμμα: μοντέλο vs αγορά ανά επιλογή</summary>{ch}</details></div>"""
 
 
-CSS = """
-:root{--surface:#fcfcfb;--plane:#f9f9f7;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;
---border:rgba(11,11,11,.10);--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;--s8:#e34948;
---good:#0ca30c;--goodtxt:#006300;--bad:#d03b3b;--warn:#fab219;--chip:#efeee9}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--surface:#1a1a19;--plane:#0d0d0d;--ink:#f0efec;
---ink2:#c3c2b7;--grid:#2c2c2a;--border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;
---s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;--goodtxt:#0ca30c;--chip:#262624}}
-:root[data-theme=dark]{--surface:#1a1a19;--plane:#0d0d0d;--ink:#f0efec;--ink2:#c3c2b7;--grid:#2c2c2a;
---border:rgba(255,255,255,.10);--s1:#3987e5;--s2:#d95926;--goodtxt:#0ca30c;--chip:#262624}
-*{box-sizing:border-box}body{margin:0;background:var(--plane);color:var(--ink);
-font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:1150px;margin:0 auto;padding:18px 16px 60px}
-h1{font-size:23px;margin:0 0 4px}h2{font-size:19px;margin:22px 0 8px}h3{font-size:16px;margin:0 0 8px}
-.sub{color:var(--ink2);margin:0 0 12px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}
-.tile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
-.tile .k{color:var(--ink2);font-size:12px}.tile .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
-.warn{border-left:4px solid var(--warn);background:var(--surface);padding:10px 14px;border-radius:8px;color:var(--ink2);font-size:14px}
-.tabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;margin:10px 0;position:sticky;top:0;background:var(--plane);z-index:5}
-.tabs button{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:999px;
-padding:7px 12px;font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
-.tabs button[aria-selected=true]{background:var(--ink);color:var(--plane);border-color:var(--ink)}
-.tab{display:none}.tab.on{display:block}
-.tbl{width:100%;overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
-th,td{padding:7px 8px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}
-th{color:var(--ink2);font-weight:600;font-size:12px;white-space:nowrap}
-td.n{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
-.fb{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;
-font-size:11px;font-weight:700;margin-right:2px;color:#fff}.fb.w{background:var(--good)}.fb.d{background:var(--muted)}.fb.l{background:var(--bad)}
-.pos{color:var(--goodtxt)}.neg{color:var(--bad)}.muted{color:var(--muted);font-size:13px}
-.wr{font-size:12px;color:var(--ink2);margin-top:3px}
-.mv{font-size:12px;font-weight:650;padding:1px 6px;border-radius:999px;background:var(--chip);white-space:nowrap}
-.mv.dn{color:var(--s1)}.mv.up{color:var(--s2)}
-ul.why{margin:6px 0 4px 18px;padding:0;font-size:13px;color:var(--ink2)}
-details{margin-top:4px}summary{cursor:pointer;color:var(--ink2);font-size:13px}
-.chart{position:relative;height:260px;margin-top:8px}.chart.sm{height:170px}
-.rules li{margin:3px 0;font-size:14px;color:var(--ink2)}
-td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
-@media (max-width:640px){
- table.picks thead{display:none}
- table.picks tr{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:2px 18px;
-   padding:10px 0;border-bottom:1px solid var(--grid)}
- table.picks td{border:0;padding:1px 0;text-align:left}
- table.picks td.t,table.picks td:nth-child(2),table.picks td:nth-child(3){grid-column:1/-1}
- table.picks td[data-l]::before{content:attr(data-l) " ";color:var(--muted);font-size:11px;font-weight:400}
- .chart{height:220px}
-}
-"""
+from .theme import CSS  # noqa: E402
 
 
 END_MIN = {"football": 150, "basketball": 180}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
@@ -238,26 +198,7 @@ def verdict(codes):
         return "live", "🟢 Σε εξέλιξη"
     return "pending", "⏳ Δεν ξεκίνησε"
 RESIC = {"won": "✅", "lost": "❌", "void": "↩️", "open": "⏳"}
-EXTRA_CSS = """
-.tk{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--grid);align-items:flex-start}.tk:first-of-type{border-top:0}
-.calh{display:flex;justify-content:space-between;align-items:center;margin:6px 0}.calh button{font-size:20px;padding:4px 14px;border:1px solid var(--grid);background:var(--chip);color:inherit;border-radius:8px}
-.calg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.cdw{text-align:center;font-size:12px;opacity:.6}
-.cd{min-height:52px;border:1px solid var(--grid);background:transparent;color:inherit;border-radius:8px;padding:2px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:1px}
-.cd i{font-style:normal;font-size:13px}.cd.has{background:var(--chip);font-weight:600}.cd:disabled{opacity:.35}.cd span{line-height:1.1}
-.tk .ic{width:26px;font-size:19px;line-height:1.2}.tk .sc{font-variant-numeric:tabular-nums}
-.grid td,.grid th{text-align:center;padding:6px 4px}.grid td.d{text-align:left;white-space:nowrap}
-.ok{color:var(--goodtxt)}.ko{color:var(--bad)}h4{margin:14px 0 6px;font-size:15px}
-.tk{font-size:18px}.scr{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.cnt{font-size:14px;margin:6px 0}
-.banner{background:#fff1c2;color:#5c4400;border:1px solid #e6c34d;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px}
-.banner a{color:inherit;font-weight:700}
-.vd{font-size:13px;padding:2px 8px;border-radius:999px;border:1px solid var(--grid);white-space:nowrap;font-weight:600}
-.b-won{color:var(--goodtxt);border-color:var(--goodtxt)}.b-lost{color:var(--bad);border-color:var(--bad)}
-.b-live{color:#1a6fd4;border-color:#1a6fd4}.b-wait,.b-pending{color:var(--muted)}
-.daysum{margin:10px 0 2px}.daysum .line{font-size:15px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.chip{font-size:13px;padding:3px 9px;border-radius:999px;border:1px solid var(--grid);background:var(--surface)}
-.livestat{font-size:13px;color:var(--muted);margin:6px 0}
-@media(prefers-color-scheme:dark){.banner{background:#3a3000;color:#ffe9a0;border-color:#7a6500}}
-"""
+EXTRA_CSS = ""      # όλο το CSS είναι στο betbot/theme.py
 
 INDEX_JS = r"""
 (function(){
@@ -397,14 +338,14 @@ def _plan_html(P, plan, cfg, tz, cidx, tctx=None) -> str:
     if not plan:
         return "<div class='card'><p class='muted'>Το πλάνο δεν είναι διαθέσιμο.</p></div>"
     ws = plan["week"]
-    head = ("<div class='card'><h3>🎯 Τι να παίξεις σήμερα</h3>"
+    head = ("<details class='card'><summary><b>ℹ️ Πώς υπολογίζεται το πλάνο</b> <span class='muted'>· ποσά, όρια, λογιστική</span></summary>"
             + _tiles([("Σύνολο σήμερα", f"{plan['total']:.2f}€", ""), ("Διαθέσιμο εβδομάδας", f"{ws['remaining']:.2f}€", ""),
                       ("Ζημιά εβδομάδας", f"{ws['settled_loss']:.2f}€ / {ws['loss_limit']:.0f}€", ""),
                       ("Ανοιχτά", f"{ws['open_stake']:.2f}€", "")])
             + "".join(f"<p>{E(n)}</p>" for n in plan["notes"])
             + "<p class='muted'>Παίζεις ΜΟΝΟ δελτία (όχι μονά). Τα ποσά είναι ΑΝΩΤΑΤΑ όρια, όχι υποχρέωση. Το αναμενόμενο μακροπρόθεσμο "
               "αποτέλεσμα είναι μικρή ζημιά (περίπου −3% του ποσού, βλ. backtest)· παίζεις μόνο ό,τι μπορείς να χάσεις. "
-              "Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></div>")
+              "Η εβδομαδιαία λογιστική υποθέτει ότι έπαιξες το πλάνο κάθε μέρα.</p></details>")
     cards = []
     for it in plan["items"]:
         legs = _enrich(it["legs"], cidx, tctx=tctx)
@@ -667,12 +608,13 @@ CAL_JS = """
   function iso(y,m,d){return y+'-'+pad(m+1)+'-'+pad(d);}
   function dayBadge(k){var a=D[k]||[],w=0,l=0;a.forEach(function(s){if(s.f)return;if(s.s==='won')w++;else if(s.s==='lost')l++;});
     return a.length?('<span class="cw">'+(w?w+'✅':'')+'</span><span class="cl">'+(l?l+'❌':'')+'</span>'+((w+l)<a.length?'<span>⏳</span>':'')):'';}
+  function cls(k){var w=0,l=0,a=D[k]||[];a.forEach(function(s){if(s.f)return;if(s.s==='won')w++;else if(s.s==='lost')l++;});return w&&!l?' w':l&&!w?' l':(w&&l)?' m':'';}
   function draw(){
     var y=cur.getFullYear(),m=cur.getMonth(),n=new Date(y,m+1,0).getDate(),off=(new Date(y,m,1).getDay()+6)%7;
     var h='<div class="calh"><button id="cprev">‹</button><b>'+MN[m]+' '+y+'</b><button id="cnext">›</button></div><div class="calg">';
     ['Δ','Τ','Τ','Π','Π','Σ','Κ'].forEach(function(x){h+='<div class="cdw">'+x+'</div>';});
     for(var i=0;i<off;i++)h+='<div></div>';
-    for(var d=1;d<=n;d++){var k=iso(y,m,d),has=D[k]?' has':'';h+='<button class="cd'+has+'" data-d="'+k+'"'+(D[k]?'':' disabled')+'><i>'+d+'</i>'+dayBadge(k)+'</button>';}
+    for(var d=1;d<=n;d++){var k=iso(y,m,d),has=D[k]?' has'+cls(k):'';h+='<button class="cd'+has+'" data-d="'+k+'"'+(D[k]?'':' disabled')+'><i>'+d+'</i>'+dayBadge(k)+'</button>';}
     box.innerHTML=h+'</div>';
     document.getElementById('cprev').onclick=function(){cur.setMonth(cur.getMonth()-1);draw();};
     document.getElementById('cnext').onclick=function(){cur.setMonth(cur.getMonth()+1);draw();};
@@ -743,6 +685,132 @@ def _ledger_html(pp) -> str:
             "πάνω από 0· «να αφαιρεθεί» = το πάνω όριο είναι κάτω από 0.</p>"
             "<div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>✅/❌</th><th>Επιτυχία</th><th>Κ/Ζ</th><th>ROI (95%)</th><th>Μέρες/εβδ.</th><th>Κρίση</th></tr></thead><tbody>"
             + "".join(tot) + "</tbody></table></div></div>")
+
+
+def _hero_html(plan, cfg, loc, n_matches, n_with, paper) -> str:
+    """Η αρχική κάρτα: τι αποφασίζει το bot για σήμερα, σε μία ματιά."""
+    br = cfg["bankroll"]
+    weekly = float(br["weekly"])
+    if not plan:
+        head, why, kp = "Σήμερα", "Το πλάνο δεν είναι διαθέσιμο.", []
+        rem = settled = total = None
+    else:
+        ws = plan["week"]
+        rem, settled, total = ws["remaining"], ws["settled_loss"], plan["total"]
+        n = len(plan["items"])
+        if ws["stop"]:
+            head, why = "Σταματάμε για αυτή την εβδομάδα", plan["notes"][0] if plan["notes"] else "Έφτασες το όριο ζημιάς."
+        elif n:
+            head = f"Σήμερα προτείνουμε {n} δελτί{'ο' if n == 1 else 'α'}"
+            why = f"Ποντάρισμα {total:.2f}€ συνολικά. Όλα έχουν περάσει τους κανόνες ποιότητας· παίζεις ΜΟΝΟ δελτία, ποτέ μονά."
+        else:
+            head = "Σήμερα δεν παίζουμε τίποτα"
+            why = ("Κανένα δελτίο δεν πέρασε τους κανόνες ποιότητας. Δεν είναι σφάλμα: προτιμάμε να μην παίξουμε παρά να παίξουμε αδύναμες επιλογές.")
+    used = 0 if rem is None else max(0.0, min(1.0, 1 - rem / weekly))
+    kp = ""
+    if rem is not None:
+        kp = (f"<div class='kpis'><div class='kpi'><div class='k'>Παίζω σήμερα</div><div class='v'>{total:.2f}€</div></div>"
+              f"<div class='kpi'><div class='k'>Υπόλοιπο εβδομάδας</div><div class='v'>{rem:.2f}€</div></div>"
+              f"<div class='kpi'><div class='k'>Ζημιά / όριο</div><div class='v'>{settled:.0f}/{weekly - float(br['stop_at']):.0f}€</div></div></div>"
+              f"<div class='meter' title='Πόσο από το ταμείο της εβδομάδας έχει δεσμευτεί'><i style='width:{used * 100:.0f}%'></i></div>")
+    wk = f"{GR_DAYS[loc.weekday()]} {loc:%d/%m/%Y}"
+    return (f"<section class='hero'><div class='eyebrow'>{wk} · {n_matches} αγώνες · {n_with} επιλογές</div>"
+            f"<div class='big'>{E(head)}</div><div class='why'>{E(why)}</div>{kp}</section>")
+
+
+def _verdict_badge(v) -> str:
+    return {"wait": "wait", "good": "good", "bad": "bad", "mid": "mid"}.get(v, "wait")
+
+
+def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
+    """📊 Ανάλυση: συμπεράσματα, scorecards ανά κατηγορία/ρίσκο, γραφήματα, βαθμονόμηση."""
+    from .paper import CAT_NAME, CATS, TIER_NAME, TIERS
+    out = []
+    rows = paper["rows"] if paper else []
+    R = {(r["cat"], r["tier"]): r for r in rows}
+    tot_settled = sum(r["settled"] for r in rows)
+    need = paper["need"] if paper else 30
+    # ---- συμπεράσματα
+    ins = []
+    if not tot_settled:
+        ins.append(("🌱", "Μαζεύουμε στοιχεία", f"Δεν έχει κριθεί ακόμα δελτίο στα εικονικά ταμεία. Η κρίση θα γίνει μετά από {need} δελτία ανά ταμείο."))
+    else:
+        ins.append(("📈", f"{tot_settled} δελτία έχουν κριθεί συνολικά",
+                    f"Για αξιόπιστο συμπέρασμα χρειάζονται {need}+ ανά ταμείο· όσα ταμεία έχουν λιγότερα είναι ενδείξεις, όχι αποδείξεις."))
+        cand = [r for r in rows if r["settled"] >= 5 and r["roi"] is not None]
+        if cand:
+            b = max(cand, key=lambda r: r["roi"])
+            w = min(cand, key=lambda r: r["roi"])
+            ins.append(("🏆", f"Καλύτερο ταμείο μέχρι τώρα: {CAT_NAME[b['cat']]} · {TIER_NAME[b['tier']]}",
+                        f"ROI {b['roi']:+.0%} σε {b['settled']} δελτία, επιτυχία {b['hit']:.0%}. (πρώιμη ένδειξη)"))
+            if w is not b:
+                ins.append(("⚠️", f"Πιο αδύναμο: {CAT_NAME[w['cat']]} · {TIER_NAME[w['tier']]}",
+                            f"ROI {w['roi']:+.0%} σε {w['settled']} δελτία. Αν παραμείνει χαμηλό μετά τα {need} δελτία, αφαιρείται."))
+        pe = [(r["avg_p"], r["hit"], r["settled"]) for r in rows if r["settled"] and r["avg_p"] and r["hit"] is not None]
+        if pe:
+            n_ = sum(x[2] for x in pe)
+            exp_ = sum(x[0] * x[2] for x in pe) / n_
+            act_ = sum(x[1] * x[2] for x in pe) / n_
+            msg = ("το bot είναι υπερβολικά αισιόδοξο" if act_ < exp_ - 0.08 else
+                   "το bot είναι συντηρητικό" if act_ > exp_ + 0.08 else "οι εκτιμήσεις του bot είναι ρεαλιστικές")
+            ins.append(("🎯", "Αναμενόμενη vs πραγματική επιτυχία", f"Αναμενόταν {exp_:.0%}, βγήκε {act_:.0%}: {msg}."))
+        d5 = [r for r in rows if r["avg_days"] is not None]
+        if d5:
+            b5 = max(d5, key=lambda r: r["avg_days"])
+            ins.append(("📅", "Στόχος 5 στις 7 ημέρες",
+                        f"Το πιο κοντά: {CAT_NAME[b5['cat']]} · {TIER_NAME[b5['tier']]} με {b5['avg_days']:.1f}/7 ημέρες ανά εβδομάδα. Προσοχή: πολλές νίκες δεν σημαίνουν κέρδος."))
+    out.append("<div class='card'><h3>💡 Τι μάθαμε μέχρι τώρα</h3>" + "".join(
+        f"<div class='insight'><div class='ico'>{i}</div><div><b>{E(t)}</b><span>{E(d)}</span></div></div>" for i, t, d in ins) + "</div>")
+    # ---- scorecards
+    cards = []
+    for cat in CATS:
+        trs = []
+        for tier in TIERS:
+            r = R.get((cat, tier))
+            if not r or not r["n"]:
+                continue
+            prog = min(1.0, r["settled"] / need)
+            roi = "—" if (r["roi"] is None or r["settled"] < 5) else f"{r['roi']:+.0%}"
+            hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
+            pl = f"{r['profit']:+.2f}€"
+            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div></div>"
+                       f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
+                       f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"
+                       f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")
+        if trs:
+            cards.append(f"<div class='scorecard'><h4>{E(CAT_NAME[cat])}</h4>{''.join(trs)}</div>")
+    if cards:
+        out.append("<h4 style='margin:18px 2px 8px'>Ταμεία ανά κατηγορία και ρίσκο</h4><p class='muted' style='margin:0 2px 8px'>Εικονικά στοιχήματα· "
+                   "η μπάρα δείχνει πόσο κοντά είμαστε στα δελτία που χρειάζονται για κρίση.</p><div class='sc-grid'>" + "".join(cards) + "</div>")
+    # ---- γράφημα σωρευτικού Κ/Ζ
+    top = sorted([r for r in rows if len(r["series"]) >= 2], key=lambda r: -len(r["series"]))[:6]
+    if top:
+        days = sorted({d for r in top for d, _ in r["series"]})
+        ds = []
+        for i, r in enumerate(top):
+            m = dict(r["series"])
+            last, data = None, []
+            for d in days:
+                last = m.get(d, last)
+                data.append(last)
+            ds.append({"label": f"{CAT_NAME[r['cat']]} · {TIER_NAME[r['tier']]}", "data": data, "borderColor": SERIES[i % len(SERIES)],
+                       "backgroundColor": SERIES[i % len(SERIES)], "tension": .25, "pointRadius": 2, "spanGaps": True})
+        out.append("<div class='card'><h3>💶 Σωρευτικό κέρδος/ζημιά (€, εικονικά)</h3>" + P.chart(
+            {"type": "line", "data": {"labels": [f"{d[8:10]}/{d[5:7]}" for d in days], "datasets": ds},
+             "options": {"scales": {"y": {"title": {"display": True, "text": "€"}}}, "plugins": {"legend": {"position": "bottom"}}}}) + "</div>")
+    # ---- βαθμονόμηση
+    lg = (st or {}).get("legs") or {}
+    bp = [r for r in lg.get("by_p", []) if r["p"] is not None]
+    if bp:
+        out.append("<div class='card'><h3>🎯 Βαθμονόμηση: ό,τι λέμε, βγαίνει;</h3><p class='muted'>Αν οι μπάρες είναι ίδιες, το bot λέει "
+                   "την αλήθεια. Αν το «πραγματικό» είναι χαμηλότερο, είναι υπερβολικά αισιόδοξο.</p>" + P.chart(
+            {"type": "bar", "data": {"labels": [f"{r['key']} (n={r['n']})" for r in bp], "datasets": [
+                {"label": "Αναμενόταν %", "data": [round(r["p"] * 100) for r in bp], "backgroundColor": "var(--s1)"},
+                {"label": "Βγήκε %", "data": [round(r["hit"] * 100) for r in bp], "backgroundColor": "var(--s3)"}]},
+             "options": {"scales": {"y": {"min": 0, "max": 100}}, "plugins": {"legend": {"position": "bottom"}}}}, small=True) + "</div>")
+    out.append(_goals_card(goals))
+    out.append(extra_html)
+    return "".join(out)
 
 
 def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None) -> str:
@@ -894,19 +962,23 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         hist_chart = "<div class='card'><h3>Σωρευτικό κέρδος/ζημιά ανά λίστα (μονάδες)</h3>" + P.chart(
             {"type": "line", "data": {"labels": labels, "datasets": ds},
              "options": {"scales": {"y": {"title": {"display": True, "text": "μονάδες"}}}}}) + "</div>"
-    sec["today"] = (_plan_html(P, plan, cfg, tz, cidx, tctx) + _alternatives_html(P, lists, plan, cfg, cidx, tctx, view)
+    daysum_html = _day_summary_html(today_slips, cidx, tctx)
+    sec["today"] = (_hero_html(plan, cfg, loc, n_matches, n_with, paper) + daysum_html + '<div class="livestat" id="livestat"></div>' + _plan_html(P, plan, cfg, tz, cidx, tctx) + _alternatives_html(P, lists, plan, cfg, cidx, tctx, view)
                     + _lottery_html(P, lists, cfg, cidx, tctx, view))
     from .stats import TAB_LIST
     for tid, lname in TAB_LIST.items():
         if tid in sec:
             sec[tid] = _yesterday_card(st, lname) + sec[tid]
-    sec["history"] = (_goals_card(goals) + _calendar_html(st) + _ledger_html(paper) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
+    _details = ("<details class='card'><summary><b>🔎 Αναλυτικοί πίνακες</b> <span class='muted'>· όλα τα νούμερα αναλυτικά</span></summary>"
+                + _ledger_html(paper) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
                       "με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. "
                       "«Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p>"
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"
                          "<th>Επιτυχία επιλογών</th><th>Κ/Ζ</th><th>ROI</th><th>Ανοιχτά</th></tr></thead><tbody>"
                          + "".join(rows) + "</tbody></table></div>" if rows else "<p class='muted'>Δεν υπάρχει ακόμα ιστορικό.</p>")
-                      + "</div>" + hist_chart + _clv_card(clv))
+                      + "</div>" + hist_chart + _clv_card(clv) + "</details>")
+    sec["analysis"] = _analysis_html(P, cfg, paper, st, goals, clv, _details)
+    sec["calendar"] = _calendar_html(st) or "<div class='card'><p class='muted'>Το ημερολόγιο θα γεμίσει με τα πρώτα δελτία.</p></div>"
 
     # ⚙️ Πηγές + κανόνες
     rr = cfg["rules"]
@@ -922,23 +994,28 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <li>Κάθε αγώνας το πολύ μία φορά σε κάθε δελτίο · το πολύ {cfg['selection']['max_legs_per_league']} επιλογές από την ίδια διοργάνωση</li>
 </ul></div>""")
 
-    daysum_html = _day_summary_html(today_slips, cidx, tctx)
-    tabs_html = "".join(f"<button role='tab' data-t='{tid}' aria-selected='{str(i == 0).lower()}'>{E(name)}</button>"
-                        for i, (tid, name) in enumerate(TABS))
     body = "".join(f"<section class='tab{' on' if i == 0 else ''}' id='t-{tid}' role='tabpanel'>{sec.get(tid, '')}</section>"
                    for i, (tid, _) in enumerate(TABS))
+    names = dict(TABS)
+    bar_html = "".join(
+        f"<button data-g='{gid}' aria-selected='{str(i == 0).lower()}'><svg viewBox='0 0 24 24'><path d='{ico}'/></svg>{lab}</button>"
+        for i, (gid, lab, ico, _t) in enumerate(GROUPS))
+    chips_html = "".join(
+        f"<div class='chipnav' id='cn-{gid}' hidden>" + "".join(f"<button data-t='{t}' aria-selected='false'>{E(names[t])}</button>" for t in tabs) + "</div>"
+        for gid, _l, _i, tabs in GROUPS if len(tabs) > 1)
+    tabs_html = ""
     js = json.dumps([[cid, c] for cid, c in P.charts], ensure_ascii=False)
     return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>BetBot Δελτίο</title>
 <meta name="generated" content="{iso(now)}"><style>{CSS}{EXTRA_CSS}</style></head><body><main>
+<header class="appbar"><div class="logo">B</div><div class="t"><b>BetBot</b><span>{GR_DAYS[loc.weekday()]} {loc:%d/%m} · ενημέρωση {loc:%H:%M}</span></div>
+<a class="pill live" href="live.html"><i></i>Live</a></header>
 <div id="stale" class="banner" hidden></div>
-<header><h1>BetBot · {GR_DAYS[loc.weekday()]} {loc:%d/%m/%Y}</h1>
-<p class="sub">Ενημέρωση {loc:%H:%M} · {n_matches} αγώνες · {n_with} επιλογές με απόδοση · {n_fair} με «δίκαιη απόδοση» · <a href="live.html"><b>🔴 Live: ✅/❌ σε κάθε αγώνα τώρα</b></a></p></header>
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
-<div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
-Παίζε μόνο το ποσό της εβδομάδας.</div>
-{daysum_html}<div class="livestat" id="livestat"></div><div class="livestat" id="espnchk"></div>
-<nav class="tabs" role="tablist">{tabs_html}</nav>{body}</main>
+{chips_html}{body}
+<div class="livestat" id="espnchk"></div>
+<p class="disclaimer">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές. Εικονικά στοιχήματα (paper trading) μέχρι να αποδειχθεί ότι υπάρχει πλεονέκτημα.</p></main>
+<nav class="bar" role="tablist">{bar_html}</nav>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 (function(){{
@@ -953,6 +1030,12 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
    Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",sans-serif';
    Chart.defaults.maintainAspectRatio = false;
    Chart.defaults.elements.bar.borderRadius = 4; Chart.defaults.elements.bar.borderSkipped = 'start';
+   Chart.defaults.elements.line.borderWidth = 2; Chart.defaults.elements.point.radius = 3; Chart.defaults.elements.point.borderColor = v('var(--surface)');
+   Chart.defaults.elements.bar.borderColor = v('var(--surface)'); Chart.defaults.elements.bar.borderWidth = 2;
+   Chart.defaults.plugins.legend.labels.usePointStyle = true; Chart.defaults.plugins.legend.labels.boxWidth = 8;
+   Chart.defaults.interaction = {{mode: 'index', intersect: false}};
+   Chart.defaults.plugins.tooltip.backgroundColor = v('var(--ink)'); Chart.defaults.plugins.tooltip.titleColor = v('var(--plane)'); Chart.defaults.plugins.tooltip.bodyColor = v('var(--plane)');
+   Chart.defaults.scale.grid.drawTicks = false;
    for (const [id, cfg] of CH) {{
      const el = document.getElementById(id);
      if(!el || drawn[id] || !root.contains(el)) continue;
@@ -961,14 +1044,22 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
      drawn[id] = new Chart(el, fix(cfg));
    }}
  }}
- const btns = document.querySelectorAll('.tabs button');
+ const GR = {json.dumps({gid: list(tabs) for gid, _l, _i, tabs in GROUPS})};
+ const grpOf = t => Object.keys(GR).find(g => GR[g].indexOf(t) >= 0);
+ const barBtns = document.querySelectorAll('.bar button'), chipBtns = document.querySelectorAll('.chipnav button');
+ let lastIn = {{}};
  function show(t){{
-   btns.forEach(b => b.setAttribute('aria-selected', String(b.dataset.t===t)));
+   const g = grpOf(t); lastIn[g] = t;
+   barBtns.forEach(b => b.setAttribute('aria-selected', String(b.dataset.g===g)));
+   document.querySelectorAll('.chipnav').forEach(c => c.hidden = (c.id !== 'cn-'+g));
+   chipBtns.forEach(b => b.setAttribute('aria-selected', String(b.dataset.t===t)));
    document.querySelectorAll('.tab').forEach(s => s.classList.toggle('on', s.id==='t-'+t));
    const s = document.getElementById('t-'+t); if(s) drawIn(s);
+   window.scrollTo({{top:0}});
    try {{ localStorage.setItem('betbot_tab', new Date().toDateString() + '|' + t); }} catch(e) {{}}
  }}
- btns.forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
+ barBtns.forEach(b => b.addEventListener('click', () => show(lastIn[b.dataset.g] || GR[b.dataset.g][0])));
+ chipBtns.forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
  let start = 'today';      // κάθε νέα μέρα ανοίγει στο πλάνο· η μνήμη καρτέλας ισχύει μόνο μέσα στην ίδια μέρα
  try {{ const v = (localStorage.getItem('betbot_tab') || '').split('|'); if (v[0] === new Date().toDateString() && document.getElementById('t-'+v[1])) start = v[1]; }} catch(e) {{}}
  show(start);

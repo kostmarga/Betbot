@@ -82,7 +82,7 @@ def build(db, cfg, now) -> dict:
                     continue                                   # το ταμείο της εβδομάδας εξαντλήθηκε
                 spent_w[wk] = spent_w.get(wk, 0.0) + st
                 profit = (st * sl["total_odds"] - st) if sl["status"] == "won" else (-st if sl["status"] == "lost" else (0.0 if sl["status"] == "void" else None))
-                bets.append({"wk": wk, "stake": st, "profit": profit, "status": sl["status"], "odds": sl["total_odds"], "p": sl["model_prob"]})
+                bets.append({"day": d, "wk": wk, "stake": st, "profit": profit, "status": sl["status"], "odds": sl["total_odds"], "p": sl["model_prob"]})
             settled = [b for b in bets if b["profit"] is not None and b["status"] != "void"]
             won = sum(1 for b in settled if b["status"] == "won")
             staked = sum(b["stake"] for b in settled)
@@ -93,6 +93,10 @@ def build(db, cfg, now) -> dict:
             wk_bets = [b for b in bets if b["wk"] == monday]
             wk_open = sum(b["stake"] for b in wk_bets if b["profit"] is None)
             wk_pl = sum(b["profit"] for b in wk_bets if b["profit"] is not None)
+            cum, series = 0.0, []
+            for b in sorted((b for b in bets if b["profit"] is not None), key=lambda b: b["day"]):
+                cum += b["profit"]
+                series.append([b["day"].isoformat(), round(cum, 2)])
             weeks = {}
             for b in bets:
                 if b["profit"] is not None:
@@ -113,5 +117,5 @@ def build(db, cfg, now) -> dict:
                          "ci": ci, "verdict": vkey, "verdict_text": vtxt, "avg_odds": (sum(b["odds"] for b in settled) / len(settled)) if settled else None,
                          "avg_p": (sum(b["p"] for b in settled) / len(settled)) if settled else None,
                          "wk_bets": len(wk_bets), "wk_spent": sum(b["stake"] for b in wk_bets), "wk_open": wk_open, "wk_pl": wk_pl,
-                         "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
+                         "series": series, "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
     return {"rows": rows, "weekly": weekly, "need": need, "monday": monday}

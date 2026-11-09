@@ -93,11 +93,10 @@ class Page:
             form = f"<p class='muted'>{E(c['home'])}: {_badges(c.get('form_home', []))} &nbsp; " \
                    f"{E(c['away'])}: {_badges(c.get('form_away', []))}</p>"
         tk, scr, attr = "", "", ""
-        if "res" in c:        # σκέλος καταγεγραμμένου δελτίου: ✅/❌/⏳ + σκορ (ενημερώνεται και ζωντανά από τον browser)
-            ic = {"won": "✅", "lost": "❌", "void": "↩️"}.get(c.get("res"), "⏳")
-            sc = c.get("sc")
+        if "res" in c:        # σκέλος καταγεγραμμένου δελτίου: ✅/❌/⚽/🏁/⏳ + σκορ (ενημερώνεται και ζωντανά από τον browser)
+            _code, ic, txt = leg_state(c, getattr(self, "now", None))
             tk = f"<span class='tk'>{ic}</span> "
-            scr = f"<div class='scr'>{(str(sc[0]) + '-' + str(sc[1]) + ' ΤΕΛΟΣ') if sc else ''}</div>"
+            scr = f"<div class='scr'>{E(txt)}</div>"
             if c.get("eid") and c.get("lg"):
                 leg = {k: c.get(k) for k in ("eid", "lg", "sport", "market", "ko", "res", "sc", "fair")}
                 leg["sel"] = c.get("selection")
@@ -138,14 +137,20 @@ class Page:
                  "backgroundColor": "var(--s2)"}]},
             "options": {"indexAxis": "y", "scales": {"x": {"min": 0, "max": 100, "title": {"display": True, "text": "Πιθανότητα %"}}}},
         }, small=len(sl["legs"]) <= 3)
-        return f"""<div class="card"><h3>{E(title)}</h3>{note}
+        vd, dslip = "", ""
+        if any("res" in l for l in sl["legs"]):
+            vcode, vtxt = verdict([leg_state(l, getattr(self, "now", None))[0] for l in sl["legs"]])
+            vd = f" <span class='vd b-{vcode}'>{vtxt}</span>"
+            if sl.get("list"):
+                dslip = f' data-slip="{E(sl["list"])}"'
+        return f"""<div class="card"{dslip}><h3>{E(title)}{vd}</h3>{note}
 <div class="tiles">
 <div class="tile"><div class="k">Συνολική απόδοση</div><div class="v">{sl['total_odds']:.2f}</div></div>
 <div class="tile"><div class="k">Επιλογές</div><div class="v">{len(sl['legs'])}</div></div>
 <div class="tile"><div class="k">Πιθανότητα (εκτίμηση)</div><div class="v">{sl['p_win'] * 100:.1f}%</div></div>
 <div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>
 {ev_tile}{stake_txt}{ret}
-</div>{_cnt_html(sl['legs'])}{self.pick_table(sl['legs'])}
+</div>{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'])}
 <details><summary>Διάγραμμα: μοντέλο vs αγορά ανά επιλογή</summary>{ch}</details></div>"""
 
 
@@ -200,7 +205,38 @@ td.t{white-space:nowrap;color:var(--ink2);font-variant-numeric:tabular-nums}
 """
 
 
+END_MIN = {"football": 150, "basketball": 180}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
 ENRICH = ("why", "form_home", "form_away", "warnings", "move")
+
+
+def leg_state(c, now):
+    """(κωδικός, εικονίδιο, κείμενο) ενός σκέλους καταγεγραμμένου δελτίου. ⏳ ΜΟΝΟ πριν την έναρξη· μετά ⚽ ή 🏁 ή το αποτέλεσμα."""
+    res = c.get("res")
+    sc = c.get("sc")
+    score = f"{sc[0]}-{sc[1]} ΤΕΛΟΣ" if sc else ""
+    if res in ("won", "lost", "void"):
+        return res, {"won": "✅", "lost": "❌", "void": "↩️"}[res], score
+    ko = parse_iso(c.get("ko") or c.get("kickoff")) if (c.get("ko") or c.get("kickoff")) else None
+    if ko is None or now is None or now < ko:
+        return "pending", "⏳", ""
+    if (now - ko).total_seconds() < END_MIN.get(c.get("sport"), 150) * 60:
+        return "play", "⚽", "παίζεται"
+    return "wait", "🏁", "τελείωσε · περιμένω αποτέλεσμα"
+
+
+def verdict(codes):
+    """(κωδικός, κείμενο) δελτίου από τους κωδικούς των σκελών (ίδια λογική με το BetbotLive.slipVerdict)."""
+    if any(c == "lost" for c in codes):
+        return "lost", "❌ ΔΕΝ ΠΕΡΑΣΕ"
+    if codes and all(c in ("won", "void") for c in codes):
+        return "won", "✅ ΠΕΡΑΣΕ"
+    if any(c == "play" for c in codes):
+        return "live", "⚽ Παίζεται"
+    if any(c == "wait" for c in codes):
+        return "wait", "🏁 Περιμένω αποτελέσματα"
+    if any(c == "won" for c in codes):
+        return "live", "🟢 Σε εξέλιξη"
+    return "pending", "⏳ Δεν ξεκίνησε"
 RESIC = {"won": "✅", "lost": "❌", "void": "↩️", "open": "⏳"}
 EXTRA_CSS = """
 .tk{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--grid);align-items:flex-start}.tk:first-of-type{border-top:0}
@@ -210,31 +246,63 @@ EXTRA_CSS = """
 .tk{font-size:18px}.scr{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}.cnt{font-size:14px;margin:6px 0}
 .banner{background:#fff1c2;color:#5c4400;border:1px solid #e6c34d;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px}
 .banner a{color:inherit;font-weight:700}
+.vd{font-size:13px;padding:2px 8px;border-radius:999px;border:1px solid var(--grid);white-space:nowrap;font-weight:600}
+.b-won{color:var(--goodtxt);border-color:var(--goodtxt)}.b-lost{color:var(--bad);border-color:var(--bad)}
+.b-live{color:#1a6fd4;border-color:#1a6fd4}.b-wait,.b-pending{color:var(--muted)}
+.daysum{margin:10px 0 2px}.daysum .line{font-size:15px}.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{font-size:13px;padding:3px 9px;border-radius:999px;border:1px solid var(--grid);background:var(--surface)}
+.livestat{font-size:13px;color:var(--muted);margin:6px 0}
 @media(prefers-color-scheme:dark){.banner{background:#3a3000;color:#ffe9a0;border-color:#7a6500}}
 """
 
 INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
-// 1) ✅/❌ + σκορ σε κάθε αγώνα των δελτίων (ζωντανά, μόνο όσο παίζεται αγώνας)
+// 1) ✅/❌/⚽/🏁 + σκορ σε κάθε αγώνα των δελτίων (ζωντανά, μόνο όσο παίζεται αγώνας)
 const rows = [];
 document.querySelectorAll('tr[data-leg]').forEach(tr => { try { rows.push({tr, leg: JSON.parse(tr.dataset.leg)}); } catch (e) {} });
+const CODE = {'✅': 'won', '❌': 'lost', '↩️': 'void', '⚽': 'play', '🟢': 'ok', '🔴': 'ok', '🏁': 'wait', '⏳': 'pending', '➖': 'pending'};
+const VIC = {won: '✅', lost: '❌', live: '⚽', wait: '🏁', pending: '⏳'};
 function update() {
   rows.forEach(r => {
-    const l = r.leg, st = B.trackable(l) ? B.cache[B.key(l)] : null, c = B.judge(l, st)[0];
+    const l = r.leg, st = B.trackable(l) ? B.cache[B.key(l)] : null, j = B.judge(l, st), c = j[0];
     const tk = r.tr.querySelector('.tk'); if (tk) tk.textContent = B.IC[c];
     const scr = r.tr.querySelector('.scr');
-    if (scr) { let t = ''; if (st && st.state !== 'pre') t = st.hs + '-' + st.as + (st.state === 'in' ? ' ' + st.clock : ' ΤΕΛΟΣ'); else if (l.sc) t = l.sc[0] + '-' + l.sc[1] + ' ΤΕΛΟΣ'; scr.textContent = t; }
+    if (scr) {
+      let t = '';
+      if (st && st.state !== 'pre') t = st.hs + '-' + st.as + (st.state === 'in' ? ' ' + st.clock : ' ΤΕΛΟΣ');
+      else if (l.sc) t = l.sc[0] + '-' + l.sc[1] + ' ΤΕΛΟΣ';
+      else if (c === 'play' || c === 'wait') t = j[1];
+      scr.textContent = t;
+    }
   });
-  document.querySelectorAll('.slipcnt').forEach(el => {
-    const card = el.closest('.card'); if (!card) return;
-    const ic = Array.from(card.querySelectorAll('.tk')).map(x => x.textContent);
-    const w = ic.filter(x => x === '✅').length, k = ic.filter(x => x === '❌').length, p = ic.filter(x => x === '🟢' || x === '🔴').length;
-    el.innerHTML = '✅ <b>' + w + '</b> · ❌ <b>' + k + '</b> · 🟢 <b>' + p + '</b> σε εξέλιξη · ⏳ <b>' + (ic.length - w - k - p) + '</b>';
+  // ανά δελτίο: μετρητής + ετικέτα ΠΕΡΑΣΕ / ΔΕΝ ΠΕΡΑΣΕ
+  const lists = {};
+  document.querySelectorAll('.card[data-slip]').forEach(card => {
+    const codes = Array.from(card.querySelectorAll('.tk')).map(x => CODE[x.textContent] || 'pending');
+    const v = B.slipVerdict(codes);
+    const vd = card.querySelector('.vd'); if (vd) { vd.className = 'vd b-' + v[0]; vd.textContent = v[1]; }
+    const cnt = card.querySelector('.slipcnt');
+    if (cnt) { const n = k => codes.filter(x => k.indexOf(x) >= 0).length; cnt.innerHTML = '✅ <b>' + n(['won']) + '</b> · ❌ <b>' + n(['lost']) + '</b> · ⚽ <b>' + n(['play', 'ok']) + '</b> παίζονται · 🏁 <b>' + n(['wait']) + '</b> περιμένω αποτέλεσμα · ⏳ <b>' + n(['pending']) + '</b> δεν ξεκίνησαν'; }
+    const name = card.dataset.slip; if (!(name in lists)) lists[name] = v[0];
   });
+  const tally = {won: 0, lost: 0, live: 0, wait: 0, pending: 0};
+  document.querySelectorAll('.chip[data-chip]').forEach(ch => {
+    const v = lists[ch.dataset.chip]; if (!v) return;
+    const nm = ch.textContent.replace(/^\S+\s/, ''); ch.textContent = VIC[v] + ' ' + nm; ch.className = 'chip b-' + v; tally[v]++;
+  });
+  const line = document.querySelector('#daysum .line');
+  if (line && document.querySelector('.chip[data-chip]')) line.innerHTML = 'Σήμερα: <b class="ok">✅ ' + tally.won + '</b> πέρασαν · <b class="ko">❌ ' + tally.lost + '</b> δεν πέρασαν · ⚽ <b>' + tally.live + '</b> παίζονται · 🏁 <b>' + tally.wait + '</b> περιμένω αποτέλεσμα · ⏳ <b>' + tally.pending + '</b> δεν ξεκίνησαν';
+  // γραμμή κατάστασης (μόνο όταν έχει νόημα): τι συμβαίνει αυτή τη στιγμή και αν ο browser φτάνει στο ESPN
+  const S = B.status(), ls = document.getElementById('livestat'); if (!ls) return;
+  const link = ' <a href="https://github.com/kostmarga/Betbot/actions/workflows/daily.yml"><b>Ανανέωση αποτελεσμάτων →</b></a>';
+  const blocked = !S.browserOk && S.lastErr;
+  if (tally.live) ls.innerHTML = '🔴 ' + tally.live + ' δελτία με αγώνες που παίζονται· ενημερώνεται κάθε 2 λεπτά' + (blocked ? ' · ⚠️ δεν φτάνω στο ESPN από τη συσκευή σου, δείχνω εκτίμηση από την ώρα.' + link : '');
+  else if (tally.wait) ls.innerHTML = blocked ? ('⚠️ Δεν μπόρεσα να φέρω τα τελικά αποτελέσματα από τη συσκευή σου. Δείχνω ό,τι ήξερε το bot στην τελευταία εκτέλεση.' + link) : '🏁 Περιμένω τα τελικά αποτελέσματα· ελέγχω κάθε 2 λεπτά.';
+  else ls.textContent = '';
 }
 const legs = rows.map(r => r.leg);
-if (legs.length) B.start(legs, update);
+if (legs.length) B.start(legs, update); else update();
 
 // 2) Προειδοποίηση όταν η σελίδα είναι ξεπερασμένη (το GitHub καθυστερεί τα προγραμματισμένα τρεξίματα)
 const GEN = new Date(document.querySelector('meta[name=generated]').content), NOW = new Date();
@@ -264,14 +332,14 @@ def _pkey(c):
     return (c.get("match_id"), c.get("market"), c.get("selection"), c.get("line"))
 
 
-def _cnt_html(legs) -> str:
-    """Μέτρηση ✅/❌/⏳ ενός δελτίου (όταν τα σκέλη έχουν αποτέλεσμα). Ενημερώνεται και ζωντανά από τον browser."""
+def _cnt_html(legs, now=None) -> str:
+    """Μέτρηση ✅/❌/⚽/🏁/⏳ ενός δελτίου (όταν τα σκέλη έχουν αποτέλεσμα). Ενημερώνεται και ζωντανά από τον browser."""
     if not any("res" in l for l in legs):
         return ""
-    w = sum(1 for l in legs if l.get("res") == "won")
-    k = sum(1 for l in legs if l.get("res") == "lost")
-    n = len(legs) - w - k
-    return f"<div class='cnt slipcnt'>✅ <b>{w}</b> · ❌ <b>{k}</b> · 🟢 <b>0</b> σε εξέλιξη · ⏳ <b>{n}</b></div>"
+    codes = [leg_state(l, now)[0] for l in legs]
+    c = lambda *k: sum(1 for x in codes if x in k)
+    return (f"<div class='cnt slipcnt'>✅ <b>{c('won')}</b> · ❌ <b>{c('lost')}</b> · ⚽ <b>{c('play')}</b> παίζονται · "
+            f"🏁 <b>{c('wait')}</b> περιμένω αποτέλεσμα · ⏳ <b>{c('pending')}</b> δεν ξεκίνησαν</div>")
 
 
 def _enrich(legs, cidx, fair=False, tctx=None):
@@ -334,12 +402,13 @@ def _plan_html(P, plan, cfg, tz, cidx, tctx=None) -> str:
         legs = _enrich(it["legs"], cidx, tctx=tctx)
         ev = it["ev"] * 100
         srcs = sorted({SRC_NAME.get(l.get("best_source") or "", "") for l in it["legs"]} - {""})
+        _vc, _vt = verdict([leg_state(l, tctx["now"] if tctx else None)[0] for l in legs]) if tctx else ("pending", "")
         cards.append(
-            f"<div class='card'><h3>{E(it['title'])}: <b>{it['stake']:.2f}€</b></h3>"
+            f"<div class='card' data-slip=\"{E(it['list'])}\"><h3>{E(it['title'])}: <b>{it['stake']:.2f}€</b> <span class='vd b-{_vc}'>{_vt}</span></h3>"
             + _tiles([("Ποντάρισμα", f"{it['stake']:.2f}€", ""), ("Συνολική απόδοση", f"{it['total_odds']:.2f}", ""),
                       ("Πιθανότητα", f"{it['p_win'] * 100:.0f}%", ""), ("Αν κερδίσει", f"{it['ret']:.2f}€", "pos"),
                       ("Αναμενόμενο ανά 1€", f"{ev:+.0f}%", "")])
-            + _cnt_html(legs) + P.pick_table(legs)
+            + _cnt_html(legs, tctx['now'] if tctx else None) + P.pick_table(legs)
             + f"<p class='muted'>Τιμές: {E(', '.join(srcs) or 'αγοράς')}. Πάτα «Γιατί;» σε κάθε επιλογή για τους λόγους. "
               "Ψάξε την ίδια επιλογή στο πρακτορείο σου· αν η απόδοση εκεί είναι αισθητά χαμηλότερη, προτίμησε να μην παίξεις.</p></div>")
     return head + "".join(cards)
@@ -512,6 +581,28 @@ def _history_stats_html(st) -> str:
     return summ + grid + legs + detail
 
 
+VERDICT_IC = {"won": "✅", "lost": "❌", "live": "⚽", "wait": "🏁", "pending": "⏳"}
+
+
+def _day_summary_html(today_slips, cidx, tctx) -> str:
+    """Γραμμή πάνω-πάνω: ποια δελτία της ημέρας πέρασαν / δεν πέρασαν / παίζονται, ένα «chip» ανά κατηγορία."""
+    from .stats import LISTS, NAMES
+    if not today_slips:
+        return "<div class='daysum' id='daysum'><div class='line muted'>Σήμερα δεν έχει καταγραφεί ακόμα δελτίο.</div></div>"
+    chips, cnt = [], {"won": 0, "lost": 0, "live": 0, "wait": 0, "pending": 0}
+    for lid in LISTS:
+        fz = today_slips.get(lid)
+        if not fz:
+            continue
+        legs = _enrich(fz["legs"], cidx, fair=lid.startswith("fair_"), tctx=tctx)
+        code, _ = verdict([leg_state(l, tctx["now"])[0] for l in legs])
+        cnt[code] += 1
+        chips.append(f"<span class='chip b-{code}' data-chip=\"{lid}\">{VERDICT_IC[code]} {E(NAMES[lid])}</span>")
+    line = (f"Σήμερα: <b class='ok'>✅ {cnt['won']}</b> πέρασαν · <b class='ko'>❌ {cnt['lost']}</b> δεν πέρασαν · ⚽ <b>{cnt['live']}</b> παίζονται · "
+            f"🏁 <b>{cnt['wait']}</b> περιμένω αποτέλεσμα · ⏳ <b>{cnt['pending']}</b> δεν ξεκίνησαν")
+    return f"<div class='daysum' id='daysum'><div class='line'>{line}</div><div class='chips'>{''.join(chips)}</div></div>"
+
+
 def _goals_card(g) -> str:
     if not g:
         return ""
@@ -557,7 +648,8 @@ def _clv_card(clv) -> str:
 
 def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
     P = Page(cfg)
-    tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}}
+    P.now = now
+    tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
     today_slips = (st or {}).get("today_slips") or {}
 
     def view(listname, current, fair=False):
@@ -565,7 +657,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         fz = today_slips.get(listname)
         if fz:
             return {"legs": _enrich(fz["legs"], cidx, fair=fair, tctx=tctx), "total_odds": fz["total_odds"], "p_win": fz["model_prob"],
-                    "p_market": None, "fair": fair, "locked": fz["created_at"]}
+                    "p_market": None, "fair": fair, "locked": fz["created_at"], "list": listname}
         if current:
             return dict(current, legs=_enrich(current["legs"], cidx, fair=fair, tctx=tctx), fair=fair)
         return None
@@ -731,6 +823,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <li>Κάθε αγώνας το πολύ μία φορά σε κάθε δελτίο · το πολύ {cfg['selection']['max_legs_per_league']} επιλογές από την ίδια διοργάνωση</li>
 </ul></div>""")
 
+    daysum_html = _day_summary_html(today_slips, cidx, tctx)
     tabs_html = "".join(f"<button role='tab' data-t='{tid}' aria-selected='{str(i == 0).lower()}'>{E(name)}</button>"
                         for i, (tid, name) in enumerate(TABS))
     body = "".join(f"<section class='tab{' on' if i == 0 else ''}' id='t-{tid}' role='tabpanel'>{sec.get(tid, '')}</section>"
@@ -745,6 +838,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
 <div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
 Παίζε μόνο το ποσό της εβδομάδας.</div>
+{daysum_html}<div class="livestat" id="livestat"></div>
 <nav class="tabs" role="tablist">{tabs_html}</nav>{body}</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>

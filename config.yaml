@@ -131,7 +131,7 @@ lists:
   # με όσο το δυνατόν μεγαλύτερη πιθανότητα μέσα σε αυτό το εύρος. Αντιστάθμισμα: πιθανότητα ~40–50% (όχι 63%).
   # Η αναμενόμενη ζημιά ανά 1€ είναι παρόμοια (~−3…−8%) – η υψηλότερη απόδοση δεν κάνει το στοίχημα πιο κερδοφόρο.
   recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.60,
-                max_leg_odds: 1.90, max_basketball_legs: 1, single_min_odds: 1.60, single_max_odds: 2.30,
+                max_leg_odds: 1.90, max_basketball_legs: 1, max_basketball_legs_thin: 2, thin_football_matches: 4, single_min_odds: 1.60, single_max_odds: 2.30,
                 single_min_prob: 0.55}
   safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.70, min_total: 1.60, max_total: 2.60, min_legs: 2, max_legs: 4,
                 max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)

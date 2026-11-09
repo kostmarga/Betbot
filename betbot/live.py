@@ -152,14 +152,22 @@ function parseSummary(d) {
 }
 
 // Κρίση επιλογής: [κωδικός, κείμενο προόδου]. Ίδια λογική με το selector.settle_leg + live (sure/dead/ok/bad).
+// Χωρίς ζωντανά δεδομένα: εκτίμηση από την ώρα. ⏳ ΜΟΝΟ πριν την έναρξη· μετά ⚽ (παίζεται) ή 🏁 (τελείωσε, περιμένω αποτέλεσμα).
+const END_MIN = {football: 150, basketball: 180};
+function byTime(l) {
+  const ko = l.ko ? Date.parse(l.ko) : NaN;
+  if (isNaN(ko) || Date.now() < ko) return ['pending', ''];
+  const end = ko + (END_MIN[l.sport] || 150) * 60000;
+  return Date.now() < end ? ['play', 'παίζεται'] : ['wait', 'τελείωσε · περιμένω αποτέλεσμα'];
+}
 function judge(l, st) {
   const m = l.market, s = l.sel, L = l.line;
-  if (m === 'THROWINS' || m === 'PLAYER') return (l.res === 'won' || l.res === 'lost' || l.res === 'void') ? [l.res, ''] : ['na', 'δεν παρακολουθείται live'];
+  if (m === 'THROWINS' || m === 'PLAYER') return (l.res === 'won' || l.res === 'lost' || l.res === 'void') ? [l.res, ''] : (byTime(l)[0] === 'pending' ? ['pending', ''] : ['na', 'δεν παρακολουθείται live']);
   if (!st) {
     if (l.res === 'won' || l.res === 'lost' || l.res === 'void') return [l.res, l.sc ? l.sc[0] + '-' + l.sc[1] : ''];
-    return ['pending', ''];
+    return byTime(l);
   }
-  if (st.state === 'pre') return ['pending', ''];
+  if (st.state === 'pre') return byTime(l);
   const h = st.hs, a = st.as, fin = st.state === 'post', sc = h + '-' + a;
   const res = h > a ? '1' : (h === a ? 'X' : '2');
   const tot = col => { const x = st.stats.home && st.stats.home[col], y = st.stats.away && st.stats.away[col]; return (x == null || y == null) ? null : x + y; };
@@ -192,8 +200,8 @@ function judge(l, st) {
   if (m === 'SPREAD') { const v = (h - a) + L; if (fin && v === 0) return ['void', sc]; return now(v !== 0 && ((v > 0) === (s === 'HOME'))); }
   return ['na', sc];
 }
-const grp = c => (c === 'won' || c === 'sure') ? 'w' : (c === 'lost' || c === 'dead') ? 'l' : (c === 'ok' || c === 'bad') ? 'p' : 'n';
-const IC = {won:'✅', lost:'❌', void:'↩️', sure:'✅', dead:'❌', ok:'🟢', bad:'🔴', pending:'⏳', na:'➖'};
+const grp = c => (c === 'won' || c === 'sure') ? 'w' : (c === 'lost' || c === 'dead') ? 'l' : (c === 'ok' || c === 'bad' || c === 'play') ? 'p' : (c === 'wait') ? 'q' : 'n';
+const IC = {won:'✅', lost:'❌', void:'↩️', sure:'✅', dead:'❌', ok:'🟢', bad:'🔴', play:'⚽', wait:'🏁', pending:'⏳', na:'➖'};
 
 // Ποιοι αγώνες χρειάζονται ερώτηση: ΜΟΝΟ όσοι έχουν ήδη ξεκινήσει και δεν έχουν τελειώσει (όχι πριν την έναρξη, όχι μετά το τέλος).
 function neededEvents() {
@@ -245,7 +253,16 @@ function start(ls, cb) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') tick(); });
   onUpdate(); tick();
 }
-return {start, judge, parseSummary, cache, key, trackable, hhmm, esc, grp, IC, status};
+function slipVerdict(codes) {
+  if (codes.some(c => c === 'lost' || c === 'dead')) return ['lost', '❌ ΔΕΝ ΠΕΡΑΣΕ'];
+  if (codes.every(c => c === 'won' || c === 'void')) return ['won', '✅ ΠΕΡΑΣΕ'];
+  if (codes.every(c => c === 'won' || c === 'void' || c === 'sure')) return ['won', '✅ Σχεδόν σίγουρο'];
+  if (codes.some(c => c === 'ok' || c === 'bad' || c === 'play')) return ['live', '⚽ Παίζεται'];
+  if (codes.some(c => c === 'wait')) return ['wait', '🏁 Περιμένω αποτελέσματα'];
+  if (codes.some(c => c === 'won' || c === 'sure')) return ['live', '🟢 Σε εξέλιξη'];
+  return ['pending', '⏳ Δεν ξεκίνησε'];
+}
+return {start, judge, parseSummary, cache, key, trackable, hhmm, esc, grp, IC, status, slipVerdict, byTime};
 })();
 """
 
@@ -256,13 +273,7 @@ const DATA = JSON.parse(document.getElementById('data').textContent);
 const GEN = new Date(document.getElementById('data').dataset.gen);
 const genTxt = GEN.toLocaleTimeString('el-GR', {timeZone:'Europe/Athens', hour:'2-digit', minute:'2-digit', hour12:false});
 
-function slipVerdict(codes) {
-  if (codes.some(c => c === 'lost' || c === 'dead')) return ['lost', '❌ Χάθηκε'];
-  if (codes.every(c => c === 'won' || c === 'void')) return ['won', '✅ Πέρασε'];
-  if (codes.every(c => c === 'won' || c === 'void' || c === 'sure')) return ['won', '✅ Σχεδόν σίγουρο'];
-  if (codes.some(c => c === 'ok' || c === 'bad' || c === 'won' || c === 'sure')) return ['live', '🟢 Σε εξέλιξη'];
-  return ['pending', '⏳ Δεν ξεκίνησε'];
-}
+const slipVerdict = B.slipVerdict;
 function legRow(l, st, code, txt) {
   const live = st && st.state === 'in', fin = st && st.state === 'post';
   const score = st && st.state !== 'pre' ? '<span class="sc">' + st.hs + '-' + st.as + '</span> ' + (live ? '<span class="live">' + esc(st.clock) + '</span>' : (fin ? 'ΤΕΛΟΣ' : '')) : (l.sc ? '<span class="sc">' + l.sc[0] + '-' + l.sc[1] + '</span> ΤΕΛΟΣ' : '');
@@ -273,7 +284,7 @@ function legRow(l, st, code, txt) {
 }
 function render() {
   const app = document.getElementById('app');
-  const seen = {}, tot = {w: 0, l: 0, p: 0, n: 0}, sl = {won: 0, lost: 0, live: 0, pending: 0}, byDay = {};
+  const seen = {}, tot = {w: 0, l: 0, p: 0, q: 0, n: 0}, sl = {won: 0, lost: 0, live: 0, wait: 0, pending: 0}, byDay = {};
   const TODAY = DATA.reduce((m, s) => s.day > m ? s.day : m, '');      // οι μετρητές πάνω-πάνω αφορούν ΜΟΝΟ τη σημερινή ημέρα
   DATA.forEach(s => {
     const codes = [], rows = [];
@@ -287,20 +298,22 @@ function render() {
     });
     const [v, vt] = slipVerdict(codes);
     if (s.day === TODAY) sl[v]++;
-    const c = {w: 0, l: 0, p: 0, n: 0}; codes.forEach(x => c[grp(x)]++);
+    const c = {w: 0, l: 0, p: 0, q: 0, n: 0}; codes.forEach(x => c[grp(x)]++);
     const card = '<div class="card"><h3><span>' + esc(s.name) + ' <span class="tot">· ' + (s.fair ? 'ελάχιστη απόδοση ' : 'απόδοση ') + Number(s.odds).toFixed(2) + ' · εκτίμηση ' + Math.round((s.p || 0) * 100) + '%</span></span><span class="badge b-' + v + '">' + vt + '</span></h3>' +
-      '<div class="cnt">✅ <b>' + c.w + '</b> · ❌ <b>' + c.l + '</b> · 🟢 <b>' + c.p + '</b> σε εξέλιξη · ⏳ <b>' + c.n + '</b> δεν ξεκίνησαν</div>' + rows.join('') + '</div>';
+      '<div class="cnt">✅ <b>' + c.w + '</b> · ❌ <b>' + c.l + '</b> · ⚽ <b>' + c.p + '</b> παίζονται · 🏁 <b>' + c.q + '</b> περιμένω αποτέλεσμα · ⏳ <b>' + c.n + '</b> δεν ξεκίνησαν</div>' + rows.join('') + '</div>';
     (byDay[s.day] = byDay[s.day] || []).push(card);
   });
   const days = Object.keys(byDay).sort().reverse(), today = days.length ? days[0] : '';
   let out = '<div class="tiles">' +
     '<div class="tile"><div class="k">Σήμερα: δελτία που πέρασαν</div><div class="v ok">✅ ' + sl.won + '</div></div>' +
-    '<div class="tile"><div class="k">Δελτία που χάθηκαν</div><div class="v lost">❌ ' + sl.lost + '</div></div>' +
-    '<div class="tile"><div class="k">Σε εξέλιξη</div><div class="v live">🟢 ' + sl.live + '</div></div>' +
+    '<div class="tile"><div class="k">Δελτία που ΔΕΝ πέρασαν</div><div class="v lost">❌ ' + sl.lost + '</div></div>' +
+    '<div class="tile"><div class="k">Παίζονται</div><div class="v live">⚽ ' + sl.live + '</div></div>' +
+    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">🏁 ' + sl.wait + '</div></div>' +
     '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + sl.pending + '</div></div></div>' +
     '<div class="tiles"><div class="tile"><div class="k">Επιλογές που βγήκαν</div><div class="v ok">✅ ' + tot.w + '</div></div>' +
     '<div class="tile"><div class="k">Επιλογές που έχασαν</div><div class="v lost">❌ ' + tot.l + '</div></div>' +
-    '<div class="tile"><div class="k">Παίζονται τώρα</div><div class="v live">🟢 ' + tot.p + '</div></div>' +
+    '<div class="tile"><div class="k">Παίζονται τώρα</div><div class="v live">⚽ ' + tot.p + '</div></div>' +
+    '<div class="tile"><div class="k">Περιμένω αποτέλεσμα</div><div class="v n">🏁 ' + tot.q + '</div></div>' +
     '<div class="tile"><div class="k">Δεν ξεκίνησαν</div><div class="v n">⏳ ' + tot.n + '</div></div></div>';
   if (!DATA.length) out += '<div class="card n">Δεν υπάρχουν δελτία ακόμα. Δημιουργούνται στην πρωινή εκτέλεση.</div>';
   days.forEach(d => { out += '<h2>' + (d === today ? 'Σήμερα' : 'Προηγούμενη μέρα (ακόμα σε εξέλιξη)') + ' · ' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</h2>' + byDay[d].join(''); });

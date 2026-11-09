@@ -17,14 +17,15 @@ from zoneinfo import ZoneInfo
 
 from .util import parse_iso
 
-PLAN_LISTS = ("recommended", "single", "safe", "x30")     # για τη λογιστική της εβδομάδας («single» = παλιά δελτία)
-TODAY_LISTS = ("recommended", "safe")                      # τα δελτία (όχι μονά) που προτείνονται καθημερινά
+PLAN_LISTS = ("recommended", "single", "safe", "x10", "x30")     # για τη λογιστική της εβδομάδας («single» = παλιά δελτία)
+MAIN_LISTS = ("recommended", "safe")                        # ΕΝΑ κύριο δελτίο (~2) την ημέρα: το πρώτο που υπάρχει
+TEN_LIST = "x10"                                           # ΕΝΑ δελτίο ~10 την ημέρα (lottery_stake, 1€)
 SRC = {"espn": "ESPN", "espn_max": "ESPN", "fdco": "μέσος όρος", "fdco_max": "καλύτερη τιμή",
        "oddsapi": "μέσος όρος", "oddsapi_max": "καλύτερη τιμή"}
 
 
 def _stake_eur(list_name, br) -> float:
-    return float(br["lottery_stake"]) if list_name == "x30" else float(br["unit"])
+    return float(br["lottery_stake"]) if list_name in ("x10", "x30") else float(br["unit"])
 
 
 def _slip_money(sl, br):
@@ -88,16 +89,24 @@ def build_plan(db, cfg, now) -> dict:
     reserve = 0.0 if ws["lottery_played"] else lot       # κρατάμε το ποσό του λαχείου
     avail = max(0.0, ws["remaining"] - reserve)
     n_max = int(br["max_bets_per_day"])
-    regular = [todays[k] for k in TODAY_LISTS if k in todays][:n_max]
-    for sl in regular:
+    main = next((todays[k] for k in MAIN_LISTS if k in todays), None)
+    if main is not None:
         stake = min(unit, avail)
-        if stake < 1.0:
+        if stake >= 1.0:
+            avail -= stake
+            plan["items"].append(_item(main, stake, tz))
+        else:
             plan["notes"].append("Το εβδομαδιαίο ποσό εξαντλήθηκε (ή δεσμεύεται για τα ανοιχτά στοιχήματα)· δεν παίζεις άλλο σήμερα.")
-            break
-        avail -= stake
-        plan["items"].append(_item(sl, stake, tz))
-    if not regular:
-        plan["notes"].append("Σήμερα δεν βρέθηκε επιλογή που να περνά τους κανόνες. Η σωστή απόφαση είναι να μην παίξεις τίποτα.")
+    else:
+        plan["notes"].append("Σήμερα δεν βρέθηκε δελτίο ~2 που να περνά τους κανόνες.")
+    ten = todays.get(TEN_LIST)
+    if ten is not None and len(plan["items"]) < n_max and avail >= lot:
+        avail -= lot
+        plan["items"].append(_item(ten, lot, tz))
+    elif ten is None:
+        plan["notes"].append("Σήμερα δεν βρέθηκε δελτίο ~10 που να περνά τους κανόνες.")
+    if not plan["items"]:
+        plan["notes"].append("Η σωστή απόφαση είναι να μην παίξεις τίποτα.")
     # λαχείο: Σάββατο/Κυριακή, μία φορά τη βδομάδα
     if "x30" in todays and not ws["lottery_played"] and ws["weekday"] >= 5 and ws["remaining"] >= lot:
         plan["items"].append(_item(todays["x30"], lot, tz, lottery=True))
@@ -108,7 +117,7 @@ def build_plan(db, cfg, now) -> dict:
 
 
 def _item(sl, stake, tz, lottery=False):
-    return {"title": "🔥 Λαχείο (για πλάκα)" if lottery else ("⭐ Δελτίο της ημέρας" if sl["list_name"] == "recommended" else "🛡️ Safe δελτίο"),
+    return {"title": "🔥 Λαχείο (για πλάκα)" if lottery else ("🎯 Δελτίο ~10" if sl["list_name"] == "x10" else ("⭐ Δελτίο της ημέρας" if sl["list_name"] == "recommended" else "🛡️ Safe δελτίο")),
             "list": sl["list_name"], "stake": stake, "total_odds": sl["total_odds"], "p_win": sl["model_prob"],
             "ret": stake * sl["total_odds"], "ev": sl["model_prob"] * sl["total_odds"] - 1,
             "legs": sl["legs"], "lottery": lottery}

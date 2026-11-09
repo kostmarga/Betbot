@@ -15,8 +15,8 @@ from .util import parse_iso
 
 LISTS = ["recommended", "safe", "x10", "x30", "x100", "overs", "combo",
          "fair_corners", "fair_cards", "fair_throw_ins", "fair_players"]
-NAMES = {"recommended": "⭐ Προτεινόμενο", "safe": "🛡️ Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-         "overs": "⚽ Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
+NAMES = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
+         "overs": "Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
          "fair_throw_ins": "↔️ Πλάγια", "fair_players": "👤 Παίκτες"}
 TAB_LIST = {"recommended": "recommended", "safe": "safe", "x10": "x10", "x30": "x30", "x100": "x100", "overs": "overs",
             "combo": "combo", "corners": "fair_corners", "cards": "fair_cards", "throw_ins": "fair_throw_ins",
@@ -147,8 +147,12 @@ def build(db, cfg, now):
     tz = ZoneInfo(cfg["timezone"])
     today = now.astimezone(tz).date()
     slips = real_slips(db.slips())
+    from .paper import SUFFIX
+    tier_slips = [s for s in db.slips() if not _LEGACY.search(s["slip_id"]) and any(
+        suf and (s.get("list_name") or "").endswith(suf) and (s["list_name"][:-len(suf)] in LISTS or s["list_name"][:-len(suf)] in ("corners", "cards", "throw_ins", "players"))
+        for suf in SUFFIX.values())]
     scores = {}
-    for s in slips:
+    for s in slips + tier_slips:
         for l in s["legs"]:
             if l["match_id"] not in scores:
                 m = db.get_match(l["match_id"])
@@ -160,7 +164,7 @@ def build(db, cfg, now):
             last_day = max(_day(s, tz) for s in prev)
             cand = [s for s in prev if _day(s, tz) == last_day]
             yesterday[lid] = dict(max(cand, key=lambda s: s["created_at"]), day=last_day)
-    todays = {s["list_name"]: s for s in slips if _day(s, tz) == today}
+    todays = {s["list_name"]: s for s in slips + tier_slips if _day(s, tz) == today}
     return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
             "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays,
             "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),

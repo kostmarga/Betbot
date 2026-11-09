@@ -1,0 +1,32 @@
+15910 matches
+devig proportional 0.98963
+devig power 0.98926
+
+Bucket  n  predicted  actual   ROI@PSC  ROI@max
+0.0-0.3  25103  0.227  0.222  -7.1%  -4.3%
+0.3-0.4   9949  0.339  0.337  -3.9%  -1.4%
+0.4-0.5   5833  0.446  0.451  -2.0%  +0.3%
+0.5-0.6   3671  0.545  0.555  -1.6%  +0.9%
+0.6-0.7   1733  0.645  0.664  -0.7%  +1.7%
+0.7-0.8   1018  0.745  0.784  +1.3%  +3.9%
+0.8-1.0    423  0.842  0.868  -0.7%  +1.8%
+
+Movement test (Pinnacle open -> close), picks with open prob 0.6-0.85, bet at OPEN price
+up 1240 actual 0.744 implied 0.695 ROI@open +1.9% [-1.4%,+5.6%]
+down 867 actual 0.670 implied 0.684 ROI@open -6.7% [-11.1%,-2.3%]
+flat 808 actual 0.722 implied 0.698 ROI@open -1.0% [-5.1%,+3.8%]
+
+Per league (closing Pinnacle, picks p>=0.65): n, predicted, actual
+EPL 225 0.743 0.773
+NED 224 0.758 0.763
+POR 218 0.766 0.803
+LIGA 169 0.737 0.817
+GSL 168 0.753 0.774
+BL 162 0.755 0.784
+SA 159 0.719 0.730
+TUR 155 0.746 0.819
+SCO 138 0.776 0.775
+L1 124 0.722 0.734
+BEL 98 0.724 0.765
+EFL1 96 0.719 0.760
+EFL2 69 0.694 0.681

@@ -71,6 +71,56 @@ def load_fdco(cfg, now):
     return rows
 
 
+NEW_URL = "https://www.football-data.co.uk/new/{code}.csv"
+
+
+def load_fdco_new(cfg, now, since):
+    """Επιπλέον πρωταθλήματα (football-data «new/»: μόνο 1Χ2, τιμές κλεισίματος) από το `since` και μετά."""
+    rows = []
+    for lg in cfg["leagues"]:
+        if not lg.get("fdco_new") or lg["sport"] != "football":
+            continue
+        try:
+            text, _ = http_get(NEW_URL.format(code=lg["fdco_new"]), expect="text")
+        except Exception as e:
+            log.warning("backtest: %s: %s", lg["id"], e)
+            continue
+        for r in csv.DictReader(io.StringIO(text.lstrip("\ufeff"))):
+            r = {k.strip(): v for k, v in r.items() if k}
+            ko, hg, ag = _date(r), _i(r.get("HG")), _i(r.get("AG"))
+            h, a = (r.get("Home") or "").strip(), (r.get("Away") or "").strip()
+            if ko is None or hg is None or ag is None or not h or not a:
+                continue
+            ko = ko.astimezone(timezone.utc)
+            if not (since <= ko < now):
+                continue
+            o1x2 = [_price(r, c) for c in (["AvgCH", "PSCH", "B365CH"], ["AvgCD", "PSCD", "B365CD"], ["AvgCA", "PSCA", "B365CA"])]
+            m1x2 = [_price(r, c) for c in (["MaxCH"], ["MaxCD"], ["MaxCA"])]
+            rows.append({"league": lg["id"], "ko": ko, "home": h, "away": a, "hg": hg, "ag": ag,
+                         "o1x2": o1x2 if all(o1x2) else None, "ou": None,
+                         "m1x2": m1x2 if all(m1x2) else None, "mou": None})
+    return rows
+
+
+def extra_leagues_table(rows, sel):
+    """Ανά πρωτάθλημα: οι ΤΡΕΧΟΝΤΕΣ κανόνες (μόνο 1Χ2) σε όλο το διαθέσιμο ιστορικό."""
+    L = ["| Πρωτάθλημα | Αγώνες | Επιλογές | Hit-rate | ROI (μέση τιμή) | ROI (καλύτερη τιμή) | 95% διάστημα ROI (μέση τιμή) |", "|---|---|---|---|---|---|---|"]
+    by = defaultdict(list)
+    for r in rows:
+        by[r["league"]].append(r)
+    for lid, rs in sorted(by.items()):
+        picks = market_rules(rs, sel)
+        if not picks:
+            L.append(f"| {lid} | {len(rs)} | 0 | — | — | — | — |")
+            continue
+        pa = [(c["odds"] if c["win"] else 0) - 1 for c in picks]
+        pb = [(c["best"] if c["win"] else 0) - 1 for c in picks]
+        ci = bootstrap_roi(pa)
+        L.append(f"| {lid} | {len(rs)} | {len(picks)} | {np.mean([c['win'] for c in picks]):.1%} | {np.mean(pa):+.1%} | "
+                 f"{np.mean(pb):+.1%} | " + (f"{ci[0]:+.1%} … {ci[1]:+.1%}" if ci else "—") + " |")
+    return L
+
+
 def devig(prices):
     inv = [1 / p for p in prices]
     t = sum(inv)
@@ -294,6 +344,12 @@ def run(cfg, now, out_path="docs/backtest.md", months=13):
     for nm, f in (("1η μισή περιόδου", lambda c: c["ko"] < mid), ("2η μισή περιόδου", lambda c: c["ko"] >= mid)):
         L += ["", f"{nm}:", ""] + rules_table([c for c in cur if f(c)])
     L += ["", "Η «καλύτερη τιμή» είναι το μέγιστο ανάμεσα στα πρακτορεία του football-data: αισιόδοξη, γιατί δεν έχεις πάντα πρόσβαση σε όλα και υπάρχουν όρια στοιχήματος.", ""]
+    extra = load_fdco_new(cfg, now, now - timedelta(days=3 * 365))
+    if extra:
+        L += ["## 3γ. Επιπλέον πρωταθλήματα (μόνο 1Χ2, τιμές κλεισίματος, έως 3 χρόνια ιστορικό)", "",
+              "Οι ίδιοι κανόνες με το 3β. Δεν υπάρχουν τιμές Over/Under, άρα ελέγχεται μόνο το 1Χ2. Η «πιθανότητα» είναι της αγοράς, "
+              "δηλαδή ελέγχουμε αν οι κανόνες φιλτραρίζουν σωστά και πόσο κοστίζει η προμήθεια, όχι αν «ξέρουμε περισσότερα».", ""]
+        L += extra_leagues_table(extra, sel) + [""]
     log.info("backtest κόρνερ/καρτών…")
     counts = run_counts(cfg, db, aliases, now, start)
     L += ["## 4. Κόρνερ και κάρτες (χωρίς ιστορικές αποδόσεις: μόνο ακρίβεια πιθανοτήτων)", "",

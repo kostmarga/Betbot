@@ -20,12 +20,12 @@ slip:
 
 # ---------- Φίλτρα επιλογών ----------
 selection:
-  min_model_prob: 0.55       # ελάχιστη πιθανότητα (μετά το blend με την αγορά)
+  min_model_prob: 0.60       # ελάχιστη πιθανότητα (μετά το blend με την αγορά)
   min_edge: -0.10            # ελάχιστο value: p*απόδοση - 1. Με πιθανότητες από την αγορά το value = −προμήθεια (~−3…−7%), γι' αυτό −0.10
   min_odds: 1.15             # κάτω από αυτό δεν αξίζει ούτε για δέσιμο
   max_odds: 2.10             # (παλιό, για συμβατότητα)
   max_odds_any: 3.00         # μέγιστη απόδοση μίας επιλογής (backtest: οι υψηλές αποδόσεις χάνουν πολύ περισσότερο· 6+ ≈ −21%)
-  fair_min_prob: 0.55        # επιλογές ΧΩΡΙΣ απόδοση: ελάχιστη πιθανότητα για να εμφανιστούν
+  fair_min_prob: 0.60        # επιλογές ΧΩΡΙΣ απόδοση: ελάχιστη πιθανότητα για να εμφανιστούν
   fair_min_odds: 1.30        # ... και δίκαιη απόδοση τουλάχιστον 1.30 (αλλιώς δεν αξίζει: π.χ. «Under 12.5 κόρνερ»)
   fair_value_margin: 0.05    # «παίξ' το αν ≥» = δίκαιη απόδοση × 1.05
   market_blend: 0.0          # 0 = μόνο αγορά, 1 = μόνο μοντέλο. Μπάσκετ: δεν έχει backtest, αλλά το μοντέλο ποδοσφαίρου έχασε από την αγορά και με τα πάντα βάρη -> ίδια προσοχή
@@ -83,6 +83,13 @@ leagues:
   - {id: UCL,  name: UEFA Champions League,  sport: football, espn: uefa.champions,   sofascore: 7,     odds_api: soccer_uefa_champs_league}
   - {id: UEL,  name: UEFA Europa League,      sport: football, espn: uefa.europa,      sofascore: 679,   odds_api: soccer_uefa_europa_league}
   - {id: UECL, name: UEFA Conference League,  sport: football, espn: uefa.europa.conf, sofascore: 17015, odds_api: soccer_uefa_europa_conference_league}
+  # --- επιπλέον πρωταθλήματα (ESPN για προγράμματα/αποτελέσματα/αποδόσεις, fdco_new μόνο για backtest 1Χ2) ---
+  # Backtest 09/11/2026: κρατήθηκαν όσα έχουν ROI ≥ των κύριων λιγκών. ΕΞΩ: Αυστρία, Ελβετία, Δανία, Αργεντινή, Ιρλανδία (αρνητικό ROI) και MLS (hit-rate 63% < 65% των κύριων λιγκών). Κριτήριο: ΔΕΝ πέφτει το hit-rate.
+  - {id: NOR,  name: Eliteserien,         sport: football, espn: nor.1, fdco_new: NOR}
+  - {id: SWE,  name: Allsvenskan,         sport: football, espn: swe.1, fdco_new: SWE}
+  - {id: BRA,  name: Brasileirão,         sport: football, espn: bra.1, fdco_new: BRA}
+  - {id: MEX,  name: Liga MX,             sport: football, espn: mex.1, fdco_new: MEX}
+  - {id: JPN,  name: J1 League,           sport: football, espn: jpn.1, fdco_new: JPN}
   - {id: NBA,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}
   - {id: EL,   name: Euroleague,        sport: basketball, euroleague: E,          odds_api: basketball_euroleague}
   - {id: GBL,  name: ΕΚΟ Basket League, sport: basketball, greek_site: true}   # μόνο μέσω ελληνικού site (βλ. README)
@@ -125,22 +132,34 @@ rules:
   max_drift_against: 0.08        # απόδοση που ανέβηκε ≥8% -> έξω από Προτεινόμενο/Safe
   move_show_min: 0.04            # στην καρτέλα Κινήσεις: από 4% και πάνω
 
+# ---------- Επίπεδα ρίσκου (paper trading: 20€/εβδομάδα ΑΝΑ κατηγορία ΚΑΙ ανά επίπεδο, βλ. betbot/paper.py) ----------
+# balanced = οι τιμές των λιστών παρακάτω. strong/bold μετατοπίζουν το min_leg_prob και αλλάζουν το εύρος απόδοσης.
+tiers:
+  strong:   {leg_prob_delta: 0.10, recommended: {min_total: 1.50, max_total: 2.30, max_leg_odds: 1.50},
+             safe: {min_total: 1.40, max_total: 2.20}}
+  balanced: {}
+  bold:     {leg_prob_delta: -0.05, recommended: {min_total: 2.60, max_total: 4.50, max_leg_odds: 2.40}}
+paper:
+  weekly: 20               # € ανά ταμείο (κατηγορία × επίπεδο) ανά εβδομάδα
+  unit: 2                  # € ανά δελτίο (x30/x100: 1€)
+  min_settled: 30          # κρίση ΜΟΝΟ μετά από τόσα δελτία που κρίθηκαν
+
 # ---------- Λίστες / dashboards ----------
 lists:
   # Προτεινόμενο = δελτίο που ΑΞΙΖΕΙ να παίξεις: συνολική απόδοση ~2.0–3.2 (όχι 1.47: με 2€ κερδίζεις 0.94€ και δεν αξίζει),
   # με όσο το δυνατόν μεγαλύτερη πιθανότητα μέσα σε αυτό το εύρος. Αντιστάθμισμα: πιθανότητα ~40–50% (όχι 63%).
   # Η αναμενόμενη ζημιά ανά 1€ είναι παρόμοια (~−3…−8%) – η υψηλότερη απόδοση δεν κάνει το στοίχημα πιο κερδοφόρο.
-  recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.60,
+  recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.65,
                 max_leg_odds: 1.90, max_basketball_legs: 1, max_basketball_legs_thin: 2, thin_football_matches: 4, single_min_odds: 1.60, single_max_odds: 2.30,
-                single_min_prob: 0.55}
-  safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.70, min_total: 1.60, max_total: 2.60, min_legs: 2, max_legs: 4,
+                single_min_prob: 0.65}
+  safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.75, min_total: 1.60, max_total: 2.60, min_legs: 2, max_legs: 4,
                 max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)
-  x10:         {min_leg_prob: 0.58, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
-  x30:         {min_leg_prob: 0.55, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
-  x100:        {min_leg_prob: 0.50, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
-  overs:       {min_leg_prob: 0.55, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
-  corners:     {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
-  cards:       {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
+  x10:         {min_leg_prob: 0.62, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
+  x30:         {min_leg_prob: 0.60, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
+  x100:        {min_leg_prob: 0.55, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
+  overs:       {min_leg_prob: 0.60, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
+  corners:     {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
+  cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   players:     {min_leg_prob: 0.55, count: 15, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: false}
   combo:       {min_leg_prob: 0.58, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}

@@ -240,6 +240,10 @@ def verdict(codes):
 RESIC = {"won": "✅", "lost": "❌", "void": "↩️", "open": "⏳"}
 EXTRA_CSS = """
 .tk{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--grid);align-items:flex-start}.tk:first-of-type{border-top:0}
+.calh{display:flex;justify-content:space-between;align-items:center;margin:6px 0}.calh button{font-size:20px;padding:4px 14px;border:1px solid var(--grid);background:var(--chip);color:inherit;border-radius:8px}
+.calg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.cdw{text-align:center;font-size:12px;opacity:.6}
+.cd{min-height:52px;border:1px solid var(--grid);background:transparent;color:inherit;border-radius:8px;padding:2px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.cd i{font-style:normal;font-size:13px}.cd.has{background:var(--chip);font-weight:600}.cd:disabled{opacity:.35}.cd span{line-height:1.1}
 .tk .ic{width:26px;font-size:19px;line-height:1.2}.tk .sc{font-variant-numeric:tabular-nums}
 .grid td,.grid th{text-align:center;padding:6px 4px}.grid td.d{text-align:left;white-space:nowrap}
 .ok{color:var(--goodtxt)}.ko{color:var(--bad)}h4{margin:14px 0 6px;font-size:15px}
@@ -303,6 +307,10 @@ function update() {
 }
 const legs = rows.map(r => r.leg);
 if (legs.length) B.start(legs, update); else update();
+// Αυτοέλεγχος: φτάνει η συσκευή σου στο ESPN; (μία ερώτηση κατά το άνοιγμα)
+(function(){ var c = document.getElementById('espnchk'); if (!c) return;
+  B.probe().then(function(r){ c.innerHTML = r === 'ok' ? '📡 Σύνδεση με ESPN από τη συσκευή σου: ✅ λειτουργεί' :
+    '📡 Σύνδεση με ESPN από τη συσκευή σου: ⚠️ δεν απαντά (' + r + '). Τα αποτελέσματα θα φανούν μετά το επόμενο τρέξιμο του bot.'; }); })();
 
 // 2) Προειδοποίηση όταν η σελίδα είναι ξεπερασμένη (το GitHub καθυστερεί τα προγραμματισμένα τρεξίματα)
 const GEN = new Date(document.querySelector('meta[name=generated]').content), NOW = new Date();
@@ -646,7 +654,97 @@ def _clv_card(clv) -> str:
             f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None) -> str:
+CAL_JS = """
+(function(){
+  var el=document.getElementById('caldata'); if(!el) return;
+  var D=JSON.parse(el.textContent), box=document.getElementById('cal'), out=document.getElementById('calday');
+  var MN=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος'];
+  var IC={won:'✅',lost:'❌',void:'↩️',open:'⏳'};
+  var keys=Object.keys(D).sort(), last=keys.length?keys[keys.length-1]:null;
+  var cur=last?new Date(last+'T12:00:00'):new Date(); cur.setDate(1);
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
+  function pad(n){return (n<10?'0':'')+n;}
+  function iso(y,m,d){return y+'-'+pad(m+1)+'-'+pad(d);}
+  function dayBadge(k){var a=D[k]||[],w=0,l=0;a.forEach(function(s){if(s.f)return;if(s.s==='won')w++;else if(s.s==='lost')l++;});
+    return a.length?('<span class="cw">'+(w?w+'✅':'')+'</span><span class="cl">'+(l?l+'❌':'')+'</span>'+((w+l)<a.length?'<span>⏳</span>':'')):'';}
+  function draw(){
+    var y=cur.getFullYear(),m=cur.getMonth(),n=new Date(y,m+1,0).getDate(),off=(new Date(y,m,1).getDay()+6)%7;
+    var h='<div class="calh"><button id="cprev">‹</button><b>'+MN[m]+' '+y+'</b><button id="cnext">›</button></div><div class="calg">';
+    ['Δ','Τ','Τ','Π','Π','Σ','Κ'].forEach(function(x){h+='<div class="cdw">'+x+'</div>';});
+    for(var i=0;i<off;i++)h+='<div></div>';
+    for(var d=1;d<=n;d++){var k=iso(y,m,d),has=D[k]?' has':'';h+='<button class="cd'+has+'" data-d="'+k+'"'+(D[k]?'':' disabled')+'><i>'+d+'</i>'+dayBadge(k)+'</button>';}
+    box.innerHTML=h+'</div>';
+    document.getElementById('cprev').onclick=function(){cur.setMonth(cur.getMonth()-1);draw();};
+    document.getElementById('cnext').onclick=function(){cur.setMonth(cur.getMonth()+1);draw();};
+    Array.prototype.forEach.call(box.querySelectorAll('.cd.has'),function(b){b.onclick=function(){show(b.getAttribute('data-d'));};});
+  }
+  function show(k){
+    var a=D[k]||[],h='<h4>'+k.split('-').reverse().join('/')+'</h4>';
+    a.forEach(function(s){
+      var v={won:'<span class="ok">✅ ΠΕΡΑΣΕ</span>',lost:'<span class="ko">❌ ΔΕΝ ΠΕΡΑΣΕ</span>',void:'↩️ Άκυρο'}[s.s]||'⏳ Σε εξέλιξη';
+      h+='<div class="card"><b>'+esc(s.n)+'</b> · '+v+'<div class="muted">'+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · εκτιμώμενη πιθανότητα '+Math.round(s.p*100)+'%</div>';
+      s.L.forEach(function(l){h+='<div class="tk"><span class="ic">'+(IC[l.r]||'⏳')+'</span><div><b>'+esc(l.h)+' – '+esc(l.a)+'</b> <span class="sc">'+esc(l.sc)+'</span><div class="muted">'+esc(l.lb)+(l.o?' @ '+Number(l.o).toFixed(2):'')+'</div></div></div>';});
+      h+='</div>';});
+    out.innerHTML=h||'<p class="muted">Δεν υπάρχουν δελτία αυτή τη μέρα.</p>';
+    out.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  draw(); if(last) show(last);
+})();
+"""
+
+
+def _calendar_html(st) -> str:
+    """📆 Ημερολόγιο: πατάς μια μέρα και βλέπεις όλα τα δελτία της με ✅/❌ ανά αγώνα."""
+    if not st or not st.get("calendar"):
+        return ""
+    import json
+    data = json.dumps(st["calendar"], ensure_ascii=False).replace("</", "<\\/")
+    return ("<div class='card'><h3>📆 Ημερολόγιο: δες οποιαδήποτε μέρα</h3><p class='muted'>Πάτα μια μέρα για να δεις τι είχαμε προτείνει και "
+            "τι πέρασε. ✅ = δελτία που πέρασαν, ❌ = που δεν πέρασαν, ⏳ = σε εξέλιξη. Περιλαμβάνει και τα επίπεδα ρίσκου.</p>"
+            "<div id='cal'></div></div><div id='calday'></div>"
+            f"<script type='application/json' id='caldata'>{data}</script><script>{CAL_JS}</script>")
+
+
+def _ledger_html(pp) -> str:
+    """Paper trading: ταμείο ανά κατηγορία × επίπεδο ρίσκου (βλ. betbot/paper.py)."""
+    if not pp:
+        return ""
+    from .paper import CAT_NAME, CATS, TIER_NAME, TIERS
+    R = {(r["cat"], r["tier"]): r for r in pp["rows"]}
+    if not any(r["n"] for r in pp["rows"]):
+        return ("<div class='card'><h3>📒 Ταμεία (paper trading)</h3><p class='muted'>Κάθε κατηγορία × επίπεδο ρίσκου έχει δικό της "
+                f"εικονικό ταμείο {pp['weekly']:.0f}€ την εβδομάδα. Θα γεμίσει από την πρώτη εκτέλεση.</p></div>")
+    money = lambda v: f"{v:+.2f}€"
+    wk, tot = [], []
+    for cat in CATS:
+        for tier in TIERS:
+            r = R[(cat, tier)]
+            if not r["n"]:
+                continue
+            nm = f"{CAT_NAME[cat]} · {TIER_NAME[tier]}"
+            cls = "ok" if r["wk_pl"] > 0 else "ko" if r["wk_pl"] < 0 else ""
+            wk.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['wk_bets']}</td><td class='n'>{r['wk_spent']:.0f}€</td>"
+                      f"<td class='n {cls}'><b>{money(r['wk_pl'])}</b></td><td class='n'>{r['wk_open']:.0f}€</td>"
+                      f"<td class='n'>{r['wk_left']:.0f}€</td></tr>")
+            roi = "—" if r["roi"] is None else f"{r['roi']:+.0%}"
+            ci = "" if not r["ci"] else f" <span class='muted'>({r['ci'][0]:+.0%}…{r['ci'][1]:+.0%})</span>"
+            hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
+            c2 = "ok" if r["profit"] > 0 else "ko" if r["profit"] < 0 else ""
+            tot.append(f"<tr><td>{E(nm)}</td><td class='n'>{r['n']}</td><td class='n'>{r['won']}/{r['lost']}</td>"
+                       f"<td class='n'>{hit}</td><td class='n {c2}'><b>{money(r['profit'])}</b></td><td class='n'>{roi}{ci}</td>"
+                       f"<td>{r['verdict_text']}</td></tr>")
+    return ("<div class='card'><h3>📒 Ταμεία: " f"{pp['weekly']:.0f}€ την εβδομάδα ανά κατηγορία και ρίσκο</h3>"
+            "<p class='muted'>Εικονικά στοιχήματα (paper trading), δεν παίζεται πραγματικό χρήμα. Κάθε συνδυασμός έχει δικό του ταμείο· "
+            "δείχνει πόσα θα είχαμε χάσει ή κερδίσει. Στόχος: να κρατήσουμε μόνο ό,τι αποδεδειγμένα αξίζει.</p>"
+            f"<h4>Αυτή την εβδομάδα (από {pp['monday']:%d/%m})</h4><div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th>"
+            "<th>Στοιχηματίστηκαν</th><th>Κ/Ζ έως τώρα</th><th>Εκκρεμή</th><th>Υπόλοιπο</th></tr></thead><tbody>" + "".join(wk) + "</tbody></table></div>"
+            "<h4>Συνολικά και κρίση</h4><p class='muted'>Κρίση μόνο μετά από " f"{pp['need']} δελτία που κρίθηκαν. «Αξίζει» = το κάτω όριο του 95% διαστήματος του ROI είναι "
+            "πάνω από 0· «να αφαιρεθεί» = το πάνω όριο είναι κάτω από 0.</p>"
+            "<div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>✅/❌</th><th>Επιτυχία</th><th>Κ/Ζ</th><th>ROI (95%)</th><th>Κρίση</th></tr></thead><tbody>"
+            + "".join(tot) + "</tbody></table></div></div>")
+
+
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None) -> str:
     P = Page(cfg)
     P.now = now
     tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
@@ -801,7 +899,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     for tid, lname in TAB_LIST.items():
         if tid in sec:
             sec[tid] = _yesterday_card(st, lname) + sec[tid]
-    sec["history"] = (_goals_card(goals) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
+    sec["history"] = (_goals_card(goals) + _calendar_html(st) + _ledger_html(paper) + _history_stats_html(st) + "<div class='card'><h3>📊 Κ/Ζ ανά λίστα (σε μονάδες)</h3><p class='muted'>Όλες οι λίστες καταγράφονται «στα χαρτιά» "
                       "με 1 μονάδα, για να βλέπουμε ποια δουλεύει. Χρειάζονται 4–6 εβδομάδες για σοβαρό συμπέρασμα. "
                       "«Επιτυχία επιλογών» = πόσες μεμονωμένες επιλογές βγήκαν.</p>"
                       + ("<div class='tbl'><table><thead><tr><th>Λίστα</th><th>Κλεισμένα</th><th>Κέρδισαν</th><th>%</th>"
@@ -838,7 +936,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
 <div class="warn">Στατιστική εκτίμηση, όχι εγγύηση. Ακόμα και οι «σίγουρες» επιλογές χάνουν περίπου 1 στις 3–4 φορές.
 Παίζε μόνο το ποσό της εβδομάδας.</div>
-{daysum_html}<div class="livestat" id="livestat"></div>
+{daysum_html}<div class="livestat" id="livestat"></div><div class="livestat" id="espnchk"></div>
 <nav class="tabs" role="tablist">{tabs_html}</nav>{body}</main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>

@@ -245,6 +245,10 @@ function schedule() {
   else { const nk = nextKickoff(); delay = nk ? Math.min(Math.max(nk - Date.now() + 5000, 5000), 600000) : 600000; }   // αλλιώς ξύπνημα στην επόμενη έναρξη
   timer = setTimeout(tick, delay);
 }
+// Έλεγχος σύνδεσης: ρωτά ΜΙΑ φορά ένα ελαφρύ endpoint του ESPN, ώστε να ξέρουμε αν η συσκευή φτάνει εκεί (ποτέ cache:'no-store')
+function probe() {
+  return fetch(ESPN + 'basketball/nba/scoreboard').then(r => r.ok ? 'ok' : 'http ' + r.status).catch(e => 'δίκτυο/CORS');
+}
 function status() { return {lastOk, lastErr, browserOk, playing: Object.keys(neededEvents()).length, nk: nextKickoff()}; }
 function start(ls, cb) {
   legs = ls; onUpdate = cb;
@@ -262,7 +266,7 @@ function slipVerdict(codes) {
   if (codes.some(c => c === 'won' || c === 'sure')) return ['live', '🟢 Σε εξέλιξη'];
   return ['pending', '⏳ Δεν ξεκίνησε'];
 }
-return {start, judge, parseSummary, cache, key, trackable, hhmm, esc, grp, IC, status, slipVerdict, byTime};
+return {start, probe, judge, parseSummary, cache, key, trackable, hhmm, esc, grp, IC, status, slipVerdict, byTime};
 })();
 """
 
@@ -334,6 +338,8 @@ async function checkNew() {
 setInterval(checkNew, 5 * 60 * 1000);
 const all = []; DATA.forEach(s => s.legs.forEach(l => all.push(l)));
 B.start(all, render);
+B.probe().then(function(r){ var c = document.getElementById('espnchk'); if (c) c.innerHTML = r === 'ok' ? '📡 Σύνδεση με ESPN από τη συσκευή σου: ✅ λειτουργεί' :
+  '📡 Σύνδεση με ESPN από τη συσκευή σου: ⚠️ δεν απαντά (' + r + ')'; });
 window.__betbot = {judge: B.judge, parseSummary: B.parseSummary, cache: B.cache, DATA};
 })();
 """
@@ -348,7 +354,7 @@ def render(cfg, now, data: list[dict]) -> str:
 <h1>🔴 BetBot Live</h1>
 <p class="sub">✅ βγήκε · ❌ έχασε · 🟢 πάει καλά · 🔴 πάει άσχημα · ⏳ δεν ξεκίνησε · ➖ χωρίς live ·
 <a href="index.html">← Κύρια σελίδα</a></p>
-<p id="status">Φόρτωση…</p>
+<p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
 <p class="sub">Δεδομένα δελτίων από την εκτέλεση των {loc:%H:%M} ({loc:%d/%m}). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
 Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>

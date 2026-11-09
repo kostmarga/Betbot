@@ -93,6 +93,15 @@ def build(db, cfg, now) -> dict:
             wk_bets = [b for b in bets if b["wk"] == monday]
             wk_open = sum(b["stake"] for b in wk_bets if b["profit"] is None)
             wk_pl = sum(b["profit"] for b in wk_bets if b["profit"] is not None)
+            day_pl = {}
+            for b in settled:
+                day_pl[b["day"]] = day_pl.get(b["day"], 0.0) + b["profit"]
+            green_days = (sum(1 for v in day_pl.values() if v > 0) / len(day_pl)) if day_pl else None
+            wk_pl_all = {}
+            for b in settled:
+                if b["wk"] < monday:
+                    wk_pl_all[b["wk"]] = wk_pl_all.get(b["wk"], 0.0) + b["profit"]
+            green_weeks = (sum(1 for v in wk_pl_all.values() if v > 0) / len(wk_pl_all)) if wk_pl_all else None
             cum, series = 0.0, []
             for b in sorted((b for b in bets if b["profit"] is not None), key=lambda b: b["day"]):
                 cum += b["profit"]
@@ -117,5 +126,5 @@ def build(db, cfg, now) -> dict:
                          "ci": ci, "verdict": vkey, "verdict_text": vtxt, "avg_odds": (sum(b["odds"] for b in settled) / len(settled)) if settled else None,
                          "avg_p": (sum(b["p"] for b in settled) / len(settled)) if settled else None,
                          "wk_bets": len(wk_bets), "wk_spent": sum(b["stake"] for b in wk_bets), "wk_open": wk_open, "wk_pl": wk_pl,
-                         "series": series, "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
+                         "series": series, "green_days": green_days, "green_weeks": green_weeks, "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
     return {"rows": rows, "weekly": weekly, "need": need, "monday": monday}

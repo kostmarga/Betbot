@@ -30,7 +30,7 @@ from betbot.models import BasketballModel, CountModel, FootballModel, PlayerMode
 from betbot.util import iso, log
 
 SLIM_KEYS = ("match_id", "league", "league_name", "sport", "kickoff", "home", "away", "market",
-             "selection", "line", "label", "odds", "p_model", "p_market", "p", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
+             "selection", "line", "label", "odds", "p_model", "p_market", "p", "p_raw", "cal", "min_play", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
 
 
 def load_cfg(path="config.yaml"):

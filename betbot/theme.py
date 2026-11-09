@@ -163,4 +163,7 @@ div.tk .sc{font-family:var(--mono)}
 .badge.good{background:var(--accent-soft);color:var(--goodtxt)}.badge.bad{background:color-mix(in srgb,var(--bad) 13%,transparent);color:var(--bad)}
 .badge.mid{background:color-mix(in srgb,var(--warn) 24%,transparent);color:#8a5a00}.badge.wait{background:var(--chip);color:var(--muted)}
 .stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+
+.minp{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.slip-odds .minp{margin-top:3px}
 """

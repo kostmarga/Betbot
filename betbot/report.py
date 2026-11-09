@@ -89,7 +89,7 @@ class Page:
 
     # ---------------- μία επιλογή ----------------
     def pick_row(self, c, show_fair=True):
-        odds_cell = f"<b>{c['odds']:.2f}</b>" if c.get("odds") else \
+        odds_cell = (f"<b>{c['odds']:.2f}</b>" + (f"<div class='minp {'ok' if c['odds'] >= c['min_play'] else 'ko'}'>αξίζει από {c['min_play']:.2f}</div>" if c.get("min_play") else "")) if c.get("odds") else \
             (f"<span class='muted'>δίκαιη {c['fair_odds']:.2f}</span><br><b>παίξ' το αν ≥ {c['play_if']:.2f}</b>"
              if c.get("play_if") else "—")
         edge = c.get("edge")
@@ -159,10 +159,12 @@ class Page:
             if sl.get("list"):
                 dslip = f' data-slip="{E(sl["list"])}"'
         ttl = plain(title)
+        mps = [l.get("min_play") for l in sl["legs"]]
+        minp_total = (f"<div class='minp {'ok' if sl['total_odds'] >= math.prod(mps) else 'ko'}'>αξίζει από {math.prod(mps):.2f}</div>" if (mps and all(mps) and not sl.get("fair")) else "")
         stake_v = f"{stake:.2f}€" if stake else "—"
         ret_v = f"{stake * sl['total_odds']:.2f}€" if stake else "—"
         return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}</div>
-<div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b></div></div>
+<div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b>{minp_total}</div></div>
 <div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'])}</div>
 <div class="slip-stub"><div><small>Ποντάρισμα</small><b>{stake_v}</b></div><div><small>Αν κερδίσει</small><b class="pos">{ret_v}</b></div>
 <div><small>Πιθανότητα</small><b>{sl['p_win'] * 100:.0f}%</b></div></div>
@@ -778,7 +780,9 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             roi = "—" if (r["roi"] is None or r["settled"] < 5) else f"{r['roi']:+.0%}"
             hit = "—" if r["hit"] is None else f"{r['hit']:.0%}"
             pl = f"{r['profit']:+.2f}€"
-            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div></div>"
+            gd = "—" if r["green_days"] is None else f"{r['green_days']:.0%}"
+            gw = "—" if r["green_weeks"] is None else f"{r['green_weeks']:.0%}"
+            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
                        f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
                        f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"
                        f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")

@@ -145,18 +145,36 @@ class MatchContext:
         return sum(pts[f["r"]] for f in form) / len(form)
 
 
+def calibrate_football(p, cfg):
+    """Διόρθωση «φαβορί–αουτσάιντερ»: στο backtest 3 σεζόν (15.910 αγώνες, κλείσιμο Pinnacle) τα φαβορί (≥50%) βγαίνουν
+    ΣΥΧΝΟΤΕΡΑ από όσο λέει η αγορά και τα αουτσάιντερ (<30%) λιγότερο. Εφαρμόζεται το `shrink` (π.χ. 50%) της μέτρησης, γιατί είναι θορυβώδης.
+    Επιστρέφει (p_διορθωμένη, μονάδες διόρθωσης)."""
+    c = (cfg or {}).get("calibration") or {}
+    if not c.get("enabled", False):
+        return p, 0.0
+    sh = float(c.get("shrink", 0.5))
+    for lo, hi, d in c.get("football_1x2", []):
+        if lo <= p < hi:
+            return min(0.97, max(0.01, p + sh * d)), sh * d
+    return p, 0.0
+
+
 def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     m = ctx.m
     market, sel, line = key
     price = (odds_row.get("best_price") or odds_row["price"]) if odds_row else None
     p = (blend * p_model + (1 - blend) * q) if (odds_row and q is not None) else p_model
+    p_raw, cal_d = p, 0.0
+    if ctx.sport == "football" and market == "1X2" and odds_row and q is not None:
+        p, cal_d = calibrate_football(p, ctx.cfg)
     mv = ctx.moves.get(key)
     c = {
         "match_id": m["match_id"], "league": m["league"], "league_name": ctx.lg["name"], "sport": ctx.sport,
         "kickoff": m["kickoff"], "home": ctx.home, "away": ctx.away,
         "market": market, "selection": sel, "line": line, "family": MARKET_FAMILY.get(market, market),
         "label": label(market, sel, line, ctx.home, ctx.away, extra),
-        "odds": price, "p_model": p_model, "p_market": q, "p": p,
+        "odds": price, "p_model": p_model, "p_market": q, "p": p, "p_raw": p_raw, "cal": cal_d,
+        "min_play": (round(1 / p, 2) if (price and p > 0) else None),
         "edge": (p * price - 1) if price else None,
         "best_source": odds_row.get("best_source") if odds_row else None,
         "fair_odds": 1 / p_model if p_model > 0 else None,
@@ -164,6 +182,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,
         "warnings": [], "blocked": set(), "why": [],
     }
+    if cal_d > 0.004 and q is not None:
+        c["why"].append(f"Πιθανότητα {p * 100:.0f}%: η αγορά δίνει {p_raw * 100:.0f}% και τα φαβορί αυτού του επιπέδου βγαίνουν στο ιστορικό "
+                        f"λίγο συχνότερα (+{cal_d * 100:.1f} μονάδες)")
     return c
 
 

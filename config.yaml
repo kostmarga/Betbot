@@ -84,10 +84,9 @@ leagues:
   - {id: UEL,  name: UEFA Europa League,      sport: football, espn: uefa.europa,      sofascore: 679,   odds_api: soccer_uefa_europa_league}
   - {id: UECL, name: UEFA Conference League,  sport: football, espn: uefa.europa.conf, sofascore: 17015, odds_api: soccer_uefa_europa_conference_league}
   # --- επιπλέον πρωταθλήματα (ESPN για προγράμματα/αποτελέσματα/αποδόσεις, fdco_new μόνο για backtest 1Χ2) ---
-  # Backtest 09/11/2026: κρατήθηκαν όσα έχουν ROI ≥ των κύριων λιγκών. ΕΞΩ (αρνητικό ROI): Αυστρία, Ελβετία, Δανία, Αργεντινή, Ιρλανδία.
+  # Backtest 09/11/2026: κρατήθηκαν όσα έχουν ROI ≥ των κύριων λιγκών. ΕΞΩ: Αυστρία, Ελβετία, Δανία, Αργεντινή, Ιρλανδία (αρνητικό ROI) και MLS (hit-rate 63% < 65% των κύριων λιγκών). Κριτήριο: ΔΕΝ πέφτει το hit-rate.
   - {id: NOR,  name: Eliteserien,         sport: football, espn: nor.1, fdco_new: NOR}
   - {id: SWE,  name: Allsvenskan,         sport: football, espn: swe.1, fdco_new: SWE}
-  - {id: MLS,  name: MLS,                 sport: football, espn: usa.1, fdco_new: USA}
   - {id: BRA,  name: Brasileirão,         sport: football, espn: bra.1, fdco_new: BRA}
   - {id: MEX,  name: Liga MX,             sport: football, espn: mex.1, fdco_new: MEX}
   - {id: JPN,  name: J1 League,           sport: football, espn: jpn.1, fdco_new: JPN}

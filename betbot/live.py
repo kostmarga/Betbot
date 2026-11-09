@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 from .collectors.espn_stats import TEAM_ALT, _pick
 from .stats import LISTS, NAMES, real_slips
+from .theme import calm
 from .util import http_get, iso, parse_iso
 
 E = html.escape
@@ -348,10 +349,10 @@ window.__betbot = {judge: B.judge, parseSummary: B.parseSummary, cache: B.cache,
 def render(cfg, now, data: list[dict]) -> str:
     loc = now.astimezone(ZoneInfo(cfg["timezone"]))
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
+    return calm(f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BetBot Live</title><style>{CSS}</style></head><body><main>
-<h1>🔴 BetBot Live</h1>
+<h1>BetBot Live</h1>
 <p class="sub">✅ βγήκε · ❌ έχασε · 🟢 πάει καλά · 🔴 πάει άσχημα · ⏳ δεν ξεκίνησε · ➖ χωρίς live ·
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
@@ -361,7 +362,7 @@ def render(cfg, now, data: list[dict]) -> str:
 </main>
 <script id="data" type="application/json" data-gen="{iso(now)}">{payload}</script>
 <script>{CORE_JS}</script>
-<script>{PAGE_JS}</script></body></html>"""
+<script>{PAGE_JS}</script></body></html>""")
 
 
 def run(cfg: dict, now, out_path: str | None = None) -> str:

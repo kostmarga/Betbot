@@ -22,10 +22,10 @@ from .util import parse_iso
 
 TIERS = ("strong", "balanced", "bold")
 SUFFIX = {"strong": "~s", "balanced": "", "bold": "~b"}
-TIER_NAME = {"strong": "🟢 Δυνατό", "balanced": "🟡 Ισορροπημένο", "bold": "🟠 Τολμηρό"}
+TIER_NAME = {"strong": "Δυνατό", "balanced": "Ισορροπημένο", "bold": "Τολμηρό"}
 CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "combo", "corners", "cards")
-CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "🛡️ Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-            "overs": "⚽ Over", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες"}
+CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
+            "overs": "Over", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες"}
 LOTTERY = ("x30", "x100")
 
 

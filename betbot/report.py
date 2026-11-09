@@ -29,8 +29,8 @@ SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(
 E = html.escape
 
 TABS = [
-    ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "🛡️ Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
-    ("x100", "🎰 100+"), ("overs", "⚽ Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
+    ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
+    ("x100", "🎰 100+"), ("overs", "Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
     ("throw_ins", "↔️ Πλάγια"), ("players", "👤 Παίκτες"), ("combo", "🔀 Συνδυαστικό"),
     ("moves", "📉 Κινήσεις"), ("analysis", "📊 Ανάλυση"), ("calendar", "📆 Ημερολόγιο"), ("sources", "⚙️ Πηγές"),
 ]
@@ -42,7 +42,7 @@ GROUPS = [   # κάτω μπάρα: (id, ετικέτα, εικονίδιο SVG 
     ("calendar", "Ημερολόγιο", "M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM4 10h16M8 3v4M16 3v4", ("calendar",)),
     ("more", "Άλλα", "M5 12h.01M12 12h.01M19 12h.01", ("moves", "sources")),
 ]
-LIST_NAMES = dict(TABS) | {"single": "⭐ Μονό της ημέρας", "safe1": "🛡️ Safe (μονά)",
+LIST_NAMES = dict(TABS) | {"single": "⭐ Μονό της ημέρας", "safe1": "Safe (μονά)",
                            "fair_corners": "🚩 Κόρνερ (δίκαιη)", "fair_cards": "🟨 Κάρτες (δίκαιη)",
                            "fair_throw_ins": "↔️ Πλάγια (δίκαιη)", "fair_players": "👤 Παίκτες (δίκαιη)"}
 
@@ -102,6 +102,7 @@ class Page:
                       f"{arrow}{abs(mv['pct']) * 100:.0f}%</span>"
         warn = "".join(f"<div class='wr'>⚠️ {E(w)}</div>" for w in c.get("warnings", []))
         why = "".join(f"<li>{E(w)}</li>" for w in c.get("why", []))
+        whyline = f"<div class='whyline'>{E(c['why'][0])}</div>" if c.get("why") else ""
         form = ""
         if c.get("form_home") or c.get("form_away"):
             form = f"<p class='muted'>{E(c['home'])}: {_badges(c.get('form_home', []))} &nbsp; " \
@@ -109,7 +110,7 @@ class Page:
         tk, scr, attr = "", "", ""
         if "res" in c:        # σκέλος καταγεγραμμένου δελτίου: ✅/❌/⚽/🏁/⏳ + σκορ (ενημερώνεται και ζωντανά από τον browser)
             _code, ic, txt = leg_state(c, getattr(self, "now", None))
-            tk = f"<span class='tk'>{ic}</span> "
+            tk = f"<span class='tk' data-c='{_code}'>{ic}</span> "
             scr = f"<div class='scr'>{E(txt)}</div>"
             if c.get("eid") and c.get("lg"):
                 leg = {k: c.get(k) for k in ("eid", "lg", "sport", "market", "ko", "res", "sc", "fair")}
@@ -118,10 +119,10 @@ class Page:
                 attr = f' data-leg="{E(json.dumps(leg, ensure_ascii=False))}"'
         return f"""<tr{attr}>
 <td class="t">{tk}{_when(c['kickoff'], self.tz)}{scr}</td>
-<td><b>{E(c['home'])}</b> – <b>{E(c['away'])}</b><br><span class="muted">{E(c['league_name'])}</span></td>
-<td>{E(c['label'])} {mv_cell}{warn}
-<details><summary>Γιατί;</summary><ul class="why">{why}</ul>{form}</details></td>
-<td class="n" data-l="Απόδ.">{odds_cell}</td><td class="n" data-l="Πιθαν."><b>{_pct(c['p'])}</b></td><td class="n" data-l="Value">{edge_cell}</td></tr>"""
+<td class="m"><b>{E(c['home'])}</b> – <b>{E(c['away'])}</b><br><span class="muted">{E(c['league_name'])}</span></td>
+<td class="p"><b>{E(c['label'])}</b> {mv_cell}{warn}{whyline}
+<details><summary>Όλοι οι λόγοι</summary><ul class="why">{why}</ul>{form}</details></td>
+<td class="n o" data-l="Απόδ.">{odds_cell}</td><td class="n q" data-l="Πιθαν."><b>{_pct(c['p'])}</b></td><td class="n v" data-l="Value">{edge_cell}</td></tr>"""
 
     def pick_table(self, picks, empty="Καμία επιλογή σήμερα."):
         if not picks:
@@ -170,7 +171,7 @@ class Page:
 <div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>{ev_tile}</div>{ch}</details></div>"""
 
 
-from .theme import CSS  # noqa: E402
+from .theme import CSS, calm  # noqa: E402
 
 
 END_MIN = {"football": 150, "basketball": 180}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
@@ -219,7 +220,7 @@ const VIC = {won: '✅', lost: '❌', live: '⚽', wait: '🏁', pending: '⏳'}
 function update() {
   rows.forEach(r => {
     const l = r.leg, st = B.trackable(l) ? B.cache[B.key(l)] : null, j = B.judge(l, st), c = j[0];
-    const tk = r.tr.querySelector('.tk'); if (tk) tk.textContent = B.IC[c];
+    const tk = r.tr.querySelector('.tk'); if (tk) { tk.textContent = B.IC[c]; tk.dataset.c = c; }
     const scr = r.tr.querySelector('.scr');
     if (scr) {
       let t = '';
@@ -391,7 +392,7 @@ def _alternatives_html(P, lists, plan, cfg, cidx, tctx=None, view=None) -> str:
     in_plan = {it.get("list") for it in (plan or {}).get("items", [])}
     unit = cfg["bankroll"]["unit"]
     blocks = []
-    for lid, key, title in (("safe", "safe", "🛡️ Safe δελτίο"), ("overs", "overs", "⚽ Over δελτίο"),
+    for lid, key, title in (("safe", "safe", "Safe δελτίο"), ("overs", "overs", "Over δελτίο"),
                             ("combo", "combo", "🔀 Συνδυαστικό"), ("fair_corners", "corners", "🚩 Δελτίο κόρνερ"),
                             ("fair_cards", "cards", "🟨 Δελτίο καρτών"), ("fair_throw_ins", "throw_ins", "↔️ Δελτίο πλάγιων"),
                             ("fair_players", "players", "👤 Δελτίο παικτών")):
@@ -459,8 +460,8 @@ def _yesterday_card(st, lid) -> str:
             f"{sum(1 for r in res if r == 'won')}/{len(res)} επιλογές βγήκαν</p>" + _leg_ticks(sl["legs"], st["scores"], fair) + "</div>")
 
 
-NAMES_HIST = {"recommended": "⭐ Προτεινόμενο", "safe": "🛡️ Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-              "overs": "⚽ Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
+NAMES_HIST = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
+              "overs": "Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
               "fair_throw_ins": "↔️ Πλάγια", "fair_players": "👤 Παίκτες"}
 
 
@@ -872,7 +873,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     """
 
         sl_safe = view("safe" + sfx, lists["safe"].get("slip"))
-        sec["safe"] = (P.slip_block(sl_safe, "🛡️ Safe δελτίο", br["unit"],
+        sec["safe"] = (P.slip_block(sl_safe, "Safe δελτίο", br["unit"],
                                     "<p class='muted'>Οι πιο πιθανές επιλογές της ημέρας σε ΕΝΑ δελτίο (χαμηλές αποδόσεις, υψηλή πιθανότητα ανά επιλογή).</p>" + lock_note(sl_safe))
                        + _picks_details(P, lists["safe"]["picks"], "Όλες οι σίγουρες επιλογές (αναφορά)"))
         _v = view("x10" + sfx, lists["x10"]["slip"])
@@ -883,7 +884,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         sec["x100"] = P.slip_block(_v, f"🎰 Λαχείο {L['x100']['min_total']:.0f}+", br["lottery_stake"], _lot_note(lists["x100"]["slip"]) + lock_note(_v))
         ov = lists["overs"]
         _ov = view("overs" + sfx, ov["slip"])
-        sec["overs"] = (P.slip_block(_ov, "⚽ Over δελτίο (γκολ)", br["unit"], lock_note(_ov))
+        sec["overs"] = (P.slip_block(_ov, "Over δελτίο (γκολ)", br["unit"], lock_note(_ov))
                         + _picks_details(P, ov["picks"], "Όλες οι επιλογές γκολ (αναφορά)"))
         for lid, title, what in (("corners", "🚩 Κόρνερ", "κόρνερ"), ("cards", "🟨 Κάρτες", "κάρτες"),
                                  ("throw_ins", "↔️ Πλάγια", "πλάγια"), ("players", "👤 Παίκτες", "παίκτες")):
@@ -1029,7 +1030,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         for gid, _l, _i, tabs in GROUPS if len(tabs) > 1)
     tabs_html = ""
     js = json.dumps([[cid, c] for cid, c in P.charts], ensure_ascii=False)
-    return f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
+    return calm(f"""<!doctype html><html lang="el"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>BetBot Δελτίο</title>
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="BetBot">
@@ -1099,7 +1100,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 }})();
 </script>
 <script>{CORE_JS}</script>
-<script>{INDEX_JS}</script></body></html>"""
+<script>{INDEX_JS}</script></body></html>""")
 
 
 # ---------------------------------------------------------------- ΙΣΤΟΡΙΚΟ

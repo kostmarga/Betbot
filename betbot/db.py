@@ -125,6 +125,22 @@ CREATE TABLE IF NOT EXISTS referees (
     source     TEXT NOT NULL
 );
 
+-- Βαθμολογία διοργάνωσης (ESPN): μία γραμμή ανά ομάδα, ανανεώνεται σε κάθε εκτέλεση
+CREATE TABLE IF NOT EXISTS standings (
+    league  TEXT NOT NULL,
+    team    TEXT NOT NULL,
+    rank    INTEGER,
+    played  INTEGER,
+    points  REAL,
+    wins    INTEGER,
+    draws   INTEGER,
+    losses  INTEGER,
+    gf      INTEGER,
+    ga      INTEGER,
+    updated TEXT,
+    PRIMARY KEY (league, team)
+);
+
 -- Αντιστοίχιση αγώνα με id σε άλλες πηγές (π.χ. sofascore)
 CREATE TABLE IF NOT EXISTS ext_ids (
     match_id   TEXT NOT NULL,
@@ -409,6 +425,16 @@ class DB:
 
     def lineups_for(self, match_id):
         return [dict(r) for r in self.conn.execute("SELECT * FROM lineups WHERE match_id=?", (match_id,))]
+
+    def upsert_standings(self, rows):
+        rows = list(rows)
+        with self.tx() as c:
+            c.executemany("INSERT OR REPLACE INTO standings VALUES(:league,:team,:rank,:played,:points,:wins,:draws,:losses,:gf,:ga,:updated)", rows)
+        return len(rows)
+
+    def standing_for(self, league, team):
+        r = self.conn.execute("SELECT * FROM standings WHERE league=? AND team=?", (league, team)).fetchone()
+        return dict(r) if r else None
 
     def set_referee(self, match_id, referee, source):
         with self.tx() as c:

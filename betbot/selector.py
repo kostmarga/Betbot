@@ -156,6 +156,16 @@ class MatchContext:
                 parts.append(f"{t}: ενδεκάδα ανακοινώθηκε")
         return ("Ενδεκάδα ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
 
+    def standing_note(self):
+        """«Βαθμολογία: Α 3ος (19β, +8) · Β 12ος (11β, −3)» από τον πίνακα standings (ESPN)."""
+        out = []
+        for t in (self.home, self.away):
+            r = self.db.standing_for(self.m["league"], t)
+            if r and r.get("rank"):
+                gd = (r["gf"] - r["ga"]) if (r.get("gf") is not None and r.get("ga") is not None) else None
+                out.append(f"{t} {r['rank']}ος ({r['points']:.0f}β σε {r['played']}αγ" + (f", {gd:+d} τέρματα" if gd is not None else "") + ")")
+        return ("Βαθμολογία: " + " · ".join(out)) if len(out) == 2 else None
+
     def absences(self, team):
         return self.absent.get(team, [])
 
@@ -211,6 +221,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,
         "warnings": [], "blocked": set(), "why": [],
     }
+    sn = ctx.standing_note() if market != "PLAYER" and ctx.sport == "football" else None
+    if sn:
+        c["why"].append(sn)
     ln, lw = ctx.lineup_note() if market != "PLAYER" else (None, None)
     if ln:
         c["why"].append(ln)

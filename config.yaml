@@ -116,6 +116,9 @@ collectors:
     enabled: true                       # ενδεκάδες από το ESPN (~1 ώρα πριν τον αγώνα) + διαιτητής όπου υπάρχει
     window_hours: 3
     max_calls_per_run: 40
+  espn_standings:
+    enabled: true                       # βαθμολογία διοργανώσεων από το ESPN (για το «γιατί»)
+    hours_ahead: 36
   espn_stats:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120

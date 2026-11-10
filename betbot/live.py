@@ -147,7 +147,7 @@ function parseSummary(d) {
               as: num(by.away && by.away.score), stats: {}, ts: Date.now()};
   ((d.boxscore && d.boxscore.teams) || []).forEach(tm => {
     const s = {}; (tm.statistics || []).forEach(x => s[x.name] = (x.displayValue !== undefined ? x.displayValue : x.value));
-    st.stats[tm.homeAway] = {corners: pick(s, ['wonCorners','cornerKicks','corners']), yellow: pick(s, ['yellowCards'])};
+    st.stats[tm.homeAway] = {corners: pick(s, ['wonCorners','cornerKicks','corners']), yellow: pick(s, ['yellowCards']), red: pick(s, ['redCards'])};
   });
   return st;
 }

@@ -375,6 +375,22 @@ def run(cfg: dict, now, out_path: str | None = None) -> str:
         pass
     path = out_path or os.path.join(cfg["reports_dir"], "live.html")
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    text = render(cfg, now, data)
+    # Να μην ξαναγράφεται (και άρα να μην γίνεται commit κάθε 10 λεπτά) όταν άλλαξε ΜΟΝΟ η ώρα εκτέλεσης στο κείμενο της σελίδας.
+    try:
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+        if _stable(old) == _stable(text):
+            return path
+    except OSError:
+        pass
     with open(path, "w", encoding="utf-8") as f:
-        f.write(render(cfg, now, data))
+        f.write(text)
     return path
+
+
+def _stable(html_text: str) -> str:
+    """Η σελίδα χωρίς την ώρα εκτέλεσης («Δεδομένα δελτίων από την εκτέλεση των ΩΩ:ΛΛ (ηη/μμ)») και χωρίς τον χρόνο παραγωγής."""
+    import re
+    t = re.sub(r"εκτέλεση των \d\d:\d\d \(\d\d/\d\d\)", "εκτέλεση των --", html_text)
+    return re.sub(r'data-gen="[^"]*"', 'data-gen=""', t)

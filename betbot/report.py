@@ -701,6 +701,7 @@ const P = JSON.parse(el.textContent), box = document.getElementById('livebox'), 
 const fact = n => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
 const pois = (k, l) => Math.exp(-l) * Math.pow(l, k) / fact(k);
 const S = {};                       // eid -> {state, hs, as, min}
+const redOf = st => st && st.stats ? ((st.stats.home && +st.stats.home.red) || 0) + ((st.stats.away && +st.stats.away.red) || 0) : 0;
 function minute(st) {
   if (!st || st.state === 'pre') return 0;
   if (st.state === 'post') return 90;
@@ -708,8 +709,10 @@ function minute(st) {
   const m = d.match(/(\d+)(?:\+(\d+))?/); return m ? Math.min(95, parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) : 0)) : 0;
 }
 function markets(p, st) {
-  const mn = Math.min(90, minute(st)), f = Math.max(0.02, (90 - mn) / 90), h = st ? st.hs : 0, a = st ? st.as : 0;
-  const lh = p.lh * f, la = p.la * f, N = 9; let p1 = 0, px = 0, p2 = 0, ov15 = 0, ov25 = 0, ov35 = 0, bt = 0;
+  // Χρόνος: το 44,4% των γκολ πέφτει στο 1ο ημίχρονο (tools/inplay_test.py)· όποιος προηγείται παίζει πιο συντηρητικά (δ=12%, βέλτιστο στο backtest)
+  const mn = Math.min(95, minute(st)), g = mn <= 45 ? mn * 0.444 / 45 : 0.444 + (Math.min(mn, 90) - 45) * 0.556 / 45, f = Math.max(0.02, 1 - g);
+  const h = st ? st.hs : 0, a = st ? st.as : 0, D = 0.12, N = 9; let lh = p.lh * f, la = p.la * f;
+  if (h > a) { lh *= 1 - D; la *= 1 + D; } else if (a > h) { lh *= 1 + D; la *= 1 - D; } let p1 = 0, px = 0, p2 = 0, ov15 = 0, ov25 = 0, ov35 = 0, bt = 0;
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
     const q = pois(i, lh) * pois(j, la), H = h + i, A = a + j, T = H + A;
     if (H > A) p1 += q; else if (H === A) px += q; else p2 += q;
@@ -724,14 +727,14 @@ function render() {
   P.forEach((p, idx) => {
     const ko = Date.parse(p.ko), st = S[p.eid], pre = now < ko, fin = st && st.state === 'post';
     if (fin) return; n++;
-    const score = st && st.state !== 'pre' ? st.hs + '-' + st.as : '–', when = pre ? 'ξεκινά ' + B.hhmm(p.ko) : (st && st.state === 'in' ? (st.clock || 'παίζεται') : 'παίζεται');
+    const red = redOf(st), score = st && st.state !== 'pre' ? st.hs + '-' + st.as : '–', when = pre ? 'ξεκινά ' + B.hhmm(p.ko) : (st && st.state === 'in' ? (st.clock || 'παίζεται') : 'παίζεται');
     const rows = markets(p, st).map((m, k) => {
       const pr = m[1], fair = pr > 0.001 ? 1 / pr : 999;
       return '<tr data-i="' + idx + '" data-k="' + k + '"><td>' + B.esc(m[0]) + '</td><td class="n">' + (pr * 100).toFixed(0) + '%</td><td class="n"><b>' + fair.toFixed(2) +
         '</b></td><td class="n"><input class="od" inputmode="decimal" placeholder="απόδοση" value="' + (window.__odds && window.__odds[p.eid + '|' + k] || '') + '"></td><td class="vv"></td></tr>';
     }).join('');
     html += '<div class="card"><div class="slip-top"><div><div class="eyebrow">' + B.esc(p.league) + '</div><b>' + B.esc(p.home) + ' – ' + B.esc(p.away) + '</b>' +
-      '<div class="muted">' + B.esc(when) + '</div></div><div class="slip-odds"><small>Σκορ</small><b>' + score + '</b></div></div>' +
+      '<div class="muted">' + B.esc(when) + '</div>' + (red ? '<div class="wr">! Κόκκινη κάρτα: το μοντέλο δεν ισχύει, οι τιμές δεν υπολογίζονται</div>' : '') + '</div><div class="slip-odds"><small>Σκορ</small><b>' + score + '</b></div></div>' +
       '<div class="tbl"><table><thead><tr><th>Αγορά</th><th>Πιθ.</th><th>Δίκαιη απόδ.</th><th>Η απόδοσή σου</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   });
   if (!n) html = '<div class="card"><p class="muted">Δεν υπάρχουν ποδοσφαιρικοί αγώνες σήμερα με αρκετά δεδομένα αγοράς.</p></div>';
@@ -743,6 +746,7 @@ function verdicts() {
   box.querySelectorAll('tr[data-i]').forEach(tr => {
     const p = P[tr.dataset.i], m = markets(p, S[p.eid])[tr.dataset.k], inp = tr.querySelector('input.od'), v = parseFloat(String(inp.value).replace(',', '.')), c = tr.querySelector('.vv');
     window.__odds = window.__odds || {}; window.__odds[p.eid + '|' + tr.dataset.k] = inp.value;
+    if (redOf(S[p.eid]) > 0) { c.textContent = '—'; return; }
     if (!(v > 1)) { c.textContent = ''; return; }
     const ev = m[1] * v - 1;
     c.innerHTML = ev >= 0.03 ? '<span class="badge good">αξίζει +' + (ev * 100).toFixed(0) + '%</span>' : '<span class="badge bad">όχι (' + (ev * 100).toFixed(0) + '%)</span>';

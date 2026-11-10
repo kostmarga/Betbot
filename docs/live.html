@@ -23,10 +23,10 @@ h2{font-size:16px;margin:20px 0 6px;color:var(--muted);font-weight:600}
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 06:00 (10/11). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 09:06 (10/11). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
 Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
 </main>
-<script id="data" type="application/json" data-gen="2026-11-10T04:00:22Z">[]</script>
+<script id="data" type="application/json" data-gen="2026-11-10T07:06:42Z">[]</script>
 <script>
 // Κοινός κώδικας live (live σελίδα + κύρια σελίδα): κρίση επιλογής, ρώτημα ESPN ΜΟΝΟ όσο παίζεται αγώνας, χρονοδιάγραμμα.
 window.BetbotLive = (function(){
@@ -48,7 +48,7 @@ function parseSummary(d) {
               as: num(by.away && by.away.score), stats: {}, ts: Date.now()};
   ((d.boxscore && d.boxscore.teams) || []).forEach(tm => {
     const s = {}; (tm.statistics || []).forEach(x => s[x.name] = (x.displayValue !== undefined ? x.displayValue : x.value));
-    st.stats[tm.homeAway] = {corners: pick(s, ['wonCorners','cornerKicks','corners']), yellow: pick(s, ['yellowCards'])};
+    st.stats[tm.homeAway] = {corners: pick(s, ['wonCorners','cornerKicks','corners']), yellow: pick(s, ['yellowCards']), red: pick(s, ['redCards'])};
   });
   return st;
 }

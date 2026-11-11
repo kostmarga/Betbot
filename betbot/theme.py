@@ -166,4 +166,7 @@ div.tk .sc{font-family:var(--mono)}
 
 .minp{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
 .slip-odds .minp{margin-top:3px}
+
+.verdict{font-size:12.5px;margin-top:6px;padding:6px 9px;border-radius:8px;background:var(--chip);line-height:1.4}
+.verdict.ok{background:var(--accent-soft)}.verdict.ko{background:color-mix(in srgb,var(--warn) 22%,transparent)}.verdict.mid{background:color-mix(in srgb,var(--warn) 14%,transparent)}
 """

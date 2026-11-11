@@ -304,6 +304,64 @@ def _avoided(key, avoid, sport) -> bool:
     return False
 
 
+def verdict_line(c, ctx):
+    """Το συμπέρασμα στο τέλος του «γιατί»: ΑΞΙΖΕΙ / ΑΞΙΖΕΙ ΜΕ ΕΠΙΦΥΛΑΞΕΙΣ / ΟΡΙΑΚΟ, με τους λόγους υπέρ και κατά.
+    «Αξίζει» σημαίνει ότι η τιμή είναι πάνω από το σημείο ισορροπίας της πιθανότητας της αγοράς· ΔΕΝ είναι εγγύηση ότι θα βγει."""
+    price, mp = c.get("odds"), c.get("min_play")
+    if not price or not mp:
+        pi = c.get("play_if")
+        return f"Συμπέρασμα: παίξ' το ΜΟΝΟ αν το πρακτορείο σου δίνει απόδοση ≥ {pi:.2f} (δεν βρήκαμε τιμή αγοράς)." if pi else None
+    pro, con = [], []
+    side = {"1X2": {"1": "home", "2": "away"}, "ML": {"HOME": "home", "AWAY": "away"}}.get(c["market"], {}).get(c["selection"])
+    if side:
+        team, opp = (ctx.home, ctx.away) if side == "home" else (ctx.away, ctx.home)
+        fm = (ctx.form_home if side == "home" else ctx.form_away)[:6]
+        fo = (ctx.form_away if side == "home" else ctx.form_home)[:6]
+        if fm:
+            w = sum(1 for x in fm if x["r"] == "Ν")
+            if w >= 4:
+                pro.append(f"{team}: {w} νίκες στα τελευταία {len(fm)}")
+            elif w <= 1:
+                con.append(f"{team}: μόνο {w} νίκη στα τελευταία {len(fm)}")
+        if fo:
+            wo = sum(1 for x in fo if x["r"] == "Ν")
+            if wo <= 1:
+                pro.append(f"{opp}: μόνο {wo} νίκη στα τελευταία {len(fo)}")
+            elif wo >= 5:
+                con.append(f"{opp}: {wo} νίκες στα τελευταία {len(fo)}")
+        try:
+            r1, r2 = ctx.db.standing_for(ctx.m["league"], team), ctx.db.standing_for(ctx.m["league"], opp)
+            if r1 and r2 and r1.get("rank") and r2.get("rank"):
+                gap = r2["rank"] - r1["rank"]
+                if gap >= 6:
+                    pro.append(f"βαθμολογία: {team} {r1['rank']}ος, {opp} {r2['rank']}ος")
+                elif gap <= -6:
+                    con.append(f"βαθμολογία: {team} {r1['rank']}ος, {opp} {r2['rank']}ος")
+        except Exception:
+            pass
+
+        def key_out(t):
+            return [r["player"] for r in ctx.lineups if r["team"] == t and r["status"] == "missing" and r["source"] in ("espn", "fpl") and "|" in (r.get("reason") or "")]
+        ko, oo = key_out(team), key_out(opp)
+        if ko:
+            con.append(f"λείπουν βασικοί του {team} ({', '.join(ko[:2])})")
+        if oo:
+            pro.append(f"λείπουν βασικοί του {opp} ({', '.join(oo[:2])})")
+    con += list(c.get("warnings") or [])[:2]
+    ok = price >= mp
+    gap = mp / price - 1                      # πόσο % πάνω από την τιμή βρίσκεται το σημείο ισορροπίας
+    verdict = ("ΑΞΙΖΕΙ ΜΕ ΕΠΙΦΥΛΑΞΕΙΣ" if con else "ΑΞΙΖΕΙ") if ok else ("ΟΡΙΑΚΟ" if gap <= 0.05 else "ΔΕΝ ΑΞΙΖΕΙ ΣΤΗΝ ΤΙΜΗ")
+    out = (f"Συμπέρασμα: {verdict} — η αγορά δίνει {c['p'] * 100:.0f}% και η τιμή {price:.2f} "
+           f"{'είναι πάνω από' if ok else 'είναι ΚΑΤΩ από'} το σημείο ισορροπίας {mp:.2f}")
+    if pro:
+        out += " · υπέρ: " + "; ".join(pro)
+    if con:
+        out += " · κατά: " + "; ".join(con)
+    if not ok:
+        out += f" · παίξ' το μόνο αν το πρακτορείο σου δίνει ≥ {mp:.2f}"
+    return out + "."
+
+
 def build_candidates(db, cfg, models, now):
     """Επιστρέφει dict: with_odds (λίστα), fair (λίστα χωρίς απόδοση), contexts (match_id -> ctx)."""
     sel_cfg = cfg["selection"]
@@ -398,6 +456,10 @@ def build_candidates(db, cfg, models, now):
             c = _cand(ctx, key, pm_, orow, q.get(key), extra, blend=b_fb if lg["sport"] == "football" else b)
             rules.apply(c, ctx, cfg)
             c["why"] = c.pop("notes", []) + rules.reasons(c, ctx, cms) + c.pop("notes_tail", [])
+            v_ = verdict_line(c, ctx)
+            if v_:
+                c["verdict"] = v_
+                c["why"].append(v_)
             if orow:
                 if _avoided(key, avoid, lg["sport"]):
                     continue

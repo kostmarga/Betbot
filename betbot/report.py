@@ -103,6 +103,10 @@ class Page:
         warn = "".join(f"<div class='wr'>⚠️ {E(w)}</div>" for w in c.get("warnings", []))
         why = "".join(f"<li>{E(w)}</li>" for w in c.get("why", []))
         whyline = f"<div class='whyline'>{E(c['why'][0])}</div>" if c.get("why") else ""
+        if c.get("verdict"):
+            vt = c["verdict"]
+            vcls = "ok" if "ΑΞΙΖΕΙ —" in vt else "mid" if ("ΕΠΙΦΥΛΑΞΕΙΣ" in vt or "ΟΡΙΑΚΟ" in vt) else "ko" if "ΔΕΝ ΑΞΙΖΕΙ" in vt else ""
+            whyline += f"<div class='verdict {vcls}'>{E(vt)}</div>"
         form = ""
         if c.get("form_home") or c.get("form_away"):
             form = f"<p class='muted'>{E(c['home'])}: {_badges(c.get('form_home', []))} &nbsp; " \
@@ -177,7 +181,7 @@ from .theme import CSS, calm  # noqa: E402
 
 
 END_MIN = {"football": 150, "basketball": 180}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
-ENRICH = ("why", "form_home", "form_away", "warnings", "move")
+ENRICH = ("why", "form_home", "form_away", "warnings", "move", "verdict")
 
 
 def leg_state(c, now):

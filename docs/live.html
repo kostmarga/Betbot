@@ -23,10 +23,10 @@ h2{font-size:16px;margin:20px 0 6px;color:var(--muted);font-weight:600}
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 13:48 (11/11). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
-Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 23:30 (11/11). Πηγή αποτελεσμάτων: ESPN και επίσημο API της Euroleague (ρωτά μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
+Οι αποδόσεις δεν ανανεώνονται live. Παίκτες και πλάγια δεν παρακολουθούνται live.</p>
 </main>
-<script id="data" type="application/json" data-gen="2026-11-11T11:48:39Z">[{"id": "2026-11-11#recommended", "list": "recommended", "name": "Προτεινόμενο", "odds": 2.0303999999999998, "p": 0.4641832977718061, "fair": false, "day": "2026-11-11", "status": "open", "legs": [{"eid": null, "lg": null, "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Paris Basketball", "away": "Fenerbahce Tarfin Istanbul", "label": "Νίκη Fenerbahce Tarfin Istanbul", "odds": 1.41, "ko": "2026-11-11T19:45:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "401909974", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Houston Rockets", "away": "Golden State Warriors", "label": "Νίκη Houston Rockets", "odds": 1.44, "ko": "2026-11-12T02:30:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}]</script>
+<script id="data" type="application/json" data-gen="2026-11-11T21:30:55Z">[{"id": "2026-11-11#recommended", "list": "recommended", "name": "Προτεινόμενο", "odds": 2.0303999999999998, "p": 0.4641832977718061, "fair": false, "day": "2026-11-11", "status": "open", "legs": [{"eid": "E2026-101", "lg": "EL", "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Paris Basketball", "away": "Fenerbahce Tarfin Istanbul", "label": "Νίκη Fenerbahce Tarfin Istanbul", "odds": 1.41, "ko": "2026-11-11T19:45:00Z", "res": "open", "sc": null, "dbst": "scheduled", "st": {"state": "in", "clock": "Q4 · 04:11", "hs": 85, "as": 81, "stats": {}}}, {"eid": "401909974", "lg": "nba", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Houston Rockets", "away": "Golden State Warriors", "label": "Νίκη Houston Rockets", "odds": 1.44, "ko": "2026-11-12T02:30:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}]</script>
 <script>
 // Κοινός κώδικας live (live σελίδα + κύρια σελίδα): κρίση επιλογής, ρώτημα ESPN ΜΟΝΟ όσο παίζεται αγώνας, χρονοδιάγραμμα.
 window.BetbotLive = (function(){
@@ -35,6 +35,17 @@ const SPORT = {football: 'soccer', basketball: 'basketball'};
 const cache = {};                       // κλειδί αγώνα -> κατάσταση από ESPN
 let legs = [], onUpdate = function(){}, timer = null, lastOk = null, lastErr = null, browserOk = false;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EL = 'https://live.euroleague.net/api/Header';
+// Euroleague: επίσημο δημόσιο live API (σκορ + τέταρτο/χρόνος)· eid = «E2026-101»
+function parseEuroleague(d) {
+  const n = x => { const v = parseInt(x, 10); return isNaN(v) ? 0 : v; };
+  const hs = n(d.ScoreA), as_ = n(d.ScoreB), q = String(d.Quarter || '').trim();
+  return {state: d.Live ? 'in' : ((hs + as_) > 0 ? 'post' : 'pre'), clock: q ? 'Q' + q + ' · ' + d.RemainingPartialTime : (String(d.GameTime || '').trim() === '20:00' ? 'ημίχρονο' : (d.GameTime ? d.GameTime + "'" : '')), hs: hs, as: as_, stats: {}, ts: Date.now()};
+}
+const fetchLeg = l => {
+  if (l.lg === 'EL') { const p = String(l.eid).split('-'); return fetch(EL + '?gamecode=' + p[1] + '&seasoncode=' + p[0]).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(parseEuroleague); }
+  return fetch(ESPN + SPORT[l.sport] + '/' + l.lg + '/summary?event=' + l.eid).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(parseSummary);
+};
 const key = l => l.sport + '|' + l.lg + '|' + l.eid;
 const trackable = l => !!(l.eid && l.lg && SPORT[l.sport]);
 const hhmm = iso => { try { return new Date(iso).toLocaleTimeString('el-GR', {timeZone:'Europe/Athens', hour:'2-digit', minute:'2-digit', hour12:false}); } catch(e) { return ''; } };
@@ -131,8 +142,7 @@ async function tick() {
     const results = await Promise.allSettled(keys.map(k => {
       const l = need[k];
       // ΧΩΡΙΣ επιπλέον επικεφαλίδες/επιλογές (π.χ. cache:'no-store'): αλλιώς ο browser στέλνει preflight και το ESPN το απορρίπτει
-      return fetch(ESPN + SPORT[l.sport] + '/' + l.lg + '/summary?event=' + l.eid)
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => { cache[k] = parseSummary(d); });
+      return fetchLeg(l).then(st => { cache[k] = st; });
     }));
     const bad = results.filter(r => r.status === 'rejected').length;
     if (bad < keys.length) { browserOk = true; lastOk = new Date(); lastErr = bad ? bad + ' αγώνες δεν απάντησαν' : null; } else { lastErr = 'το ESPN δεν απαντά'; }

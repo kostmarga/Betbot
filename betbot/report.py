@@ -317,8 +317,8 @@ def _enrich(legs, cidx, fair=False, tctx=None):
             sc = (tctx["scores"] or {}).get(mid)
             d["res"] = l.get("result")
             d["sc"] = [sc[0], sc[1]] if sc and sc[0] is not None else None
-            d["eid"] = mid[5:] if isinstance(mid, str) and mid.startswith("espn:") else None
-            d["lg"] = tctx["lgmap"].get(l.get("league"))
+            d["eid"] = mid[5:] if isinstance(mid, str) and mid.startswith("espn:") else (mid[11:] if isinstance(mid, str) and mid.startswith("euroleague:") else None)
+            d["lg"] = "EL" if isinstance(mid, str) and mid.startswith("euroleague:") else tctx["lgmap"].get(l.get("league"))
             d["ko"] = l.get("kickoff")
             d["fair"] = fair
         c = (cidx or {}).get(_pkey(l)) or {}

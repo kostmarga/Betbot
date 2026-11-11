@@ -31,7 +31,33 @@ SPORT = {"football": "soccer", "basketball": "basketball"}
 MAX_FETCH = 40
 
 
+EL_URL = "https://live.euroleague.net/api/Header"
+
+
+def parse_euroleague(d: dict) -> dict:
+    """Κατάσταση αγώνα Euroleague από το επίσημο live API (`Header`): σκορ, τέταρτο/χρόνος. Live=true -> in· αλλιώς 0-0 -> pre, με σκορ -> post."""
+    def num(x):
+        try:
+            return int(float(x))
+        except (TypeError, ValueError):
+            return 0
+    hs, as_ = num(d.get("ScoreA")), num(d.get("ScoreB"))
+    state = "in" if d.get("Live") else ("post" if (hs + as_) > 0 else "pre")
+    q = str(d.get("Quarter") or "").strip()
+    gt = str(d.get("GameTime") or "").strip()
+    clock = f"Q{q} · {d.get('RemainingPartialTime')}" if q else ("ημίχρονο" if gt == "20:00" else (f"{gt}'" if gt else ""))
+    return {"state": state, "clock": clock, "hs": hs, "as": as_, "stats": {}}
+
+
 def fetch_state(sport: str, league_espn: str, event_id: str) -> dict:
+    if league_espn == "EL":            # Euroleague: event_id = «E2026-101»
+        season, _, code = str(event_id).partition("-")
+        data, _ = http_get(EL_URL, params={"gamecode": code, "seasoncode": season}, timeout=15, retries=2)
+        return parse_euroleague(data)
+    return _fetch_espn_state(sport, league_espn, event_id)
+
+
+def _fetch_espn_state(sport: str, league_espn: str, event_id: str) -> dict:
     """Σκορ, λεπτό και (ποδόσφαιρο) κόρνερ/κίτρινες από το ESPN summary (ρωτάει ο server του bot)."""
     data, _ = http_get(URL.format(sport=SPORT[sport], league=league_espn), params={"event": event_id}, timeout=15, retries=2)
     comp = data["header"]["competitions"][0]
@@ -94,7 +120,8 @@ def build_data(db, cfg: dict, now) -> list[dict]:
             m = db.get_match(l["match_id"])
             mid = l["match_id"]
             score = [m["home_score"], m["away_score"]] if m and m["home_score"] is not None else None
-            legs.append({"eid": mid[5:] if mid.startswith("espn:") else None, "lg": lg_espn.get(l.get("league")),
+            legs.append({"eid": mid[5:] if mid.startswith("espn:") else (mid[11:] if mid.startswith("euroleague:") else None),
+                         "lg": "EL" if mid.startswith("euroleague:") else lg_espn.get(l.get("league")),
                          "sport": l.get("sport"), "market": l["market"], "sel": l["selection"], "line": l.get("line"),
                          "home": l["home"], "away": l["away"], "label": l.get("label") or "", "odds": l.get("odds"),
                          "ko": l.get("kickoff"), "res": l.get("result"), "sc": score,
@@ -134,6 +161,17 @@ const SPORT = {football: 'soccer', basketball: 'basketball'};
 const cache = {};                       // κλειδί αγώνα -> κατάσταση από ESPN
 let legs = [], onUpdate = function(){}, timer = null, lastOk = null, lastErr = null, browserOk = false;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EL = 'https://live.euroleague.net/api/Header';
+// Euroleague: επίσημο δημόσιο live API (σκορ + τέταρτο/χρόνος)· eid = «E2026-101»
+function parseEuroleague(d) {
+  const n = x => { const v = parseInt(x, 10); return isNaN(v) ? 0 : v; };
+  const hs = n(d.ScoreA), as_ = n(d.ScoreB), q = String(d.Quarter || '').trim();
+  return {state: d.Live ? 'in' : ((hs + as_) > 0 ? 'post' : 'pre'), clock: q ? 'Q' + q + ' · ' + d.RemainingPartialTime : (String(d.GameTime || '').trim() === '20:00' ? 'ημίχρονο' : (d.GameTime ? d.GameTime + "'" : '')), hs: hs, as: as_, stats: {}, ts: Date.now()};
+}
+const fetchLeg = l => {
+  if (l.lg === 'EL') { const p = String(l.eid).split('-'); return fetch(EL + '?gamecode=' + p[1] + '&seasoncode=' + p[0]).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(parseEuroleague); }
+  return fetch(ESPN + SPORT[l.sport] + '/' + l.lg + '/summary?event=' + l.eid).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(parseSummary);
+};
 const key = l => l.sport + '|' + l.lg + '|' + l.eid;
 const trackable = l => !!(l.eid && l.lg && SPORT[l.sport]);
 const hhmm = iso => { try { return new Date(iso).toLocaleTimeString('el-GR', {timeZone:'Europe/Athens', hour:'2-digit', minute:'2-digit', hour12:false}); } catch(e) { return ''; } };
@@ -230,8 +268,7 @@ async function tick() {
     const results = await Promise.allSettled(keys.map(k => {
       const l = need[k];
       // ΧΩΡΙΣ επιπλέον επικεφαλίδες/επιλογές (π.χ. cache:'no-store'): αλλιώς ο browser στέλνει preflight και το ESPN το απορρίπτει
-      return fetch(ESPN + SPORT[l.sport] + '/' + l.lg + '/summary?event=' + l.eid)
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(d => { cache[k] = parseSummary(d); });
+      return fetchLeg(l).then(st => { cache[k] = st; });
     }));
     const bad = results.filter(r => r.status === 'rejected').length;
     if (bad < keys.length) { browserOk = true; lastOk = new Date(); lastErr = bad ? bad + ' αγώνες δεν απάντησαν' : null; } else { lastErr = 'το ESPN δεν απαντά'; }
@@ -357,8 +394,8 @@ def render(cfg, now, data: list[dict]) -> str:
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των {loc:%H:%M} ({loc:%d/%m}). Πηγή αποτελεσμάτων: ESPN (ρωτάει μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
-Οι αποδόσεις δεν ανανεώνονται live. Παίκτες, πλάγια και Euroleague δεν παρακολουθούνται live.</p>
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των {loc:%H:%M} ({loc:%d/%m}). Πηγή αποτελεσμάτων: ESPN και επίσημο API της Euroleague (ρωτά μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
+Οι αποδόσεις δεν ανανεώνονται live. Παίκτες και πλάγια δεν παρακολουθούνται live.</p>
 </main>
 <script id="data" type="application/json" data-gen="{iso(now)}">{payload}</script>
 <script>{CORE_JS}</script>

@@ -443,23 +443,36 @@ def _leg_ticks(legs, scores, fair=False) -> str:
     return "".join(rows)
 
 
-def _yesterday_card(st, lid) -> str:
-    """📅 Το δελτίο της προηγούμενης ημέρας αυτής της κατηγορίας, με ✅/❌ ανά αγώνα."""
-    if not st:
-        return ""
-    sl = st["yesterday"].get(lid)
-    name = NAMES_HIST.get(lid, lid)
-    if not sl:
-        return f"<div class='card'><h3>📅 Χθες · {E(name)}</h3><p class='muted'>Δεν υπήρχε δελτίο σε αυτή την κατηγορία.</p></div>"
+def _slip_history_body(sl, st, lid) -> tuple[str, str]:
+    """(επικεφαλίδα-ετικέτα, σώμα) ενός κλεισμένου δελτίου με ✅/❌ ανά αγώνα."""
     res = [l.get("result") or "open" for l in sl["legs"]]
     done = sum(1 for r in res if r in ("won", "lost", "void"))
     verdict = {"won": "<span class='ok'>✅ ΠΕΡΑΣΕ</span>", "lost": "<span class='ko'>❌ ΔΕΝ ΠΕΡΑΣΕ</span>",
                "void": "↩️ Άκυρο"}.get(sl["status"], f"⏳ Σε εξέλιξη ({done}/{len(res)} κρίθηκαν)")
     fair = lid.startswith("fair_")
     price = f"ελάχιστη απόδοση {sl['total_odds']:.2f}" if fair else f"απόδοση {sl['total_odds']:.2f}"
-    return (f"<div class='card'><h3>📅 Χθες ({sl['day']:%d/%m}) · {E(name)}: {verdict}</h3>"
-            f"<p class='muted'>{price} · πιθανότητα που είχαμε εκτιμήσει {sl['model_prob'] * 100:.0f}% · "
-            f"{sum(1 for r in res if r == 'won')}/{len(res)} επιλογές βγήκαν</p>" + _leg_ticks(sl["legs"], st["scores"], fair) + "</div>")
+    body = (f"<p class='muted'>{price} · πιθανότητα που είχαμε εκτιμήσει {sl['model_prob'] * 100:.0f}% · "
+            f"{sum(1 for r in res if r == 'won')}/{len(res)} επιλογές βγήκαν</p>" + _leg_ticks(sl["legs"], st["scores"], fair))
+    return verdict, body
+
+
+def _yesterday_card(st, lid) -> str:
+    """📅 Το δελτίο ΤΗΣ ΧΘΕΣΙΝΗΣ ημέρας αυτής της κατηγορίας, με ✅/❌ ανά αγώνα. Αν χθες δεν υπήρχε δελτίο, το λέει καθαρά
+    και δείχνει (αναδιπλωμένο) το τελευταίο δελτίο που υπήρξε."""
+    if not st:
+        return ""
+    from datetime import timedelta
+    yday = st["today"] - timedelta(days=1)
+    sl = st["yesterday"].get(lid)
+    name = NAMES_HIST.get(lid, lid)
+    if sl and sl["day"] == yday:
+        verdict, body = _slip_history_body(sl, st, lid)
+        return f"<div class='card'><h3>📅 Χθες ({yday:%d/%m}) · {E(name)}: {verdict}</h3>{body}</div>"
+    head = f"<div class='card'><h3>📅 Χθες ({yday:%d/%m}) · {E(name)}</h3><p class='muted'>Χθες δεν υπήρχε δελτίο σε αυτή την κατηγορία.</p>"
+    if not sl:
+        return head + "</div>"
+    verdict, body = _slip_history_body(sl, st, lid)
+    return head + f"<details><summary>Τελευταίο δελτίο ({sl['day']:%d/%m}): {verdict}</summary>{body}</details></div>"
 
 
 NAMES_HIST = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",

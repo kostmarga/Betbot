@@ -87,7 +87,7 @@ def reasons(c, ctx, count_models) -> list[str]:
     def form_line(team, form):
         if not form:
             return None
-        f = form[:6]
+        f = form[:10]
         gf = sum(x["gf"] for x in f) / len(f)
         ga = sum(x["ga"] for x in f) / len(f)
         rec = "".join(x["r"] for x in f)
@@ -102,7 +102,7 @@ def reasons(c, ctx, count_models) -> list[str]:
         if fam == "goals":
             for t, fo in ((H, ctx.form_home), (A, ctx.form_away)):
                 if fo:
-                    f = fo[:6]
+                    f = fo[:10]
                     if c["market"] == "OU":
                         hit = sum(1 for x in f if (x["gf"] + x["ga"] > c["line"]) == (c["selection"] == "OVER"))
                         out.append(f"{t}: {hit}/{len(f)} τελευταία ματς έβγαλαν «{c['label']}»")
@@ -110,7 +110,7 @@ def reasons(c, ctx, count_models) -> list[str]:
                         hit = sum(1 for x in f if ((x["gf"] > 0 and x["ga"] > 0) == (c["selection"] == "YES")))
                         out.append(f"{t}: {hit}/{len(f)} τελευταία ματς έβγαλαν «{c['label']}»")
         if ctx.h2h:
-            out.append("H2H: " + ", ".join(m["score"] for m in ctx.h2h[:4]))
+            out.append("H2H (τελευταία " + str(len(ctx.h2h[:5])) + "): " + ", ".join(m["score"] for m in ctx.h2h[:5]))
         if ctx.exp:
             out.append(f"Μοντέλο: αναμενόμενο {ctx.exp}")
     elif fam in ("corners", "cards", "throw_ins"):

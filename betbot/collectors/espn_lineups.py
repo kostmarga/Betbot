@@ -1,4 +1,4 @@
-"""Agent – ενδεκάδες (και διαιτητής όπου υπάρχει) από το ESPN, δωρεάν.
+"""Agent – ενδεκάδες ποδοσφαίρου και πεντάδες NBA (και διαιτητής όπου υπάρχει) από το ESPN, δωρεάν.
 
 Το «summary» του ESPN περιέχει `rosters` με τους βασικούς (`starter: true`) και τα αναπληρωματικά περίπου 1 ώρα πριν την έναρξη.
 Γράφουμε μόνο ματς που ξεκινούν σε `window_hours` ώρες (ή ξεκίνησαν πριν λίγο). Κατάσταση παίκτη: `starter` | `bench`.
@@ -13,7 +13,8 @@ from ..db import LineupRow
 from ..util import http_get, iso
 from .base import Collector, Context
 
-URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/summary"
+URL = "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary"
+SPORT = {"football": "soccer", "basketball": "basketball"}
 
 
 class EspnLineupsCollector(Collector):
@@ -23,7 +24,7 @@ class EspnLineupsCollector(Collector):
         cc = ctx.cfg["collectors"].get("espn_lineups", {})
         hours = float(cc.get("window_hours", 3))
         cap = int(cc.get("max_calls_per_run", 40))
-        leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("espn") and lg["sport"] == "football"}
+        leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("espn") and lg["sport"] in SPORT}
         ms = ctx.db.matches(status="scheduled", since=iso(ctx.now - timedelta(minutes=30)), until=iso(ctx.now + timedelta(hours=hours)))
         fetched = iso(ctx.now)
         calls = n_match = n_rows = n_ref = 0
@@ -33,10 +34,21 @@ class EspnLineupsCollector(Collector):
                 continue
             calls += 1
             try:
-                data, _ = http_get(URL.format(league=lg["espn"]), params={"event": m["match_id"][5:]}, timeout=15, retries=2)
+                data, _ = http_get(URL.format(sport=SPORT[lg["sport"]], league=lg["espn"]), params={"event": m["match_id"][5:]}, timeout=15, retries=2)
             except Exception:
                 continue
             rows = []
+            # Μπάσκετ: η πεντάδα φαίνεται στο boxscore (starter: true) μόλις ανακοινωθεί/ξεκινήσει ο αγώνας
+            for tp in ((data.get("boxscore") or {}).get("players") or []) if lg["sport"] == "basketball" else []:
+                tname = (tp.get("team") or {}).get("displayName")
+                team = tname if tname in (m["home"], m["away"]) else None
+                ath = [a for blk in (tp.get("statistics") or []) for a in (blk.get("athletes") or [])]
+                if not team or not any(a.get("starter") for a in ath):
+                    continue
+                for a in ath:
+                    nm = (a.get("athlete") or {}).get("displayName")
+                    if nm:
+                        rows.append(LineupRow(m["match_id"], team, nm, "starter" if a.get("starter") else "bench", None, None, 1, "espn"))
             for r in data.get("rosters") or []:
                 side = r.get("homeAway")
                 team = m["home"] if side == "home" else m["away"] if side == "away" else None

@@ -247,6 +247,12 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     if market != "PLAYER":
         sn = ctx.standing_note()
         inj = ctx.injury_note()
+        if not inj:
+            # Να ξέρεις αν «δεν βρέθηκε τίποτα» σημαίνει «κανείς δεν λείπει» ή «δεν έχουμε δεδομένα για αυτή τη λίγκα»
+            if ctx.sport == "basketball" or ctx.m["league"] == "EPL":
+                inj = "Τραυματισμοί · κανένας βασικός δηλωμένος (ESPN/FPL)"
+            elif ctx.sport == "football":
+                inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για αυτή τη λίγκα — έλεγξε τα νέα των ομάδων πριν παίξεις"
         ln, lw = ctx.lineup_note()
         notes += [x for x in (inj, sn, ln) if x]
         if lw:

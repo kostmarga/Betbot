@@ -122,6 +122,9 @@ collectors:
   espn_injuries:
     enabled: true                       # τραυματισμοί NBA από το ESPN (στο «γιατί»)
     hours_ahead: 36
+  fpl:
+    enabled: true                       # τραυματισμοί/στατιστικά παικτών Premier League (επίσημο Fantasy API, δωρεάν)
+    hours_ahead: 36
   espn_stats:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120

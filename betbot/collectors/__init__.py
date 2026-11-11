@@ -17,8 +17,9 @@ from .espn_stats import EspnStatsCollector
 from .espn_lineups import EspnLineupsCollector
 from .espn_standings import EspnStandingsCollector
 from .espn_injuries import EspnInjuriesCollector
+from .fpl import FplCollector
 from .fdco_history import FdcoHistoryCollector
 from .greek_site import GreekSiteCollector
 
 ALL = [EspnCollector, EuroleagueCollector, FdcoOddsCollector, EspnOddsCollector, OddsApiCollector,
-       SofascoreCollector, EspnStatsCollector, EspnLineupsCollector, EspnStandingsCollector, EspnInjuriesCollector, FdcoHistoryCollector, GreekSiteCollector]
+       SofascoreCollector, EspnStatsCollector, EspnLineupsCollector, EspnStandingsCollector, EspnInjuriesCollector, FplCollector, FdcoHistoryCollector, GreekSiteCollector]

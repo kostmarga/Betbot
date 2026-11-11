@@ -142,6 +142,17 @@ CREATE TABLE IF NOT EXISTS standings (
     PRIMARY KEY (league, team)
 );
 
+-- Ειδήσεις (ESPN) που αφορούν τραυματισμούς/αποκλεισμούς, ανά διοργάνωση
+CREATE TABLE IF NOT EXISTS team_news (
+    league    TEXT NOT NULL,
+    url       TEXT NOT NULL,
+    published TEXT,
+    headline  TEXT,
+    summary   TEXT,
+    fetched   TEXT,
+    PRIMARY KEY (league, url)
+);
+
 -- Αντιστοίχιση αγώνα με id σε άλλες πηγές (π.χ. sofascore)
 CREATE TABLE IF NOT EXISTS ext_ids (
     match_id   TEXT NOT NULL,
@@ -437,6 +448,16 @@ class DB:
     def standing_for(self, league, team):
         r = self.conn.execute("SELECT * FROM standings WHERE league=? AND team=?", (league, team)).fetchone()
         return dict(r) if r else None
+
+    def upsert_news(self, rows):
+        rows = list(rows)
+        with self.tx() as c:
+            c.executemany("INSERT OR REPLACE INTO team_news(league,url,published,headline,summary,fetched) VALUES(:league,:url,:published,:headline,:summary,:fetched)", rows)
+        return len(rows)
+
+    def news_since(self, league, since_iso):
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM team_news WHERE league=? AND published>=? ORDER BY published DESC", (league, since_iso))]
 
     def set_referee(self, match_id, referee, source):
         with self.tx() as c:

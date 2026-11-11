@@ -20,7 +20,7 @@ import numpy as np
 
 from . import movement, rules
 from .models import COUNT_LABEL, PROP_LABEL
-from .util import iso
+from .util import iso, norm_team
 
 GROUPS = {"1X2": ["1", "X", "2"], "OU": ["OVER", "UNDER"], "BTTS": ["YES", "NO"],
           "ML": ["HOME", "AWAY"], "TOTAL": ["OVER", "UNDER"], "SPREAD": ["HOME", "AWAY"],
@@ -107,6 +107,12 @@ def _devig(odds: dict) -> dict:
 
 
 # =====================================================================
+def norm_text(text: str) -> str:
+    """Πεζά, χωρίς τόνους (για αναζήτηση ονόματος ομάδας μέσα σε κείμενο)."""
+    import unicodedata
+    return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
+
+
 class MatchContext:
     """Όλα όσα ξέρουμε για έναν επερχόμενο αγώνα (για πιθανότητες + «γιατί»)."""
 
@@ -173,6 +179,28 @@ class MatchContext:
                 any_ = True
             parts.append(f"{t}: " + (", ".join(mis[:5] + dbt[:3]) or "κανένας δηλωμένος"))
         return ("Τραυματισμοί · " + " · ".join(parts)) if any_ else None
+
+    def news_note(self):
+        """«Νέα: Titel (ηη/μμ)» από ειδήσεις ESPN των τελευταίων 14 ημερών που αναφέρουν μία από τις δύο ομάδες."""
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        arts = self.db.news_since(self.m["league"], since)
+        if not arts:
+            return None
+        import re as _re
+        def has(team, text):
+            n = norm_team(team)
+            hay = _re.sub(r"[^a-z0-9' ]", " ", norm_text(text))
+            return bool(n) and _re.search(r"\b" + _re.escape(n) + r"\b", hay) is not None
+        out = []
+        for a in arts:
+            text = (a["headline"] or "") + " " + (a["summary"] or "")
+            if has(self.home, text) or has(self.away, text):
+                d = (a["published"] or "")[:10]
+                out.append(f"{a['headline']} ({d[8:10]}/{d[5:7]})")
+            if len(out) == 2:
+                break
+        return ("Νέα (ESPN): " + " · ".join(out)) if out else None
 
     def standing_note(self):
         """«Βαθμολογία: Α 3ος (...) · Β 12ος (...)» από τον πίνακα standings (ESPN): ποδόσφαιρο και NBA."""
@@ -254,7 +282,8 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
             elif ctx.sport == "football":
                 inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για αυτή τη λίγκα — έλεγξε τα νέα των ομάδων πριν παίξεις"
         ln, lw = ctx.lineup_note()
-        notes += [x for x in (inj, sn, ln) if x]
+        nn = ctx.news_note()
+        notes += [x for x in (inj, nn, sn, ln) if x]
         if lw:
             c["warnings"].append(lw)
     if cal_d > 0.004 and q is not None:

@@ -159,16 +159,16 @@ class MatchContext:
         return (f"{who.capitalize()} ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
 
     def injury_note(self):
-        """«Τραυματισμοί · Α: Χ (εκτός · κορυφαίος σκόρερ 26.7), Υ (αμφίβολος) · Β: …» για αγώνες μπάσκετ (ESPN)."""
+        """«Τραυματισμοί · Α: Χ (εκτός · βασικός · 5 γκολ 3 ασίστ), Υ (αμφίβολος) · Β: …» (NBA από ESPN, Premier League από το FPL)."""
         parts, any_ = [], False
         for t in (self.home, self.away):
             def tag(r):
                 rs = r.get("reason") or ""
                 return (" · " + rs.split("|", 1)[0]) if "|" in rs else ""
-            mis = [f"{r['player']} (εκτός{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "missing" and r["source"] == "espn"]
-            dbt = [f"{r['player']} (αμφίβολος{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "doubtful" and r["source"] == "espn"]
+            mis = [f"{r['player']} (εκτός{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "missing" and r["source"] in ("espn", "fpl")]
+            dbt = [f"{r['player']} (αμφίβολος{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "doubtful" and r["source"] in ("espn", "fpl")]
             # πρώτα οι «κορυφαίοι» παίκτες
-            mis.sort(key=lambda x: "κορυφαίος" not in x); dbt.sort(key=lambda x: "κορυφαίος" not in x)
+            mis.sort(key=lambda x: not ("κορυφαίος" in x or "βασικός" in x)); dbt.sort(key=lambda x: not ("κορυφαίος" in x or "βασικός" in x))
             if mis or dbt:
                 any_ = True
             parts.append(f"{t}: " + (", ".join(mis[:5] + dbt[:3]) or "κανένας δηλωμένος"))
@@ -246,7 +246,7 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     notes, tail = [], []
     if market != "PLAYER":
         sn = ctx.standing_note()
-        inj = ctx.injury_note() if ctx.sport == "basketball" else None
+        inj = ctx.injury_note()
         ln, lw = ctx.lineup_note()
         notes += [x for x in (inj, sn, ln) if x]
         if lw:

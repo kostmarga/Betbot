@@ -1,0 +1,43 @@
+# Δοκιμαστικό (workflow_dispatch): ελέγχει από το GitHub Actions ποιες δωρεάν πηγές δεδομένων απαντούν.
+# Δεν αλλάζει τίποτα στο repo. Μπορεί να σβηστεί όταν δεν χρειάζεται.
+name: Probe sources
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: NBA cdn scoreboard
+        run: |
+          code=$(curl -sS -m 20 -o /tmp/sb.json -w "%{http_code}" -A "Mozilla/5.0" https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json || true)
+          echo "scoreboard HTTP $code"
+          if [ "$code" = "200" ]; then
+            python3 - <<'PY'
+          import json
+          j=json.load(open('/tmp/sb.json')); g=j["scoreboard"]["games"]
+          print("date",j["scoreboard"]["gameDate"],"games",len(g))
+          for x in g[:8]: print(x["gameId"],x["gameStatusText"],x["awayTeam"]["teamName"],"@",x["homeTeam"]["teamName"])
+          open('/tmp/ids','w').write("\n".join(x["gameId"] for x in g))
+          PY
+            for id in $(head -3 /tmp/ids); do
+              c=$(curl -sS -m 20 -o /tmp/bx.json -w "%{http_code}" -A "Mozilla/5.0" https://cdn.nba.com/static/json/liveData/boxscore/boxscore_$id.json || true)
+              echo "boxscore $id HTTP $c"
+              if [ "$c" = "200" ]; then
+                python3 - <<'PY'
+          import json
+          b=json.load(open('/tmp/bx.json'))["game"]
+          for s in ("homeTeam","awayTeam"):
+              pl=b[s].get("players",[])
+              print(s,b[s]["teamName"],"players",len(pl),"starters",[p["name"] for p in pl if p.get("starter")=="1"],"| not active:",[(p["name"],p.get("notPlayingReason")) for p in pl if p.get("status")!="ACTIVE"][:3])
+          PY
+              fi
+            done
+          fi
+      - name: NBA official injury report and other
+        run: |
+          for u in "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json" "https://api.balldontlie.io/v1/teams" "https://ak-static.cms.nba.com/referee/injury/Injury-Report_$(date -u +%F)_01PM.pdf"; do
+            code=$(curl -sS -m 20 -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u" || true); echo "$code $u"
+          done

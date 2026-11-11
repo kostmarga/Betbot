@@ -156,6 +156,18 @@ class MatchContext:
                 parts.append(f"{t}: ενδεκάδα ανακοινώθηκε")
         return ("Ενδεκάδα ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
 
+    def injury_note(self):
+        """«Τραυματισμοί: Α: Χ (εκτός), Υ (αμφίβολος) · Β: —» για αγώνες μπάσκετ (ESPN)."""
+        parts, any_ = [], False
+        for t in (self.home, self.away):
+            mis = [r["player"] for r in self.lineups if r["team"] == t and r["status"] == "missing" and r["source"] == "espn"]
+            dbt = [r["player"] for r in self.lineups if r["team"] == t and r["status"] == "doubtful" and r["source"] == "espn"]
+            if mis or dbt:
+                any_ = True
+            txt = ", ".join([f"{p} (εκτός)" for p in mis[:4]] + [f"{p} (αμφίβολος)" for p in dbt[:3]])
+            parts.append(f"{t}: {txt or 'κανένας δηλωμένος'}")
+        return ("Τραυματισμοί · " + " · ".join(parts)) if any_ else None
+
     def standing_note(self):
         """«Βαθμολογία: Α 3ος (19β, +8) · Β 12ος (11β, −3)» από τον πίνακα standings (ESPN)."""
         out = []
@@ -221,6 +233,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,
         "warnings": [], "blocked": set(), "why": [],
     }
+    inj = ctx.injury_note() if market != "PLAYER" and ctx.sport == "basketball" else None
+    if inj:
+        c["why"].append(inj)
     sn = ctx.standing_note() if market != "PLAYER" and ctx.sport == "football" else None
     if sn:
         c["why"].append(sn)

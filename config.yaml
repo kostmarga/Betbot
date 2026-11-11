@@ -119,6 +119,9 @@ collectors:
   espn_standings:
     enabled: true                       # βαθμολογία διοργανώσεων από το ESPN (για το «γιατί»)
     hours_ahead: 36
+  espn_injuries:
+    enabled: true                       # τραυματισμοί NBA από το ESPN (στο «γιατί»)
+    hours_ahead: 36
   espn_stats:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120

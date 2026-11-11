@@ -131,11 +131,13 @@ class MatchContext:
         """(κείμενο, προειδοποίηση|None): αν η ενδεκάδα ανακοινώθηκε και πόσες αλλαγές έκανε κάθε ομάδα από το προηγούμενο ματς (rotation)."""
         starters = {t: {r["player"] for r in self.lineups if r["team"] == t and r["status"] == "starter" and r["source"] == "espn"}
                     for t in (self.home, self.away)}
-        if not any(len(v) >= 9 for v in starters.values()):
+        need = 5 if self.sport == "basketball" else 9
+        who = "πεντάδα" if self.sport == "basketball" else "ενδεκάδα"
+        if not any(len(v) >= need for v in starters.values()):
             return None, None
         parts, warn = [], None
         for t, cur in starters.items():
-            if len(cur) < 9:
+            if len(cur) < need:
                 continue
             rows = self.db.conn.execute(
                 "SELECT l.match_id, l.player FROM lineups l JOIN matches mm ON mm.match_id=l.match_id "
@@ -147,33 +149,41 @@ class MatchContext:
                 if len(prev) > 1:
                     break
             last = next(iter(prev.values()), None)
-            if last and len(last) >= 9:
+            if last and len(last) >= need:
                 ch = len(cur - last)
-                parts.append(f"{t}: {ch} αλλαγές στην ενδεκάδα")
-                if ch >= 6:
-                    warn = f"Μεγάλη ανανέωση ενδεκάδας ({t}: {ch} αλλαγές) — πιθανή rotation"
+                parts.append(f"{t}: {ch} αλλαγές στην {who}")
+                if ch >= (3 if self.sport == "basketball" else 6):
+                    warn = f"Μεγάλη ανανέωση ({who}, {t}: {ch} αλλαγές) — πιθανή rotation"
             else:
-                parts.append(f"{t}: ενδεκάδα ανακοινώθηκε")
-        return ("Ενδεκάδα ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
+                parts.append(f"{t}: {who} ανακοινώθηκε")
+        return (f"{who.capitalize()} ανακοινώθηκε · " + " · ".join(parts)) if parts else None, warn
 
     def injury_note(self):
-        """«Τραυματισμοί: Α: Χ (εκτός), Υ (αμφίβολος) · Β: —» για αγώνες μπάσκετ (ESPN)."""
+        """«Τραυματισμοί · Α: Χ (εκτός · κορυφαίος σκόρερ 26.7), Υ (αμφίβολος) · Β: …» για αγώνες μπάσκετ (ESPN)."""
         parts, any_ = [], False
         for t in (self.home, self.away):
-            mis = [r["player"] for r in self.lineups if r["team"] == t and r["status"] == "missing" and r["source"] == "espn"]
-            dbt = [r["player"] for r in self.lineups if r["team"] == t and r["status"] == "doubtful" and r["source"] == "espn"]
+            def tag(r):
+                rs = r.get("reason") or ""
+                return (" · " + rs.split("|", 1)[0]) if "|" in rs else ""
+            mis = [f"{r['player']} (εκτός{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "missing" and r["source"] == "espn"]
+            dbt = [f"{r['player']} (αμφίβολος{tag(r)})" for r in self.lineups if r["team"] == t and r["status"] == "doubtful" and r["source"] == "espn"]
+            # πρώτα οι «κορυφαίοι» παίκτες
+            mis.sort(key=lambda x: "κορυφαίος" not in x); dbt.sort(key=lambda x: "κορυφαίος" not in x)
             if mis or dbt:
                 any_ = True
-            txt = ", ".join([f"{p} (εκτός)" for p in mis[:4]] + [f"{p} (αμφίβολος)" for p in dbt[:3]])
-            parts.append(f"{t}: {txt or 'κανένας δηλωμένος'}")
+            parts.append(f"{t}: " + (", ".join(mis[:5] + dbt[:3]) or "κανένας δηλωμένος"))
         return ("Τραυματισμοί · " + " · ".join(parts)) if any_ else None
 
     def standing_note(self):
-        """«Βαθμολογία: Α 3ος (19β, +8) · Β 12ος (11β, −3)» από τον πίνακα standings (ESPN)."""
+        """«Βαθμολογία: Α 3ος (...) · Β 12ος (...)» από τον πίνακα standings (ESPN): ποδόσφαιρο και NBA."""
         out = []
         for t in (self.home, self.away):
             r = self.db.standing_for(self.m["league"], t)
-            if r and r.get("rank"):
+            if not (r and r.get("rank")):
+                continue
+            if r.get("extra"):
+                out.append(f"{t} {r['rank']}ος ({r['extra']})")
+            else:
                 gd = (r["gf"] - r["ga"]) if (r.get("gf") is not None and r.get("ga") is not None) else None
                 out.append(f"{t} {r['rank']}ος ({r['points']:.0f}β σε {r['played']}αγ" + (f", {gd:+d} τέρματα" if gd is not None else "") + ")")
         return ("Βαθμολογία: " + " · ".join(out)) if len(out) == 2 else None
@@ -233,20 +243,18 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,
         "warnings": [], "blocked": set(), "why": [],
     }
-    inj = ctx.injury_note() if market != "PLAYER" and ctx.sport == "basketball" else None
-    if inj:
-        c["why"].append(inj)
-    sn = ctx.standing_note() if market != "PLAYER" and ctx.sport == "football" else None
-    if sn:
-        c["why"].append(sn)
-    ln, lw = ctx.lineup_note() if market != "PLAYER" else (None, None)
-    if ln:
-        c["why"].append(ln)
-    if lw:
-        c["warnings"].append(lw)
+    notes, tail = [], []
+    if market != "PLAYER":
+        sn = ctx.standing_note()
+        inj = ctx.injury_note() if ctx.sport == "basketball" else None
+        ln, lw = ctx.lineup_note()
+        notes += [x for x in (inj, sn, ln) if x]
+        if lw:
+            c["warnings"].append(lw)
     if cal_d > 0.004 and q is not None:
-        c["why"].append(f"Πιθανότητα {p * 100:.0f}%: η αγορά δίνει {p_raw * 100:.0f}% και τα φαβορί αυτού του επιπέδου βγαίνουν στο ιστορικό "
-                        f"λίγο συχνότερα (+{cal_d * 100:.1f} μονάδες)")
+        tail.append(f"Πιθανότητα {p * 100:.0f}%: η αγορά δίνει {p_raw * 100:.0f}% και τα φαβορί αυτού του επιπέδου βγαίνουν στο ιστορικό "
+                    f"λίγο συχνότερα (+{cal_d * 100:.1f} μονάδες)")
+    c["notes"], c["notes_tail"] = notes, tail
     return c
 
 
@@ -294,7 +302,7 @@ def build_candidates(db, cfg, models, now):
                         probs[("OU", "OVER", l)], probs[("OU", "UNDER", l)] = (ov, None), (1 - ov, None)
                 ctx.model = fm
                 ctx.exp = f"{pred.lam_home:.2f} – {pred.lam_away:.2f} γκολ"
-                ctx.form_home, ctx.form_away = fm.form(m["home"]), fm.form(m["away"])
+                ctx.form_home, ctx.form_away = fm.form(m["home"], 10), fm.form(m["away"], 10)
                 ctx.h2h = fm.h2h(m["home"], m["away"])
             for metric, cm in cms.items():
                 if not (cm.known(m["home"], 5) and cm.known(m["away"], 5)):
@@ -344,7 +352,7 @@ def build_candidates(db, cfg, models, now):
                     probs[k] = (v, None)
                 ctx.model = bm
                 ctx.exp = f"{pred.exp_home:.0f} – {pred.exp_away:.0f} πόντοι"
-                ctx.form_home, ctx.form_away = bm.form(m["home"]), bm.form(m["away"])
+                ctx.form_home, ctx.form_away = bm.form(m["home"], 10), bm.form(m["away"], 10)
                 ctx.h2h = bm.h2h(m["home"], m["away"])
         if not probs:
             continue
@@ -354,7 +362,7 @@ def build_candidates(db, cfg, models, now):
             orow = odds.get(key)
             c = _cand(ctx, key, pm_, orow, q.get(key), extra, blend=b_fb if lg["sport"] == "football" else b)
             rules.apply(c, ctx, cfg)
-            c["why"] = rules.reasons(c, ctx, cms)
+            c["why"] = c.pop("notes", []) + rules.reasons(c, ctx, cms) + c.pop("notes_tail", [])
             if orow:
                 if _avoided(key, avoid, lg["sport"]):
                     continue

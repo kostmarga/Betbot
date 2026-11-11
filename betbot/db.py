@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS standings (
     gf      INTEGER,
     ga      INTEGER,
     updated TEXT,
+    extra   TEXT,
     PRIMARY KEY (league, team)
 );
 
@@ -181,6 +182,7 @@ MIGRATIONS = [
     ("odds", "open_price", "REAL"),
     ("odds", "first_seen", "TEXT"),
     ("slips", "list_name", "TEXT"),
+    ("standings", "extra", "TEXT"),
 ]
 
 
@@ -429,7 +431,7 @@ class DB:
     def upsert_standings(self, rows):
         rows = list(rows)
         with self.tx() as c:
-            c.executemany("INSERT OR REPLACE INTO standings VALUES(:league,:team,:rank,:played,:points,:wins,:draws,:losses,:gf,:ga,:updated)", rows)
+            c.executemany("INSERT OR REPLACE INTO standings(league,team,rank,played,points,wins,draws,losses,gf,ga,updated,extra) VALUES(:league,:team,:rank,:played,:points,:wins,:draws,:losses,:gf,:ga,:updated,:extra)", [dict(r, extra=r.get("extra")) for r in rows])
         return len(rows)
 
     def standing_for(self, league, team):

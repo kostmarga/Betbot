@@ -14,6 +14,8 @@ from ..util import http_get, iso
 from .base import Collector, Context
 
 URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
+SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+LEAD = {"pointsPerGame": "σκόρερ", "assistsPerGame": "πασέρ", "reboundsPerGame": "ριμπάουντερ"}
 
 
 def _status(s: str) -> str | None:
@@ -49,9 +51,23 @@ class EspnInjuriesCollector(Collector):
         n_m = n_rows = 0
         for m in ms:
             rows = []
+            # «κορυφαίοι» παίκτες κάθε ομάδας (σκόρερ/πασέρ/ριμπάουντερ) από το summary του αγώνα: ώστε να φαίνεται αν λείπει βασικός
+            key = {}
+            try:
+                j, _ = http_get(SUMMARY, params={"event": m["match_id"][5:]}, timeout=15, retries=2)
+                for tl in j.get("leaders") or []:
+                    tname = (tl.get("team") or {}).get("displayName")
+                    for cat in tl.get("leaders") or []:
+                        for x in (cat.get("leaders") or [])[:1]:
+                            nm = (x.get("athlete") or {}).get("displayName")
+                            if nm and cat.get("name") in LEAD:
+                                key.setdefault((tname, nm), []).append(f"κορυφαίος {LEAD[cat['name']]} {x.get('displayValue')}")
+            except Exception:
+                pass
             for team in (m["home"], m["away"]):
                 for nm, st, com in by_team.get(team, []):
-                    rows.append(LineupRow(m["match_id"], team, nm, st, None, com, 1, "espn"))
+                    tag = ", ".join(key.get((team, nm), []))
+                    rows.append(LineupRow(m["match_id"], team, nm, st, None, (tag + "|" + com) if tag else com, 1, "espn"))
             if rows:
                 n_m += 1
                 n_rows += ctx.db.upsert_lineups(rows)

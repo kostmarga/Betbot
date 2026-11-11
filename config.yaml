@@ -159,8 +159,8 @@ calibration:
 # ---------- Επίπεδα ρίσκου (paper trading: 20€/εβδομάδα ΑΝΑ κατηγορία ΚΑΙ ανά επίπεδο, βλ. betbot/paper.py) ----------
 # balanced = οι τιμές των λιστών παρακάτω. strong/bold μετατοπίζουν το min_leg_prob και αλλάζουν το εύρος απόδοσης.
 tiers:
-  strong:   {leg_prob_delta: 0.10, recommended: {min_total: 1.50, max_total: 2.30, max_leg_odds: 1.50},
-             safe: {min_total: 1.40, max_total: 2.20}}
+  strong:   {leg_prob_delta: 0.10, recommended: {min_total: 1.85, max_total: 2.20, max_leg_odds: 1.60},
+             safe: {min_total: 1.85, max_total: 2.20}}
   balanced: {}
   bold:     {leg_prob_delta: -0.05, recommended: {min_total: 2.60, max_total: 4.50, max_leg_odds: 2.40}}
 paper:
@@ -173,10 +173,10 @@ lists:
   # Προτεινόμενο = δελτίο που ΑΞΙΖΕΙ να παίξεις: συνολική απόδοση ~2.0–3.2 (όχι 1.47: με 2€ κερδίζεις 0.94€ και δεν αξίζει),
   # με όσο το δυνατόν μεγαλύτερη πιθανότητα μέσα σε αυτό το εύρος. Αντιστάθμισμα: πιθανότητα ~40–50% (όχι 63%).
   # Η αναμενόμενη ζημιά ανά 1€ είναι παρόμοια (~−3…−8%) – η υψηλότερη απόδοση δεν κάνει το στοίχημα πιο κερδοφόρο.
-  recommended: {min_total: 2.00, max_total: 3.20, min_legs: 2, max_legs: 3, min_leg_prob: 0.65,
+  recommended: {min_total: 1.85, max_total: 2.30, min_legs: 2, max_legs: 3, min_leg_prob: 0.65,
                 max_leg_odds: 1.90, max_basketball_legs: 1, max_basketball_legs_thin: 2, thin_football_matches: 4, single_min_odds: 1.60, single_max_odds: 2.30,
                 single_min_prob: 0.65}
-  safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.75, min_total: 1.60, max_total: 2.60, min_legs: 2, max_legs: 4,
+  safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.75, min_total: 1.85, max_total: 2.30, min_legs: 2, max_legs: 4,
                 max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)
   x10:         {min_leg_prob: 0.62, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
   x30:         {min_leg_prob: 0.60, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}

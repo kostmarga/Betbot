@@ -125,6 +125,9 @@ collectors:
   fpl:
     enabled: true                       # τραυματισμοί/στατιστικά παικτών Premier League (επίσημο Fantasy API, δωρεάν)
     hours_ahead: 36
+  espn_news:
+    enabled: true                       # ειδήσεις τραυματισμών από το feed του ESPN (στο «γιατί»)
+    hours_ahead: 48
   espn_stats:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120

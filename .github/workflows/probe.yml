@@ -1,5 +1,5 @@
-# Δοκιμαστικό (workflow_dispatch): ελέγχει από το GitHub Actions ποιες δωρεάν πηγές δεδομένων απαντούν.
-# Δεν αλλάζει τίποτα στο repo. Μπορεί να σβηστεί όταν δεν χρειάζεται.
+# Δοκιμαστικό (workflow_dispatch): ελέγχει από το GitHub Actions ποιες πηγές απαντούν. Δεν αλλάζει τίποτα στο repo.
+# Το κλειδί APIFOOTBALL_KEY διαβάζεται από τα secrets και ΔΕΝ τυπώνεται.
 name: Probe sources
 on:
   workflow_dispatch: {}
@@ -9,35 +9,27 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
     steps:
-      - name: NBA cdn scoreboard
+      - name: API-Football
         run: |
-          code=$(curl -sS -m 20 -o /tmp/sb.json -w "%{http_code}" -A "Mozilla/5.0" https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json || true)
-          echo "scoreboard HTTP $code"
-          if [ "$code" = "200" ]; then
-            python3 - <<'PY'
-          import json
-          j=json.load(open('/tmp/sb.json')); g=j["scoreboard"]["games"]
-          print("date",j["scoreboard"]["gameDate"],"games",len(g))
-          for x in g[:8]: print(x["gameId"],x["gameStatusText"],x["awayTeam"]["teamName"],"@",x["homeTeam"]["teamName"])
-          open('/tmp/ids','w').write("\n".join(x["gameId"] for x in g))
-          PY
-            for id in $(head -3 /tmp/ids); do
-              c=$(curl -sS -m 20 -o /tmp/bx.json -w "%{http_code}" -A "Mozilla/5.0" https://cdn.nba.com/static/json/liveData/boxscore/boxscore_$id.json || true)
-              echo "boxscore $id HTTP $c"
-              if [ "$c" = "200" ]; then
-                python3 - <<'PY'
-          import json
-          b=json.load(open('/tmp/bx.json'))["game"]
-          for s in ("homeTeam","awayTeam"):
-              pl=b[s].get("players",[])
-              print(s,b[s]["teamName"],"players",len(pl),"starters",[p["name"] for p in pl if p.get("starter")=="1"],"| not active:",[(p["name"],p.get("notPlayingReason")) for p in pl if p.get("status")!="ACTIVE"][:3])
-          PY
-              fi
-            done
-          fi
-      - name: NBA official injury report and other
-        run: |
-          for u in "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json" "https://api.balldontlie.io/v1/teams" "https://ak-static.cms.nba.com/referee/injury/Injury-Report_$(date -u +%F)_01PM.pdf"; do
-            code=$(curl -sS -m 20 -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u" || true); echo "$code $u"
-          done
+          if [ -z "$APIFOOTBALL_KEY" ]; then echo "ΔΕΝ υπάρχει APIFOOTBALL_KEY στα secrets"; exit 0; fi
+          H="x-apisports-key: $APIFOOTBALL_KEY"
+          B="https://v3.football.api-sports.io"
+          show() { python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          print('errors:',d.get('errors'),'| results:',d.get('results'),'| paging:',d.get('paging'))
+          r=d.get('response')
+          if isinstance(r,dict): print('response:',json.dumps(r,ensure_ascii=False)[:600])
+          elif r: print('first:',json.dumps(r[0],ensure_ascii=False)[:700])
+          "; }
+          echo "== status"; curl -sS -m 20 -H "$H" "$B/status" | show
+          D=$(date -u +%F)
+          echo "== injuries date=$D"; curl -sS -m 20 -H "$H" "$B/injuries?date=$D" | show
+          T=$(date -u -d "+1 day" +%F)
+          echo "== injuries date=$T"; curl -sS -m 20 -H "$H" "$B/injuries?date=$T" | show
+          echo "== topscorers EPL 2026"; curl -sS -m 20 -H "$H" "$B/players/topscorers?league=39&season=2026" | show
+          echo "== topscorers EPL 2025"; curl -sS -m 20 -H "$H" "$B/players/topscorers?league=39&season=2025" | show
+          echo "== fixtures EPL date=$T (2026)"; curl -sS -m 20 -H "$H" "$B/fixtures?league=39&season=2026&date=$T" | show

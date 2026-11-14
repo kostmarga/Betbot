@@ -54,6 +54,23 @@ def apply(c, ctx, cfg):
             c["blocked"] |= {"recommended", "safe"}
             c["warnings"].append(txt)
 
+    # ── Κανόνας 7 (14/11/2026 – ο έλεγχος τραυματισμών πρέπει να ΑΠΟΦΑΣΙΖΕΙ): βασικός/κορυφαίος παίκτης της ομάδας που στοιχηματίζουμε
+    # λείπει ή είναι αμφίβολος → όχι στο Προτεινόμενο/Safe. (Δεν έχει backtest: δεν υπάρχει δωρεάν ιστορικό τραυματισμών· είναι κανόνας προσοχής.)
+    if team:
+        ka = ctx.key_absences(team)
+        if ka:
+            c["blocked"] |= {"recommended", "safe"}
+            c["warnings"].append(f"{team}: " + ", ".join(f"{p} ({'εκτός' if st == 'missing' else 'αμφίβολος'})" for p, st in ka[:3]) + " — βασικός παίκτης")
+
+    # ── Κανόνας 8 (14/11/2026): μεγάλη αλλαγή στην ενδεκάδα/πεντάδα της ομάδας που στοιχηματίζουμε (rotation) → όχι στο Προτεινόμενο/Safe
+    if team:
+        ctx.lineup_note()
+        need_ch = 3 if c["sport"] == "basketball" else 6
+        ch = ctx.rotation.get(team)
+        if ch is not None and ch >= need_ch:
+            c["blocked"] |= {"recommended", "safe"}
+            c["warnings"].append(f"{team}: {ch} αλλαγές στην αρχική {'πεντάδα' if c['sport'] == 'basketball' else 'ενδεκάδα'} (rotation)")
+
     # ── Κανόνας 3 (05/11/2026 – Efes/Hapoel/ASVEL όλοι έχασαν): μπάσκετ ≠ «σίγουρο»
     if c["sport"] == "basketball" and c["market"] == "ML" and (c["odds"] or 9) < R["basket_min_ml_odds_safe"]:
         c["blocked"].add("safe")

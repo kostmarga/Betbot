@@ -140,7 +140,7 @@ class Page:
         if not sl:
             return (f"<div class='card'><h3>{E(title)}</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές "
                     "επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – "
-                    "το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές.</p></div>")
+                    "το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές. (Στα επίπεδα Δυνατό/Τολμηρό μπορεί επίσης να σημαίνει ότι το δελτίο θα ήταν ίδιο με άλλου επιπέδου, οπότε δεν το επαναλαμβάνουμε.)</p></div>")
         stake_txt = f"<div class='tile'><div class='k'>Ποντάρισμα</div><div class='v'>{stake:.2f}€</div></div>" if stake else ""
         ret = f"<div class='tile'><div class='k'>Αν κερδίσει</div><div class='v pos'>{stake * sl['total_odds']:.2f}€</div></div>" if stake else ""
         pm = f"{sl['p_market'] * 100:.1f}%" if sl.get("p_market") else "—"

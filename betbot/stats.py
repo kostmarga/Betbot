@@ -26,7 +26,8 @@ _LEGACY = re.compile(r"-\d+$")
 
 def real_slips(slips):
     """Μόνο δελτία της νέας μορφής (ένα ανά κατηγορία ανά μέρα)."""
-    return [s for s in slips if s.get("list_name") in LISTS and not _LEGACY.search(s["slip_id"])]
+    from .paper import drop_tier_dups
+    return drop_tier_dups([s for s in slips if s.get("list_name") in LISTS and not _LEGACY.search(s["slip_id"])])
 
 
 def _day(sl, tz):
@@ -64,7 +65,8 @@ def calendar_data(db, slips, tz, names, today, days=150):
     from .paper import SUFFIX, TIER_NAME
     cut = today - timedelta(days=days)
     out, ms = defaultdict(list), {}
-    for s in sorted(slips, key=lambda x: x["created_at"]):
+    from .paper import drop_tier_dups
+    for s in sorted(drop_tier_dups(slips), key=lambda x: x["created_at"]):
         ln = s.get("list_name") or ""
         tier, base = "balanced", ln
         for t, suf in SUFFIX.items():

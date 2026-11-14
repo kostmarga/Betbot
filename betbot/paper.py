@@ -29,6 +29,32 @@ CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10"
 LOTTERY = ("x30", "x100")
 
 
+def leg_sig(legs) -> tuple:
+    """Ταυτότητα δελτίου: ποιες επιλογές περιέχει (ανεξάρτητα από σειρά)."""
+    return tuple(sorted((str(l.get("match_id")), str(l.get("market")), str(l.get("selection")), str(l.get("line"))) for l in legs))
+
+
+def split_list_name(ln):
+    for t, suf in SUFFIX.items():
+        if suf and ln.endswith(suf):
+            return t, ln[:-len(suf)]
+    return "balanced", ln
+
+
+def drop_tier_dups(slips):
+    """Αφαιρεί δελτία επιπέδου (Δυνατό/Τολμηρό) που είναι ΙΔΙΑ (ίδιες επιλογές, ίδια μέρα, ίδια κατηγορία) με δελτίο
+    προηγούμενου επιπέδου (σειρά: Ισορροπημένο, Δυνατό, Τολμηρό). Έτσι ένα δελτίο δεν εμφανίζεται ούτε μετριέται δύο φορές."""
+    order = {t: i for i, t in enumerate(("balanced", "strong", "bold"))}
+    seen, drop = set(), set()
+    for sl in sorted(slips, key=lambda x: (order[split_list_name(x.get("list_name") or "")[0]], x["created_at"])):
+        tier, cat = split_list_name(sl.get("list_name") or "")
+        k = (str(sl["slip_id"]).split("#")[0], cat, leg_sig(sl["legs"]))
+        if k in seen and tier != "balanced":
+            drop.add(id(sl))
+        seen.add(k)
+    return [sl for sl in slips if id(sl) not in drop]
+
+
 def _stake(cat, pc, cfg) -> float:
     return float(cfg["bankroll"]["lottery_stake"]) if cat in LOTTERY else float(pc["unit"])
 
@@ -60,7 +86,7 @@ def build(db, cfg, now) -> dict:
     loc = now.astimezone(tz)
     monday = (loc - timedelta(days=loc.weekday())).date()
     by = {}
-    for sl in db.slips():
+    for sl in drop_tier_dups(db.slips()):
         ln = sl.get("list_name") or ""
         tier, cat = "balanced", ln
         for t, suf in SUFFIX.items():

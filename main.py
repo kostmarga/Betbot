@@ -232,6 +232,11 @@ def main(argv=None):
         if suf:
             try:
                 tier_lists[tier] = selector.build_lists(cands, selector.tier_cfg(cfg, tier))
+                for k, x in tier_lists[tier].items():     # ίδιο δελτίο με το Ισορροπημένο → δεν αποθηκεύεται/δεν εμφανίζεται δεύτερη φορά
+                    b = lists.get(k)
+                    if isinstance(x, dict) and x.get("slip") and isinstance(b, dict) and b.get("slip") \
+                            and paper_mod.leg_sig(x["slip"]["legs"]) == paper_mod.leg_sig(b["slip"]["legs"]):
+                        tier_lists[tier][k] = {**x, "slip": None}
                 save_lists(db, cfg, now, tier_lists[tier], suffix=suf)
             except Exception as e:
                 log.warning("Επίπεδο %s: %s", tier, e)

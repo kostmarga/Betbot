@@ -661,7 +661,9 @@ CAL_JS = """
       var v={won:'<span class="ok">✅ ΠΕΡΑΣΕ</span>',lost:'<span class="ko">❌ ΔΕΝ ΠΕΡΑΣΕ</span>',void:'↩️ Άκυρο'}[s.s]||'⏳ Σε εξέλιξη';
       h+='<div class="card"><b>'+esc(s.n)+'</b> · '+v+'<div class="muted">'+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · εκτιμώμενη πιθανότητα '+Math.round(s.p*100)+'%</div>';
       s.L.forEach(function(l){h+='<div class="tk"><span class="ic">'+(IC[l.r]||'⏳')+'</span><div><b>'+esc(l.h)+' – '+esc(l.a)+'</b> <span class="sc">'+esc(l.sc)+'</span><div class="muted">'+esc(l.lb)+(l.o?' @ '+Number(l.o).toFixed(2):'')+'</div></div></div>';});
-      h+='</div>';});
+      var t=s.n+' · '+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · πιθανότητα '+Math.round(s.p*100)+'%';
+      s.L.forEach(function(l){t+='\\n'+l.h+' – '+l.a+': '+l.lb+(l.o?' @ '+Number(l.o).toFixed(2):'');});
+      h+='<button type="button" class="copybtn" data-copy="'+esc(t)+'">Αντιγραφή δελτίου</button></div>';});
     out.innerHTML=h||'<p class="muted">Δεν υπάρχουν δελτία αυτή τη μέρα.</p>';
     out.scrollIntoView({behavior:'smooth',block:'nearest'});
   }

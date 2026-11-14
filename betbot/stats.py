@@ -88,7 +88,7 @@ def calendar_data(db, slips, tz, names, today, days=150):
                          "r": l.get("result") or "open", "sc": f"{sc[0]}-{sc[1]}" if sc else ""})
         name = names[base] + ("" if tier == "balanced" else " · " + TIER_NAME[tier])
         out[d.isoformat()].append({"n": name, "o": round(s["total_odds"], 2), "p": round(s["model_prob"] or 0, 3),
-                                   "s": s["status"], "f": base.startswith("fair_"), "L": legs})
+                                   "s": s["status"], "f": base.startswith("fair_"), "k": f"{base}|{tier}", "L": legs})
     return dict(out)
 
 

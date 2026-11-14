@@ -63,6 +63,9 @@ def _pct(x):
 GR_DAYS = ["Δευ", "Τρι", "Τετ", "Πεμ", "Παρ", "Σαβ", "Κυρ"]
 
 
+BOOKIES = (('Stoiximan', 'https://www.stoiximan.gr/'), ('Novibet', 'https://www.novibet.gr/'))
+
+
 def _when(iso_s, tz):
     d = _local(iso_s, tz)
     return f"{GR_DAYS[d.weekday()]} {d:%H:%M}"
@@ -88,7 +91,7 @@ class Page:
         return f'<div class="chart{" sm" if small else ""}"><canvas id="{cid}" role="img"></canvas></div>'
 
     # ---------------- μία επιλογή ----------------
-    def pick_row(self, c, show_fair=True):
+    def pick_row(self, c, show_fair=True, find=False):
         odds_cell = (f"<b>{c['odds']:.2f}</b>" + (f"<div class='minp {'ok' if c['odds'] >= c['min_play'] else 'ko'}'>αξίζει από {c['min_play']:.2f}</div>" if c.get("min_play") else "")) if c.get("odds") else \
             (f"<span class='muted'>δίκαιη {c['fair_odds']:.2f}</span><br><b>παίξ' το αν ≥ {c['play_if']:.2f}</b>"
              if c.get("play_if") else "—")
@@ -121,17 +124,22 @@ class Page:
                 leg["sel"] = c.get("selection")
                 leg["line"] = c.get("line")
                 attr = f' data-leg="{E(json.dumps(leg, ensure_ascii=False))}"'
+        fnd = ""
+        if find:
+            fnd = "<div class='find'>" + "".join(
+                f"<button type='button' class='findbtn' data-q=\"{E(c['home'])}\" data-u='{u}'>{n}</button>"
+                for n, u in BOOKIES) + "</div>"
         return f"""<tr{attr}>
 <td class="t">{tk}{_when(c['kickoff'], self.tz)}{scr}</td>
-<td class="m"><b>{E(c['home'])}</b> – <b>{E(c['away'])}</b><br><span class="muted">{E(c['league_name'])}</span></td>
+<td class="m"><b>{E(c['home'])}</b> – <b>{E(c['away'])}</b><br><span class="muted">{E(c['league_name'])}</span>{fnd}</td>
 <td class="p"><b>{E(c['label'])}</b> {mv_cell}{warn}{whyline}
 <details><summary>Όλοι οι λόγοι</summary><ul class="why">{why}</ul>{form}</details></td>
 <td class="n o" data-l="Απόδ.">{odds_cell}</td><td class="n q" data-l="Πιθαν."><b>{_pct(c['p'])}</b></td><td class="n v" data-l="Value">{edge_cell}</td></tr>"""
 
-    def pick_table(self, picks, empty="Καμία επιλογή σήμερα."):
+    def pick_table(self, picks, empty="Καμία επιλογή σήμερα.", find=False):
         if not picks:
             return f"<p class='muted'>{empty}</p>"
-        rows = "".join(self.pick_row(c) for c in picks)
+        rows = "".join(self.pick_row(c, find=find) for c in picks)
         return ("<div class='tbl'><table class='picks'><thead><tr><th>Ώρα</th><th>Αγώνας</th><th>Επιλογή</th><th>Απόδ.</th>"
                 f"<th>Πιθαν.</th><th>Value</th></tr></thead><tbody>{rows}</tbody></table></div>")
 
@@ -173,7 +181,7 @@ class Page:
         ret_v = f"{stake * sl['total_odds']:.2f}€" if stake else "—"
         return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}</div>
 <div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b>{minp_total}</div></div>
-<div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'])}</div>
+<div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'], find=True)}</div>
 <div class="slip-stub"><div><small>Ποντάρισμα</small><b>{stake_v}</b></div><div><small>Αν κερδίσει</small><b class="pos">{ret_v}</b></div>
 <div><small>Πιθανότητα</small><b>{sl['p_win'] * 100:.0f}%</b></div></div>
 <div class="slip-copy">{copy_btn}</div>
@@ -224,6 +232,14 @@ INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
 document.addEventListener('click', e => {
+  const f = e.target.closest('.findbtn');
+  if (f) {   // άνοιγμα πρακτορείου + αντιγραφή ονόματος ομάδας για την αναζήτηση εκεί
+    window.open(f.dataset.u, '_blank', 'noopener');
+    const q = f.dataset.q, o = f.dataset.o || f.textContent; f.dataset.o = o; f.textContent = 'Αντιγράφηκε: ' + q;
+    setTimeout(() => f.textContent = o, 2500);
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(q).catch(() => {});
+    return;
+  }
   const b = e.target.closest('.copybtn'); if (!b) return;
   const t = b.dataset.copy, done = () => { const o = b.dataset.o || b.textContent; b.dataset.o = o; b.textContent = 'Αντιγράφηκε ✓'; setTimeout(() => b.textContent = o, 1800); };
   const fb = () => { const a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch (x) {} a.remove(); };

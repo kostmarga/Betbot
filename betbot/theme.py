@@ -139,6 +139,7 @@ div.tk .sc{font-family:var(--mono)}
 .slip-stub{border-top:1px dashed var(--border);margin-top:6px;padding:12px 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--chip)}
 .slip-stub:before,.slip-stub:after{display:none}
 .slip-stub small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.slip-stub b{font-family:var(--mono);font-size:17px}
+.find{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}.findbtn{font:inherit;font-size:11.5px;padding:3px 9px;border:1px solid var(--border);border-radius:6px;background:transparent;color:inherit;cursor:pointer}.findbtn:active{opacity:.7}
 .slip-copy{padding:8px 14px;background:var(--chip);text-align:right}.copybtn{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card,transparent);color:inherit;cursor:pointer}.copybtn:active{opacity:.7}
 .slip-more{padding:0 14px 12px;background:var(--chip)}.slip-more summary{padding:2px 0 6px}
 .slip table.picks tr:last-child{border-bottom:0}

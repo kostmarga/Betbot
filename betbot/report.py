@@ -232,6 +232,29 @@ INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
 document.addEventListener('click', e => {
+  const tr = e.target.closest('.trow[data-k]'); if (!tr) return;
+  const nxt = tr.nextElementSibling;
+  if (nxt && nxt.classList.contains('lgpanel')) { nxt.remove(); tr.classList.remove('open'); return; }
+  const el = document.getElementById('caldata'); if (!el) return;
+  const D = JSON.parse(el.textContent), k = tr.dataset.k, all = [];
+  Object.keys(D).sort().reverse().forEach(d => D[d].forEach(s => { if (s.k === k) all.push({d, s}); }));
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const IC = {won: '✅', lost: '❌', void: '↩️', open: '⏳'}, panel = document.createElement('div'); panel.className = 'lgpanel';
+  let flt = 'all';
+  const cnt = f => all.filter(x => f === 'all' || x.s.s === f).length;
+  const draw = () => {
+    const chips = [['all', 'Όλα'], ['won', 'Κερδισμένα'], ['lost', 'Χαμένα'], ['open', 'Σε εξέλιξη']].map(([f, n]) =>
+      '<button type="button" class="lgchip' + (flt === f ? ' on' : '') + '" data-f="' + f + '">' + n + ' (' + cnt(f) + ')</button>').join('');
+    const list = all.filter(x => flt === 'all' || x.s.s === flt).map(({d, s}) =>
+      '<div class="lgslip"><div class="lgh"><b>' + d.split('-').reverse().slice(0, 2).join('/') + '</b> · ' + (IC[s.s] || '⏳') + ' · απόδοση ' + s.o.toFixed(2) +
+      ' · πιθανότητα ' + Math.round(s.p * 100) + '%</div>' + s.L.map(l => '<div class="lgl">' + (IC[l.r] || '⏳') + ' ' + esc(l.h) + ' – ' + esc(l.a) +
+      (l.sc ? ' <span class="sc">' + esc(l.sc) + '</span>' : '') + '<span class="muted"> · ' + esc(l.lb) + (l.o ? ' @ ' + Number(l.o).toFixed(2) : '') + '</span></div>').join('') + '</div>').join('');
+    panel.innerHTML = '<div class="lgchips">' + chips + '</div>' + (list || '<p class="muted">Κανένα δελτίο σε αυτή την επιλογή.</p>');
+    panel.querySelectorAll('.lgchip').forEach(b => b.onclick = ev => { ev.stopPropagation(); flt = b.dataset.f; draw(); });
+  };
+  draw(); tr.after(panel); tr.classList.add('open');
+});
+document.addEventListener('click', e => {
   const f = e.target.closest('.findbtn');
   if (f) {   // άνοιγμα πρακτορείου + αντιγραφή ονόματος ομάδας για την αναζήτηση εκεί
     window.open(f.dataset.u, '_blank', 'noopener');
@@ -911,7 +934,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             pl = f"{r['profit']:+.2f}€"
             gd = "—" if r["green_days"] is None else f"{r['green_days']:.0%}"
             gw = "—" if r["green_weeks"] is None else f"{r['green_weeks']:.0%}"
-            trs.append(f"<div class='trow'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
+            trs.append(f"<div class='trow' data-k='{cat}|{tier}' title='Πάτα για να δεις τα δελτία'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
                        f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
                        f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"
                        f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")

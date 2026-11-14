@@ -159,6 +159,7 @@ div.tk .sc{font-family:var(--mono)}
 .scorecard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
 .scorecard h4{margin:0 0 6px;color:var(--ink);font-size:14px;text-transform:none;letter-spacing:0}
 .trow{display:grid;grid-template-columns:112px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--grid);font-size:13px}
+.trow[data-k]{cursor:pointer}.trow.open{background:var(--chip);border-radius:8px}.lgpanel{padding:8px 4px 12px;border-top:1px dashed var(--border)}.lgchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.lgchip{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:inherit;cursor:pointer}.lgchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}.lgslip{padding:8px 0;border-top:1px solid var(--grid);font-size:13px}.lgh{margin-bottom:3px}.lgl{padding-left:2px;font-size:12.5px}
 .trow:first-of-type{border-top:0}.trow .nm{font-weight:650;white-space:nowrap}.trow .st{color:var(--muted);font-size:12px}
 .bar2{height:4px;background:var(--grid);border-radius:2px;overflow:hidden;margin-top:5px}.bar2 i{display:block;height:100%;background:var(--accent)}
 .badge{font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;white-space:nowrap}

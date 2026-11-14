@@ -165,6 +165,10 @@ class Page:
         ttl = plain(title)
         mps = [l.get("min_play") for l in sl["legs"]]
         minp_total = (f"<div class='minp {'ok' if sl['total_odds'] >= math.prod(mps) else 'ko'}'>αξίζει από {math.prod(mps):.2f}</div>" if (mps and all(mps) and not sl.get("fair")) else "")
+        lines = [f"{ttl} · απόδοση {sl['total_odds']:.2f} · πιθανότητα {sl['p_win'] * 100:.0f}%"]
+        lines += [f"{_when(l['kickoff'], self.tz)} {l['home']} – {l['away']}: {plain(l['label'])} @ {l['odds']:.2f}" if l.get("odds")
+                  else f"{_when(l['kickoff'], self.tz)} {l['home']} – {l['away']}: {plain(l['label'])}" for l in sl["legs"]]
+        copy_btn = f'<button type="button" class="copybtn" data-copy="{E(chr(10).join(lines))}">Αντιγραφή δελτίου</button>'
         stake_v = f"{stake:.2f}€" if stake else "—"
         ret_v = f"{stake * sl['total_odds']:.2f}€" if stake else "—"
         return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}</div>
@@ -172,6 +176,7 @@ class Page:
 <div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'])}</div>
 <div class="slip-stub"><div><small>Ποντάρισμα</small><b>{stake_v}</b></div><div><small>Αν κερδίσει</small><b class="pos">{ret_v}</b></div>
 <div><small>Πιθανότητα</small><b>{sl['p_win'] * 100:.0f}%</b></div></div>
+<div class="slip-copy">{copy_btn}</div>
 <details class="slip-more"><summary>Λεπτομέρειες, σημειώσεις και διάγραμμα</summary>{note}<div class="tiles">
 <div class="tile"><div class="k">Επιλογές</div><div class="v">{len(sl['legs'])}</div></div>
 <div class="tile"><div class="k">Κατά την αγορά</div><div class="v">{pm}</div></div>{ev_tile}</div>{ch}</details></div>"""
@@ -218,6 +223,12 @@ EXTRA_CSS = ""      # όλο το CSS είναι στο betbot/theme.py
 INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
+document.addEventListener('click', e => {
+  const b = e.target.closest('.copybtn'); if (!b) return;
+  const t = b.dataset.copy, done = () => { const o = b.dataset.o || b.textContent; b.dataset.o = o; b.textContent = 'Αντιγράφηκε ✓'; setTimeout(() => b.textContent = o, 1800); };
+  const fb = () => { const a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); done(); } catch (x) {} a.remove(); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, fb); else fb();
+});
 // 1) ✅/❌/⚽/🏁 + σκορ σε κάθε αγώνα των δελτίων (ζωντανά, μόνο όσο παίζεται αγώνας)
 const rows = [];
 document.querySelectorAll('tr[data-leg]').forEach(tr => { try { rows.push({tr, leg: JSON.parse(tr.dataset.leg)}); } catch (e) {} });

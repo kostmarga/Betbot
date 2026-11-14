@@ -50,6 +50,24 @@ def _parse(league, comp, year, payload) -> list[Match]:
     return out
 
 
+HEADER = "https://live.euroleague.net/api/Header"
+
+
+def _ref_name(raw):
+    """«PERUGA, CARLOS» -> «Carlos Peruga»."""
+    last, _, first = str(raw).partition(",")
+    return " ".join(x.strip().title() for x in (first, last) if x.strip())
+
+
+def referees_for(code, season):
+    """Οι τρεις διαιτητές του αγώνα από το επίσημο API (κενό αν δεν έχουν ανακοινωθεί ακόμα)."""
+    try:
+        d, _ = http_get(HEADER, params={"gamecode": code, "seasoncode": season}, retries=1)
+    except Exception:
+        return []
+    return [_ref_name(d[k]) for k in ("Referee1", "Referee2", "Referee3") if isinstance(d, dict) and d.get(k)]
+
+
 class EuroleagueCollector(Collector):
     name = "euroleague"
 
@@ -62,4 +80,16 @@ class EuroleagueCollector(Collector):
             for year in (season - 1, season):
                 data, _ = http_get(URL.format(comp=comp, year=year))
                 total += ctx.db.upsert_matches(_parse(lg, comp, year, data))
-        return f"{total} αγώνες"
+        # Διαιτητές για αγώνες των επόμενων 48 ωρών (αν το API τους έχει ήδη)
+        from datetime import timedelta
+        refs = 0
+        until = iso(ctx.now + timedelta(hours=48))
+        for m in ctx.db.matches(sport="basketball", status="scheduled", since=iso(ctx.now - timedelta(hours=3)), until=until):
+            if not m["match_id"].startswith("euroleague:"):
+                continue
+            season, _, code = m["match_id"].split(":", 1)[1].partition("-")
+            names = referees_for(code, season)
+            if names:
+                ctx.db.set_referee(m["match_id"], " · ".join(names), "euroleague")
+                refs += 1
+        return f"{total} αγώνες · διαιτητές σε {refs}"

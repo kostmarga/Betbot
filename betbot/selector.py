@@ -124,6 +124,7 @@ class MatchContext:
         self.lineups = db.lineups_for(m["match_id"])
         self.moves = movement.moves_for_match(db, m["match_id"])
         self.model = None
+        self.rotation = {}
         self.form_home = self.form_away = []
         self.h2h = []
         self.exp = ""
@@ -142,6 +143,7 @@ class MatchContext:
         if not any(len(v) >= need for v in starters.values()):
             return None, None
         parts, warn = [], None
+        self.rotation = {}
         for t, cur in starters.items():
             if len(cur) < need:
                 continue
@@ -157,6 +159,7 @@ class MatchContext:
             last = next(iter(prev.values()), None)
             if last and len(last) >= need:
                 ch = len(cur - last)
+                self.rotation[t] = ch
                 parts.append(f"{t}: {ch} αλλαγές στην {who}")
                 if ch >= (3 if self.sport == "basketball" else 6):
                     warn = f"Μεγάλη ανανέωση ({who}, {t}: {ch} αλλαγές) — πιθανή rotation"
@@ -218,6 +221,14 @@ class MatchContext:
 
     def absences(self, team):
         return self.absent.get(team, [])
+
+    def key_absences(self, team):
+        """Βασικοί/κορυφαίοι παίκτες της ομάδας που λείπουν ή είναι αμφίβολοι (πηγές: ESPN για NBA, FPL για Premier League)."""
+        out = []
+        for r in self.absent.get(team, []):
+            if r.get("source") in ("espn", "fpl") and ("κορυφαίος" in (r.get("reason") or "") or "βασικός" in (r.get("reason") or "")):
+                out.append((r["player"], r["status"]))
+        return out
 
     def lineup_status(self, team, player):
         for r in self.lineups:

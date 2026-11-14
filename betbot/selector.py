@@ -283,7 +283,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
                 inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για αυτή τη λίγκα — έλεγξε τα νέα των ομάδων πριν παίξεις"
         ln, lw = ctx.lineup_note()
         nn = ctx.news_note()
-        notes += [x for x in (inj, nn, sn, ln) if x]
+        rf = (f"Διαιτητές (Euroleague): {ctx.referee} · ενημερωτικό, δεν επηρεάζει τον υπολογισμό"
+              if ctx.referee and str(ctx.m["match_id"]).startswith("euroleague:") else None)
+        notes += [x for x in (inj, nn, sn, ln, rf) if x]
         if lw:
             c["warnings"].append(lw)
     if cal_d > 0.004 and q is not None:

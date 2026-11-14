@@ -31,7 +31,7 @@ selection:
   market_blend: 0.0          # 0 = μόνο αγορά, 1 = μόνο μοντέλο. Μπάσκετ: δεν έχει backtest, αλλά το μοντέλο ποδοσφαίρου έχασε από την αγορά και με τα πάντα βάρη -> ίδια προσοχή
   market_blend_football: 0.0 # ποδόσφαιρο: backtest 13 μηνών -> όσο περισσότερο βάρος στο μοντέλο, τόσο χειρότερα
   avoid:                     # επιλογές που έχασαν σταθερά και στις δύο μισές του backtest
-    - {sport: football, market: OU, selection: UNDER, line: 2.5}   # ROI −7% (Over: ~−1%)
+    - {sport: football, market: OU, selection: UNDER}   # ΟΛΕΣ οι γραμμές Under (2.5/3.5/4.5…). Backtest 21.855 αγώνων: Under 2.5 ROI −6…−14% σε ΚΑΘΕ κλίμακα πιθανότητας (Over: ~−1%). Οι άλλες γραμμές δεν έχουν δικό τους backtest· τις αποκλείουμε προληπτικά
   max_legs_per_league: 3     # διασπορά κινδύνου
   min_team_matches: 8        # ομάδα με λιγότερα ματς στο ιστορικό -> αγνοείται
 

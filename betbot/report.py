@@ -680,9 +680,10 @@ CAL_JS = """
   function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});}
   function pad(n){return (n<10?'0':'')+n;}
   function iso(y,m,d){return y+'-'+pad(m+1)+'-'+pad(d);}
-  function dayBadge(k){var a=D[k]||[],w=0,l=0;a.forEach(function(s){if(s.f)return;if(s.s==='won')w++;else if(s.s==='lost')l++;});
-    return a.length?('<span class="cw">'+(w?w+'✅':'')+'</span><span class="cl">'+(l?l+'❌':'')+'</span>'+((w+l)<a.length?'<span>⏳</span>':'')):'';}
-  function cls(k){var w=0,l=0,a=D[k]||[];a.forEach(function(s){if(s.f)return;if(s.s==='won')w++;else if(s.s==='lost')l++;});return w&&!l?' w':l&&!w?' l':(w&&l)?' m':'';}
+  function cnt(k){var a=D[k]||[],r={w:0,l:0,o:0,v:0,n:a.length};a.forEach(function(s){if(s.s==='won')r.w++;else if(s.s==='lost')r.l++;else if(s.s==='void')r.v++;else r.o++;});return r;}
+  function dayBadge(k){var c=cnt(k);
+    return c.n?('<span class="cw">'+(c.w?c.w+'✅':'')+'</span><span class="cl">'+(c.l?c.l+'❌':'')+'</span>'+(c.o?'<span>'+c.o+'⏳</span>':'')):'';}
+  function cls(k){var c=cnt(k);return c.w&&!c.l?' w':c.l&&!c.w?' l':(c.w&&c.l)?' m':'';}
   function draw(){
     var y=cur.getFullYear(),m=cur.getMonth(),n=new Date(y,m+1,0).getDate(),off=(new Date(y,m,1).getDay()+6)%7;
     var h='<div class="calh"><button id="cprev">‹</button><b>'+MN[m]+' '+y+'</b><button id="cnext">›</button></div><div class="calg">';
@@ -695,7 +696,7 @@ CAL_JS = """
     Array.prototype.forEach.call(box.querySelectorAll('.cd.has'),function(b){b.onclick=function(){show(b.getAttribute('data-d'));};});
   }
   function show(k){
-    var a=D[k]||[],h='<h4>'+k.split('-').reverse().join('/')+'</h4>';
+    var a=D[k]||[],c=cnt(k),h='<h4>'+k.split('-').reverse().join('/')+'</h4><p class="muted">'+c.n+(c.n===1?' δελτίο':' δελτία')+' · '+c.w+' ✅ · '+c.l+' ❌'+(c.o?' · '+c.o+' σε εξέλιξη':'')+(c.v?' · '+c.v+' άκυρα':'')+'</p>';
     a.forEach(function(s){
       var v={won:'<span class="ok">✅ ΠΕΡΑΣΕ</span>',lost:'<span class="ko">❌ ΔΕΝ ΠΕΡΑΣΕ</span>',void:'↩️ Άκυρο'}[s.s]||'⏳ Σε εξέλιξη';
       h+='<div class="card"><b>'+esc(s.n)+'</b> · '+v+'<div class="muted">'+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · εκτιμώμενη πιθανότητα '+Math.round(s.p*100)+'%</div>';

@@ -47,6 +47,10 @@ models:
     history_days: 400
     half_life_days: 90
     markets: [ML, TOTAL, SPREAD]
+  nfl:                       # NFL (16/11/2026): ίδιο μοντέλο με μπάσκετ· οι πιθανότητες έρχονται από την αγορά (market_blend 0)
+    history_days: 800
+    half_life_days: 120
+    markets: [ML, TOTAL, SPREAD]
   counts:                    # κόρνερ / κάρτες / πλάγια
     history_days: 400
     half_life_days: 120
@@ -92,6 +96,7 @@ leagues:
   - {id: JPN,  name: J1 League,           sport: football, espn: jpn.1, fdco_new: JPN}
   - {id: NBA,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}
   - {id: EL,   name: Euroleague,        sport: basketball, euroleague: E,          odds_api: basketball_euroleague}
+  - {id: NFL,  name: NFL,               sport: nfl,        espn: nfl}   # ΜΟΝΟ ML/spread/totals από ESPN (DraftKings)· backtest: docs/nfl_backtest.txt
   - {id: GBL,  name: ΕΚΟ Basket League, sport: basketball, greek_site: true}   # μόνο μέσω ελληνικού site (βλ. README)
 
 # ---------- Πηγές (collectors / agents) ----------

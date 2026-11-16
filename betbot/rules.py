@@ -30,7 +30,7 @@ def apply(c, ctx, cfg):
         if ppg is not None and ppg < R["min_ppg_for_win"]:
             c["blocked"] |= {"recommended", "safe"}
             c["warnings"].append(f"{team}: κακή φόρμα ({ppg:.1f} β/ματς στα 5 τελευταία)")
-    if team and c["sport"] == "basketball":
+    if team and c["sport"] in ("basketball", "nfl"):
         form = ctx.form_home if side == "home" else ctx.form_away
         if form:
             wins = sum(1 for f in form[:5] if f["r"] == "Ν") / min(5, len(form))
@@ -108,7 +108,7 @@ def reasons(c, ctx, count_models) -> list[str]:
         gf = sum(x["gf"] for x in f) / len(f)
         ga = sum(x["ga"] for x in f) / len(f)
         rec = "".join(x["r"] for x in f)
-        unit = "πόντ." if ctx.sport == "basketball" else "γκολ"
+        unit = "πόντ." if ctx.sport in ("basketball", "nfl") else "γκολ"
         return f"{team}: φόρμα {rec} · {gf:.1f} {unit} υπέρ / {ga:.1f} κατά ανά ματς"
 
     if fam in ("result", "goals", "points"):

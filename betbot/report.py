@@ -213,7 +213,7 @@ class Page:
 from .theme import CSS, calm  # noqa: E402
 
 
-END_MIN = {"football": 150, "basketball": 180}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
+END_MIN = {"football": 150, "basketball": 180, "nfl": 210}      # εκτίμηση διάρκειας αγώνα (λεπτά) – ίδιο με το BetbotLive.byTime στο JS
 ENRICH = ("why", "form_home", "form_away", "warnings", "move", "verdict")
 
 

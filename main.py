@@ -54,11 +54,11 @@ def build_models(db, cfg, ctx, now, notes):
         log.info("Μοντέλο ποδοσφαίρου: %d ομάδες", len(models["football"].teams))
     except Exception as e:
         notes.append(("μοντέλο ποδοσφαίρου", False, str(e)))
-    for lg in ctx.leagues(sport="basketball"):
+    for lg in ctx.leagues(sport="basketball") + ctx.leagues(sport="nfl"):
         if lg.get("greek_site") and not cfg["collectors"]["greek_site"].get("enabled"):
             continue          # ΕΚΟ Basket League: μόνο αν ρυθμιστεί το ελληνικό site
         try:
-            models["basketball"][lg["id"]] = BasketballModel(cfg["models"]["basketball"], ctx.aliases).fit(
+            models["basketball"][lg["id"]] = BasketballModel(cfg["models"].get(lg["sport"], cfg["models"]["basketball"]), ctx.aliases).fit(
                 db.matches(league=lg["id"]), now)
         except Exception as e:
             notes.append((f"μοντέλο {lg['id']}", False, str(e)))
@@ -116,7 +116,7 @@ def results_due_iso(db, now):
     from datetime import timedelta
     from betbot.stats import real_slips
     from betbot.util import parse_iso
-    end = {"football": 150, "basketball": 180}
+    end = {"football": 150, "basketball": 180, "nfl": 210}
     best = None
     for sl in real_slips(db.slips()):
         for l in sl["legs"]:

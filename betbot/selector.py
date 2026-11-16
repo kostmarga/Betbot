@@ -292,6 +292,8 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
                 inj = "Τραυματισμοί · κανένας βασικός δηλωμένος (ESPN/FPL)"
             elif ctx.sport == "football":
                 inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για αυτή τη λίγκα — έλεγξε τα νέα των ομάδων πριν παίξεις"
+            elif ctx.sport == "nfl":
+                inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για NFL — έλεγξε το injury report (ιδίως τον quarterback) πριν παίξεις"
         ln, lw = ctx.lineup_note()
         nn = ctx.news_note()
         rf = (f"Διαιτητές (Euroleague): {ctx.referee} · ενημερωτικό, δεν επηρεάζει τον υπολογισμό"
@@ -494,6 +496,9 @@ def pm_key(pm, team):
 # =====================================================================
 #  Δελτία
 # =====================================================================
+US_SPORTS = ("basketball", "nfl")      # αθλήματα «πόντων» με αγορές ML/SPREAD/TOTAL· μετράνε μαζί στο όριο max_basketball_legs
+
+
 def build_slip(cands, lo, hi, min_legs, max_legs, cfg, exclude=frozenset(), max_basket=99,
                step=0.02, keep=6, require_families=None):
     """Group-knapsack DP: το πολύ μία επιλογή ανά αγώνα, μέγιστο Σlog(p),
@@ -519,7 +524,7 @@ def build_slip(cands, lo, hi, min_legs, max_legs, cfg, exclude=frozenset(), max_
                 for score, legs in sols:
                     if sum(1 for l in legs if l["league"] == it["league"]) >= max_per_league:
                         continue
-                    if it["sport"] == "basketball" and sum(1 for l in legs if l["sport"] == "basketball") >= max_basket:
+                    if it["sport"] in US_SPORTS and sum(1 for l in legs if l["sport"] in US_SPORTS) >= max_basket:
                         continue
                     new.setdefault((k + 1, w2), []).append((score + math.log(it["p"]), legs + (it,)))
         for key in new:
@@ -586,7 +591,7 @@ def build_lists(cands: dict, cfg) -> dict:
         max_basket = max(max_basket, rc.get("max_basketball_legs_thin", 2))
     slip = build_slip(pool, rc["min_total"], rc["max_total"], rc["min_legs"], rc["max_legs"], cfg, max_basket=max_basket)
     if slip:
-        slip["thin_day"] = thin and sum(1 for l in slip["legs"] if l["sport"] == "basketball") > rc["max_basketball_legs"]
+        slip["thin_day"] = thin and sum(1 for l in slip["legs"] if l["sport"] in US_SPORTS) > rc["max_basketball_legs"]
     used = {l["match_id"] for l in slip["legs"]} if slip else set()
     spool = [c for c in ok if not_blocked(c, "recommended") and c["p"] >= rc["single_min_prob"]
              and rc["single_min_odds"] <= c["odds"] <= rc["single_max_odds"] and c["match_id"] not in used]

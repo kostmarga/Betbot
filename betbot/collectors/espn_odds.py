@@ -21,7 +21,7 @@ from ..util import http_get, iso, parse_iso
 from .base import Collector, Context
 
 URL = "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary"
-SPORT = {"football": "soccer", "basketball": "basketball"}
+SPORT = {"football": "soccer", "basketball": "basketball", "nfl": "football"}
 
 
 def american_to_decimal(s) -> float | None:
@@ -53,8 +53,35 @@ def _side(block, which):
             _num_line(cur.get("line")))
 
 
+def parse_pickcenter(data: dict) -> list[tuple]:
+    """NFL: το «summary» δεν έχει `odds` αλλά `pickcenter` με επίπεδη μορφή (moneyLine / spread / overUnder, αμερικάνικες τιμές).
+    Η γραμμή spread είναι πάντα της γηπεδούχου (αρνητική όταν φαβορί). Επιστρέφει όπως η parse_odds."""
+    out = []
+    for pc in (data.get("pickcenter") or [])[:1]:
+        h, a = pc.get("homeTeamOdds") or {}, pc.get("awayTeamOdds") or {}
+        for sel, side in (("HOME", h), ("AWAY", a)):
+            p = american_to_decimal(side.get("moneyLine"))
+            if p:
+                out.append(("ML", sel, None, p, None, 1, p))
+        sp = pc.get("spread")
+        if sp is not None:
+            for sel, side in (("HOME", h), ("AWAY", a)):
+                p = american_to_decimal(side.get("spreadOdds"))
+                if p:
+                    out.append(("SPREAD", sel, float(sp), p, None, 1, p))
+        ou = pc.get("overUnder")
+        if ou is not None:
+            for sel, k in (("OVER", "overOdds"), ("UNDER", "underOdds")):
+                p = american_to_decimal(pc.get(k))
+                if p:
+                    out.append(("TOTAL", sel, float(ou), p, None, 1, p))
+    return out
+
+
 def parse_odds(sport: str, data: dict) -> list[tuple]:
     """Επιστρέφει [(market, selection, line, price, open_price, n_books, max_price)] με μέσο όρο των πρακτορείων."""
+    if sport == "nfl" and not data.get("odds"):
+        return parse_pickcenter(data)
     agg = defaultdict(list)   # (market, sel, line) -> [(price, open)]
     for prov in data.get("odds") or []:
         ml, tot, sp = prov.get("moneyline"), prov.get("total"), prov.get("pointSpread")

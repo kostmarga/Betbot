@@ -959,20 +959,20 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
         n_all = sum(r["n"] for r in real); n_set = sum(r["settled"] for r in real)
         n_w = sum(r["won"] for r in real); n_l = sum(r["lost"] for r in real); n_o = sum(r["open"] for r in real)
         funded = sum(r.get("funded", 0.0) for r in real); staked = sum(r["staked"] for r in real); pl = sum(r["profit"] for r in real)
+        _fr = [r for r in rows if r.get("fair") and r["n"]]
+        fn, fw, fl, fo = (sum(r[k] for r in _fr) for k in ("n", "won", "lost", "open"))
         now_b = funded + pl; roi_all = (pl / staked) if staked else None
         tl = lambda k, v, c="": f"<div class='tile'><div class='k'>{k}</div><div class='v {c}'>{v}</div></div>"
-        out.append("<div class='card'><h3>Σύνολο μέχρι σήμερα</h3><p class='muted'>Όλα τα εικονικά ταμεία μαζί (μόνο όσα έχουν απόδοση πρακτορείου). "
+        out.append("<div class='card'><h3>Σύνολο μέχρι σήμερα</h3><p class='muted'>Όλα τα δελτία μαζί: «Δελτία», «Κερδισμένα», «Χαμένα» και «Επιτυχία» περιλαμβάνουν και όσα δεν έχουν απόδοση πρακτορείου (κόρνερ/κάρτες/παίκτες)· τα ποσά (κεφάλαιο, κέρδος, ROI) αφορούν ΜΟΝΟ όσα έχουν απόδοση. "
                    f"Κάθε ταμείο παίρνει {paper['weekly']:.0f}€ την εβδομάδα· «κεφάλαιο» = όσα έχουν διατεθεί συνολικά από την αρχή. Προσοχή: ένα μόνο κερδισμένο δελτίο με πολύ υψηλή απόδοση (π.χ. 30+) μπορεί να κάνει το σύνολο θετικό· το πραγματικό μέτρο είναι η επιτυχία και τα ταμεία ξεχωριστά, μετά από αρκετά δελτία.</p><div class='tiles'>"
-                   + tl("Δελτία που παίξαμε", n_all) + tl("Κερδισμένα", n_w, "pos") + tl("Χαμένα", n_l, "neg") + tl("Σε εξέλιξη", n_o)
-                   + tl("Επιτυχία", f"{n_w / n_set:.0%}" if n_set else "—")
+                   + tl("Δελτία που παίξαμε", f"{n_all + fn}") + tl("Κερδισμένα", n_w + fw, "pos") + tl("Χαμένα", n_l + fl, "neg") + tl("Σε εξέλιξη", n_o + fo)
+                   + tl("Επιτυχία", f"{(n_w + fw) / (n_set + fw + fl):.0%}" if (n_set + fw + fl) else "—")
                    + tl("Κεφάλαιο που διατέθηκε", f"{funded:.0f}€") + tl("Στοιχηματίστηκαν (κριθέντα)", f"{staked:.0f}€")
                    + tl("Κέρδος / ζημιά", f"{pl:+.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
                    + tl("Υπόλοιπο τώρα", f"{now_b:.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
                    + tl("ROI", f"{roi_all:+.0%}" if roi_all is not None else "—", "pos" if (roi_all or 0) > 0 else "neg" if (roi_all or 0) < 0 else "")
                    + "</div>"
-                   + (lambda fr: (f"<p class='muted' style='margin:10px 2px 0'>Δεν περιλαμβάνονται {sum(r['n'] for r in fr)} δελτία χωρίς απόδοση πρακτορείου "
-                                  f"(κόρνερ/κάρτες/παίκτες): {sum(r['won'] for r in fr)} ✅ {sum(r['lost'] for r in fr)} ❌ · δες παρακάτω. Μαζί με αυτά, ο συνολικός αριθμός δελτίων είναι {n_all + sum(r['n'] for r in fr)}.</p>") if fr else "")(
-                       [r for r in rows if r.get("fair") and r["n"]])
+                   + f"<p class='muted' style='margin:10px 2px 0'>Από τα {n_all + fn}: {n_all} με απόδοση πρακτορείου ({n_w} ✅ {n_l} ❌ {n_o} ⏳) και {fn} χωρίς απόδοση ({fw} ✅ {fl} ❌ {fo} ⏳).</p>"
                    + "</div>")
     # ---- συμπεράσματα
     ins = []

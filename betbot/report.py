@@ -75,14 +75,17 @@ def tier_rule(cfg, tier, lid) -> str:
     """Σύντομη περιγραφή του επιπέδου για μια λίστα: «σκέλη ≥75%» (+ εύρος απόδοσης όταν το επίπεδο το αλλάζει)."""
     from .selector import tier_cfg
     try:
-        L = tier_cfg(cfg, tier)["lists"].get(lid) or {}
+        L = tier_cfg(cfg, tier)["lists"].get(lid.replace("fair_", "")) or {}
     except Exception:
         return ""
     parts = []
+    from .paper import _stake
+    stake = _stake(lid.replace("fair_", ""), cfg.get("paper") or {"unit": cfg["bankroll"]["unit"]}, cfg)
     if L.get("min_leg_prob"):
         parts.append(f"σκέλη ≥{L['min_leg_prob'] * 100:.0f}%")
     if lid in ("recommended", "safe") and L.get("min_total") and tier != "balanced":
         parts.append(f"απόδοση {L['min_total']:.2f}–{L['max_total']:.2f}")
+    parts.append(f"ποντάρισμα {stake:g}€")
     return " · ".join(parts)
 
 

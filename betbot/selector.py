@@ -106,6 +106,21 @@ def _devig(odds: dict) -> dict:
     return q
 
 
+def _devig_full(odds: dict) -> dict:
+    """Όπως η _devig, αλλά ΜΟΝΟ για πλήρεις αγορές (όλες οι επιλογές παρούσες) — χωρίς την υπόθεση «~6% margin» για ελλιπείς."""
+    q, groups = {}, defaultdict(dict)
+    for (m, s, l), r in odds.items():
+        groups[(m, l)][s] = r["price"]
+    for (m, l), sels in groups.items():
+        need = GROUPS.get(m, [])
+        if need and all(s in sels for s in need):
+            inv = {s: 1 / sels[s] for s in need}
+            tot = sum(inv.values())
+            for s in need:
+                q[(m, s, l)] = inv[s] / tot
+    return q
+
+
 # =====================================================================
 def norm_text(text: str) -> str:
     """Πεζά, χωρίς τόνους (για αναζήτηση ονόματος ομάδας μέσα σε κείμενο)."""
@@ -283,6 +298,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "warnings": [], "blocked": set(), "why": [],
     }
     notes, tail = [], []
+    if q is not None and key in (getattr(ctx, "sharp", None) or {}):
+        qc = (getattr(ctx, "q_cons", None) or {}).get(key)
+        notes.append(f"Βάση πιθανότητας: Pinnacle {q * 100:.0f}%" + (f" (μέσος όρος αγοράς {qc * 100:.0f}%)" if qc else "") + " — πρακτορείο αναφοράς")
     if market != "PLAYER":
         sn = ctx.standing_note()
         inj = ctx.injury_note()
@@ -395,6 +413,12 @@ def build_candidates(db, cfg, models, now):
         ctx = MatchContext(m, lg, models, db, cfg)
         odds = _best_odds(db.odds_for(m["match_id"]))
         q = _devig(odds) if odds else {}
+        # Pinnacle = το «πιο ακριβές» πρακτορείο (τιμές κλεισίματος Pinnacle χρησιμοποιήθηκαν και στη βαθμονόμηση 15.910 αγώνων)· όπου έχουμε
+        # πλήρη αγορά του, αυτό γίνεται η βάση της πιθανότητας· αλλιώς μένει η συναίνεση των πρακτορείων
+        pin = {(r["market"], r["selection"], r["line"]): r for r in db.odds_for(m["match_id"]) if r["source"] == "pinnacle"}
+        ctx.q_cons = dict(q)
+        ctx.sharp = _devig_full(pin) if pin else {}
+        q.update(ctx.sharp)
         probs = {}                       # key -> (p_model, extra)
 
         if lg["sport"] == "football":
@@ -630,6 +654,15 @@ def build_lists(cands: dict, cfg) -> dict:
         goals = [c for c in goals if c["selection"] in ("OVER", "YES")]
     out["overs"] = {"picks": sorted(goals, key=lambda c: -c["p"])[:oc["count"]],
                     "slip": build_slip(goals, oc["min_total"], oc["max_total"], oc["min_legs"], oc["max_legs"], cfg)}
+
+    # ⚽⚽ BTTS: και οι δύο ομάδες σκοράρουν (YES) ή όχι (NO)· πιθανότητες από την αγορά (Pinnacle όπου υπάρχει)
+    bc = L.get("btts")
+    if bc:
+        bt = [c for c in ok if c["market"] == "BTTS" and not_blocked(c, "slips") and c["p"] >= bc.get("min_leg_prob", 0)]
+        out["btts"] = {"picks": sorted(bt, key=lambda c: -c["p"])[:bc["count"]],
+                       "slip": build_slip(bt, bc["min_total"], bc["max_total"], bc["min_legs"], bc["max_legs"], cfg)}
+    else:
+        out["btts"] = {"picks": [], "slip": None}
 
     # 🚩 Κόρνερ · 🟨 Κάρτες · ↔️ Πλάγια · 👤 Παίκτες (με ή χωρίς απόδοση)
     for lid, fam in (("corners", "corners"), ("cards", "cards"), ("throw_ins", "throw_ins"), ("players", "players")):

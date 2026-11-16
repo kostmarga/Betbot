@@ -30,11 +30,11 @@ E = html.escape
 
 TABS = [
     ("today", "🎯 Σήμερα"), ("recommended", "⭐ Προτεινόμενο"), ("safe", "Safe"), ("x10", "🎯 10+"), ("x30", "🔥 30+"),
-    ("x100", "🎰 100+"), ("overs", "Over"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
+    ("x100", "🎰 100+"), ("overs", "Over"), ("btts", "BTTS"), ("corners", "🚩 Κόρνερ"), ("cards", "🟨 Κάρτες"),
     ("throw_ins", "↔️ Πλάγια"), ("players", "👤 Παίκτες"), ("combo", "🔀 Συνδυαστικό"),
     ("live", "Live αξία"), ("moves", "📉 Κινήσεις"), ("analysis", "📊 Ανάλυση"), ("calendar", "📆 Ημερολόγιο"), ("sources", "⚙️ Πηγές"),
 ]
-SLIP_TABS = ("recommended", "safe", "x10", "x30", "x100", "overs", "corners", "cards", "throw_ins", "players", "combo")
+SLIP_TABS = ("recommended", "safe", "x10", "x30", "x100", "overs", "btts", "corners", "cards", "throw_ins", "players", "combo")
 GROUPS = [   # κάτω μπάρα: (id, ετικέτα, εικονίδιο SVG path, καρτέλες)
     ("today", "Σήμερα", "M3 11l9-8 9 8M5 10v10h14V10", ("today",)),
     ("slips", "Δελτία", "M7 4h10a2 2 0 012 2v14l-3-2-2 2-2-2-2 2-2-2-3 2V6a2 2 0 012-2zM9 9h6M9 13h6", SLIP_TABS),
@@ -582,7 +582,7 @@ def _yesterday_card(st, lid) -> str:
 
 
 NAMES_HIST = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-              "overs": "Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
+              "overs": "Over", "btts": "BTTS", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
               "fair_throw_ins": "↔️ Πλάγια", "fair_players": "👤 Παίκτες"}
 
 
@@ -1154,6 +1154,12 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         _ov = view("overs" + sfx, ov["slip"])
         sec["overs"] = (P.slip_block(_ov, "Over δελτίο (γκολ)", br["unit"], lock_note(_ov))
                         + _picks_details(P, ov["picks"], "Όλες οι επιλογές γκολ (αναφορά)"))
+        bt = lists.get("btts") or {"slip": None, "picks": []}
+        _bt = view("btts" + sfx, bt["slip"])
+        sec["btts"] = (P.slip_block(_bt, "BTTS δελτίο (και οι δύο σκοράρουν)", br["unit"],
+                                    "<p class='muted'>Επιλογές «και οι δύο ομάδες σκοράρουν» (ή όχι), με πιθανότητα από την αγορά (Pinnacle όπου υπάρχει). "
+                                    "Νέα κατηγορία χωρίς backtest· παρακολουθείται ως εικονικό ταμείο.</p>" + lock_note(_bt))
+                       + _picks_details(P, bt["picks"], "Όλες οι επιλογές BTTS (αναφορά)"))
         for lid, title, what in (("corners", "🚩 Κόρνερ", "κόρνερ"), ("cards", "🟨 Κάρτες", "κάρτες"),
                                  ("throw_ins", "↔️ Πλάγια", "πλάγια"), ("players", "👤 Παίκτες", "παίκτες")):
             x = lists[lid]
@@ -1180,7 +1186,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
         _cb = view("combo" + sfx, lists["combo"]["slip"])
         sec["combo"] = P.slip_block(_cb, "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"], lock_note(_cb))
         # «Επιπλέον δελτίο»: βγήκε αργότερα μέσα στην ημέρα, με άλλους αγώνες, και περνά όλα τα όρια της κατηγορίας
-        for tid in ("recommended", "safe", "x10", "x30", "x100", "overs", "combo"):
+        for tid in ("recommended", "safe", "x10", "x30", "x100", "overs", "btts", "combo"):
             for k, fz in enumerate(today_extra.get(tid + sfx, []), 2):
                 st_ = br["lottery_stake"] if tid in ("x10", "x30", "x100") else br["unit"]
                 ex = {"legs": _enrich(fz["legs"], cidx, fair=False, tctx=tctx), "total_odds": fz["total_odds"], "p_win": fz["model_prob"],
@@ -1237,7 +1243,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
                     f"<td class='n'>{_pct(h['leg_hit']) if h['leg_hit'] is not None else '—'}</td>"
                     f"<td class='n {'pos' if h['pl'] >= 0 else 'neg'}'>{h['pl']:+.2f}</td>"
                     f"<td class='n {'pos' if h['roi'] >= 0 else 'neg'}'>{h['roi'] * 100:+.0f}%</td><td class='n'>{h['open']}</td></tr>")
-        if h["curve"] and lid in ("recommended", "single", "x10", "x30", "x100", "overs", "combo", "safe1"):
+        if h["curve"] and lid in ("recommended", "single", "x10", "x30", "x100", "overs", "btts", "combo", "safe1"):
             curves.append((lid, h["curve"]))
     hist_chart = ""
     if curves:

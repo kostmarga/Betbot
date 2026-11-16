@@ -25,36 +25,53 @@ from .base import Collector, Context
 
 BASE = "https://api.oddspapi.io/v4"
 MARKET_TYPES = {"totals-corners": "CORNERS", "totals-bookings": "CARDS"}
+MAP_VERSION = 2
+# ποια αγορές θέλουμε από κάθε πρακτορείο: Stoiximan = οι τιμές που παίζεις· Pinnacle = πρακτορείο αναφοράς για τις πιθανότητες (devig)
+BOOKS = {"stoiximan": {"CORNERS", "CARDS", "1X2", "OU", "BTTS"}, "pinnacle": {"1X2", "OU", "BTTS"}}
 
 
 def build_market_map(markets: list) -> dict:
-    """{marketId: {"m": CORNERS|CARDS, "line": float, "over": outcomeId, "under": outcomeId}} από τον κατάλογο αγορών."""
+    """{marketId: {"m": αγορά, "line": float|None, "outs": {outcomeId: επιλογή}}} από τον κατάλογο αγορών του OddsPapi.
+    Κόρνερ/κάρτες (totals-corners / totals-bookings, πλήρης αγώνας) και ποδόσφαιρο (sportId 10): Full Time Result (1X2), Over Under Full Time (μόνο γραμμές
+    x.5), Both Teams To Score."""
     out = {}
     for m in markets or []:
-        mt = MARKET_TYPES.get(m.get("marketType"))
-        if not mt or m.get("playerProp") or m.get("period") not in ("fulltime", "full time", "ft"):
+        if m.get("playerProp") or m.get("period") not in ("fulltime", "full time", "ft"):
             continue
+        name = (m.get("marketName") or "").strip()
+        outs_raw = {str(o.get("outcomeName") or "").strip().lower(): str(o.get("outcomeId")) for o in (m.get("outcomes") or [])}
         h = m.get("handicap")
-        ocs = {str(o.get("outcomeName") or "").strip().lower(): str(o.get("outcomeId")) for o in (m.get("outcomes") or [])}
-        if h is None or "over" not in ocs or "under" not in ocs:
-            continue
-        out[str(m.get("marketId"))] = {"m": mt, "line": float(h), "over": ocs["over"], "under": ocs["under"]}
+        mt = MARKET_TYPES.get(m.get("marketType"))
+        if mt:
+            if h is None or "over" not in outs_raw or "under" not in outs_raw:
+                continue
+            out[str(m.get("marketId"))] = {"m": mt, "line": float(h), "outs": {outs_raw["over"]: "OVER", outs_raw["under"]: "UNDER"}}
+        elif m.get("sportId") == 10 and name == "Full Time Result" and {"1", "x", "2"} <= set(outs_raw):
+            out[str(m.get("marketId"))] = {"m": "1X2", "line": None, "outs": {outs_raw["1"]: "1", outs_raw["x"]: "X", outs_raw["2"]: "2"}}
+        elif m.get("sportId") == 10 and name == "Over Under Full Time" and h is not None and abs(float(h) % 1 - 0.5) < 1e-9 and {"over", "under"} <= set(outs_raw):
+            out[str(m.get("marketId"))] = {"m": "OU", "line": float(h), "outs": {outs_raw["over"]: "OVER", outs_raw["under"]: "UNDER"}}
+        elif m.get("sportId") == 10 and name == "Both Teams To Score" and {"yes", "no"} <= set(outs_raw):
+            out[str(m.get("marketId"))] = {"m": "BTTS", "line": None, "outs": {outs_raw["yes"]: "YES", outs_raw["no"]: "NO"}}
     return out
 
 
-def parse_fixture_odds(fx: dict, bookmaker: str, mmap: dict) -> list[tuple]:
-    """[(market, selection, line, price)] για έναν αγώνα (μόνο ενεργές τιμές > 1)."""
+def parse_fixture_odds(fx: dict, bookmaker: str, mmap: dict, allowed=None) -> list[tuple]:
+    """[(market, selection, line, price)] για έναν αγώνα. Μόνο ΠΛΗΡΕΙΣ αγορές (όλες οι επιλογές ενεργές με τιμή > 1)· αλλιώς δεν
+    μπορεί να γίνει σωστό devig. `allowed`: σύνολο αγορών που θέλουμε."""
     bo = ((fx.get("bookmakerOdds") or {}).get(bookmaker) or {}).get("markets") or {}
     rows = []
     for mid, m in bo.items():
         d = mmap.get(str(mid))
-        if not d or m.get("marketActive") is False:
+        if not d or (allowed and d["m"] not in allowed) or m.get("marketActive") is False:
             continue
-        for sel, oid in (("OVER", d["over"]), ("UNDER", d["under"])):
+        got = []
+        for oid, sel in d["outs"].items():
             o = ((m.get("outcomes") or {}).get(oid) or {}).get("players", {}).get("0") or {}
             p = o.get("price")
             if p and float(p) > 1.0 and o.get("active") is not False:
-                rows.append((d["m"], sel, d["line"], round(float(p), 3)))
+                got.append((d["m"], sel, d["line"], round(float(p), 3)))
+        if len(got) == len(d["outs"]):
+            rows += got
     return rows
 
 
@@ -83,14 +100,14 @@ class OddsPapiCollector(Collector):
         if raw:
             try:
                 d = json.loads(raw)
-                if d.get("month") == ctx.now.strftime("%Y-%m") and d.get("map"):
+                if d.get("month") == ctx.now.strftime("%Y-%m") and d.get("map") and d.get("v") == MAP_VERSION:
                     return d["map"]
             except Exception:
                 pass
         mk = self._get(key, "/markets")
         mm = build_market_map(mk if isinstance(mk, list) else [])
         if mm:
-            ctx.db.set_ext_id("oddspapi:markets", "map", json.dumps({"month": ctx.now.strftime("%Y-%m"), "map": mm}))
+            ctx.db.set_ext_id("oddspapi:markets", "map", json.dumps({"month": ctx.now.strftime("%Y-%m"), "v": MAP_VERSION, "map": mm}))
         return mm
 
     # ---- κύριο ----
@@ -106,7 +123,7 @@ class OddsPapiCollector(Collector):
         max_leagues = int(cc.get("max_leagues", 6))
         # γύροι ημέρας: πρωί (<10 UTC), μεσημέρι (10–15), απόγευμα (≥15)· ένας γύρος ανά slot (νέοι αγώνες/τιμές εμφανίζονται μέσα στην ημέρα)
         part = "am" if ctx.now.hour < 10 else "mid" if ctx.now.hour < 15 else "pm"
-        slot = f"{ctx.now:%Y-%m-%d}:{part}"
+        slot = f"{ctx.now:%Y-%m-%d}:{part}:v{MAP_VERSION}"      # η έκδοση στο κλειδί ξαναρχίζει τον γύρο όταν αλλάζουν οι αγορές που ζητάμε
         done_slot = ctx.db.cached(f"oddspapi:{slot}")
         leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("oddspapi") and lg["sport"] == "football"}
         ms = ctx.db.matches(status="scheduled", since=iso(ctx.now - timedelta(hours=1)), until=iso(ctx.now + timedelta(hours=hours)))
@@ -145,33 +162,36 @@ class OddsPapiCollector(Collector):
         top = sorted(by_lg, key=lambda l: -len(by_lg[l]))[:max_leagues]
         groups = [top[i:i + 3] for i in range(0, len(top), 3)]
         fetched, calls, n_fx, n_rows, no_mkts = iso(ctx.now), 0, 0, 0, 0
-        for g in groups:
-            if calls >= max_calls:
-                break
-            tids = ",".join(str(leagues[l]["oddspapi"]) for l in g)
-            try:
-                data = self._get(key, "/odds-by-tournaments", tournamentIds=tids, bookmaker=book, verbosity=3)
-            except Exception as e:
-                return f"σφάλμα κλήσης: {e}"
-            calls += 1
-            for fx in data if isinstance(data, list) else []:
-                cands = [m for l in g for m in by_lg.get(l, [])]
-                tm = [{"home": m["home"], "away": m["away"], "m": m} for m in cands]
-                hit, sc = match_fixture(fx.get("participant1Name") or "", fx.get("participant2Name") or "", tm, ctx.aliases)
-                if not hit:
-                    continue
+        per_book = {}
+        for book in [bk for bk in (cc.get("bookmakers") or [cc.get("bookmaker", "stoiximan"), "pinnacle"]) if bk in BOOKS]:
+            for g in groups:
+                if calls >= max_calls:
+                    break
+                tids = ",".join(str(leagues[l]["oddspapi"]) for l in g)
                 try:
-                    dt = abs((parse_iso(fx["startTime"]) - parse_iso(hit["m"]["kickoff"])).total_seconds())
-                except Exception:
-                    dt = 0
-                if dt > 4 * 3600:
-                    continue
-                rows = parse_fixture_odds(fx, book, mmap)
-                if not rows:
-                    no_mkts += 1
-                    continue
-                n_fx += 1
-                n_rows += ctx.db.upsert_odds([OddsRow(hit["m"]["match_id"], mk, sel, ln, pr, 1, book, fetched) for mk, sel, ln, pr in rows])
+                    data = self._get(key, "/odds-by-tournaments", tournamentIds=tids, bookmaker=book, verbosity=3)
+                except Exception as e:
+                    return f"ΣΦΑΛΜΑ κλήσης ({book}): {e}"
+                calls += 1
+                for fx in data if isinstance(data, list) else []:
+                    cands = [m for l in g for m in by_lg.get(l, [])]
+                    tm = [{"home": m["home"], "away": m["away"], "m": m} for m in cands]
+                    hit, sc = match_fixture(fx.get("participant1Name") or "", fx.get("participant2Name") or "", tm, ctx.aliases)
+                    if not hit:
+                        continue
+                    try:
+                        dt = abs((parse_iso(fx["startTime"]) - parse_iso(hit["m"]["kickoff"])).total_seconds())
+                    except Exception:
+                        dt = 0
+                    if dt > 4 * 3600:
+                        continue
+                    rows = parse_fixture_odds(fx, book, mmap, BOOKS[book])
+                    if not rows:
+                        no_mkts += 1
+                        continue
+                    n_fx += 1
+                    per_book[book] = per_book.get(book, 0) + 1
+                    n_rows += ctx.db.upsert_odds([OddsRow(hit["m"]["match_id"], mk, sel, ln, pr, 1, book, fetched) for mk, sel, ln, pr in rows])
         ctx.db.mark_cached(f"oddspapi:{slot}", iso(ctx.now))
-        return (f"{n_fx} αγώνες με κόρνερ/κάρτες ({book}), {n_rows} γραμμές · {no_mkts} χωρίς ακόμα αγορές · "
-                f"κλήσεις {calls} · όριο: μένουν {left - calls - (0 if mmap else 0)}/{limit} τον μήνα")
+        return (f"{n_fx} αγώνες-πρακτορεία {per_book}, {n_rows} γραμμές · {no_mkts} χωρίς ακόμα αγορές · "
+                f"κλήσεις {calls} · όριο: μένουν {left - calls}/{limit} (λογαριασμός που χρησιμοποιήθηκε)")

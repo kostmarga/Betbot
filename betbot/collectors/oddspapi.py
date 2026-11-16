@@ -107,8 +107,7 @@ class OddsPapiCollector(Collector):
         # γύροι ημέρας: πρωί (<10 UTC), μεσημέρι (10–15), απόγευμα (≥15)· ένας γύρος ανά slot (νέοι αγώνες/τιμές εμφανίζονται μέσα στην ημέρα)
         part = "am" if ctx.now.hour < 10 else "mid" if ctx.now.hour < 15 else "pm"
         slot = f"{ctx.now:%Y-%m-%d}:{part}"
-        if ctx.db.cached(f"oddspapi:{slot}"):
-            return f"ήδη έγινε ο γύρος {slot} (οι τιμές διαβάζονται από τη βάση)"
+        done_slot = ctx.db.cached(f"oddspapi:{slot}")
         leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("oddspapi") and lg["sport"] == "football"}
         ms = ctx.db.matches(status="scheduled", since=iso(ctx.now - timedelta(hours=1)), until=iso(ctx.now + timedelta(hours=hours)))
         by_lg = {}
@@ -130,6 +129,8 @@ class OddsPapiCollector(Collector):
             if key is None and lim - us > reserve:
                 key, limit, used, left = k, lim, us, lim - us
         ctx.db.set_ext_id("oddspapi:quota", "info", json.dumps({"at": iso(ctx.now), "accounts": info, "warn_below": int(cc.get("warn_below", 40))}))
+        if done_slot:
+            return f"ήδη έγινε ο γύρος {slot} · υπόλοιπα: " + ", ".join(f"λογαριασμός {a['n']}: {a['left']}" + ("" if a.get("ok", True) else " (ΔΕΝ διαβάζεται)") for a in info)
         if not info or not any(a.get("ok", True) for a in info):
             return "ΣΦΑΛΜΑ: δεν διαβάστηκε το όριο κλήσεων (/account)· έλεγξε το ODDSPAPI_KEY· καμία κλήση"
         days_left = max(1, (31 - ctx.now.day))

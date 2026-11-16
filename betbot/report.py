@@ -71,6 +71,21 @@ def _when(iso_s, tz):
     return f"{GR_DAYS[d.weekday()]} {d:%H:%M}"
 
 
+def tier_rule(cfg, tier, lid) -> str:
+    """Σύντομη περιγραφή του επιπέδου για μια λίστα: «σκέλη ≥75%» (+ εύρος απόδοσης όταν το επίπεδο το αλλάζει)."""
+    from .selector import tier_cfg
+    try:
+        L = tier_cfg(cfg, tier)["lists"].get(lid) or {}
+    except Exception:
+        return ""
+    parts = []
+    if L.get("min_leg_prob"):
+        parts.append(f"σκέλη ≥{L['min_leg_prob'] * 100:.0f}%")
+    if lid in ("recommended", "safe") and L.get("min_total") and tier != "balanced":
+        parts.append(f"απόδοση {L['min_total']:.2f}–{L['max_total']:.2f}")
+    return " · ".join(parts)
+
+
 def day_tag(legs, now, tz) -> str:
     """«ΣΗΜΕΡΑ» / «ΑΥΡΙΟ Τρι 17/11» / «Σήμερα–Αύριο» ανάλογα με το πότε παίζονται οι αγώνες του δελτίου (ώρα Ελλάδας)."""
     if not legs or now is None:
@@ -168,7 +183,7 @@ class Page:
         if not sl:
             return (f"<div class='card'><h3>{E(title)}</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές "
                     "επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – "
-                    "το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές. (Στα επίπεδα Δυνατό/Τολμηρό μπορεί επίσης να σημαίνει ότι το δελτίο θα ήταν ίδιο με άλλου επιπέδου, οπότε δεν το επαναλαμβάνουμε.)</p></div>")
+                    "το bot δεν «γεμίζει» δελτία με αδύναμες επιλογές. (Στα επίπεδα Υψηλή/Χαμηλή πιθανότητα μπορεί επίσης να σημαίνει ότι το δελτίο θα ήταν ίδιο με άλλου επιπέδου, οπότε δεν το επαναλαμβάνουμε.)</p></div>")
         stake_txt = f"<div class='tile'><div class='k'>Ποντάρισμα</div><div class='v'>{stake:.2f}€</div></div>" if stake else ""
         ret = f"<div class='tile'><div class='k'>Αν κερδίσει</div><div class='v pos'>{stake * sl['total_odds']:.2f}€</div></div>" if stake else ""
         pm = f"{sl['p_market'] * 100:.1f}%" if sl.get("p_market") else "—"
@@ -1027,7 +1042,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                            f"<div class='bar2' title='{r['settled']}/{need} δελτία'><i style='width:{prog * 100:.0f}%'></i></div></div>"
                            f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")
                 continue
-            trs.append(f"<div class='trow' data-k='{cat}|{tier}' title='Πάτα για να δεις τα δελτία'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
+            trs.append(f"<div class='trow' data-k='{cat}|{tier}' title='Πάτα για να δεις τα δελτία'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{E(tier_rule(cfg, tier, cat))}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
                        f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
                        f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"
                        f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")
@@ -1256,15 +1271,15 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <li>Κάθε αγώνας το πολύ μία φορά σε κάθε δελτίο · το πολύ {cfg['selection']['max_legs_per_league']} επιλογές από την ίδια διοργάνωση</li>
 </ul></div>""")
 
-    TIER_META = [("strong", "Δυνατό", "πιο σίγουρο, μικρότερη απόδοση"), ("balanced", "Ισορροπημένο", "η προεπιλογή"),
-                 ("bold", "Τολμηρό", "λιγότερο σίγουρο, μεγαλύτερη απόδοση")]
+    TIER_META = [("strong", "Υψηλή πιθανότητα", "πιο σίγουρο"), ("balanced", "Μέση πιθανότητα", "η προεπιλογή"),
+                 ("bold", "Χαμηλή πιθανότητα", "τολμηρό")]
     if sec_t:
         for tid in SLIP_TABS:
             if tid not in sec:
                 continue
             panes = [("balanced", sec[tid])] + [(t, sec_t[t][tid]) for t in ("strong", "bold") if t in sec_t and tid in sec_t[t]]
             bar = ("<div class='tiersel' role='group' aria-label='Επίπεδο ρίσκου'>"
-                   + "".join(f"<button data-tier='{t}' aria-pressed='{str(t == 'balanced').lower()}'><i class='dot d-{t}'></i><b>{n}</b><span>{d}</span></button>"
+                   + "".join(f"<button data-tier='{t}' aria-pressed='{str(t == 'balanced').lower()}'><i class='dot d-{t}'></i><b>{n}</b><span>{E(tier_rule(cfg, t, tid) or d)}</span></button>"
                              for t, n, d in TIER_META if t in dict(panes)) + "</div>")
             sec[tid] = bar + "".join(f"<div class='tierpane' data-tier='{t}'{'' if t == 'balanced' else ' hidden'}>{h}</div>" for t, h in panes)
     for tid, h in ydays.items():       # «Χθες» κάτω από το σημερινό δελτίο, εκτός των επιπέδων ρίσκου

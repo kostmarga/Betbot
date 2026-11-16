@@ -23,15 +23,15 @@ h2{font-size:16px;margin:20px 0 6px;color:var(--muted);font-weight:600}
 <a href="index.html">← Κύρια σελίδα</a></p>
 <p id="status">Φόρτωση…</p><p id="espnchk" class="muted"></p>
 <div id="app"><noscript>Η live σελίδα χρειάζεται JavaScript.</noscript></div>
-<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 17:10 (16/11). Πηγή αποτελεσμάτων: ESPN και επίσημο API της Euroleague (ρωτά μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
+<p class="sub">Δεδομένα δελτίων από την εκτέλεση των 18:01 (16/11). Πηγή αποτελεσμάτων: ESPN και επίσημο API της Euroleague (ρωτά μόνο όσο παίζεται αγώνας, κάθε 2 λεπτά).
 Οι αποδόσεις δεν ανανεώνονται live. Παίκτες και πλάγια δεν παρακολουθούνται live.</p>
 </main>
-<script id="data" type="application/json" data-gen="2026-11-16T15:10:54Z">[{"id": "2026-11-16#recommended", "list": "recommended", "name": "Προτεινόμενο", "odds": 1.8626, "p": 0.5020722079545609, "fair": false, "day": "2026-11-16", "status": "open", "legs": [{"eid": "E2026-111", "lg": "EL", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Dubai Basketball", "away": "Anadolu Efes Istanbul", "label": "Νίκη Dubai Basketball", "odds": 1.34, "ko": "2026-11-17T16:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "E2026-113", "lg": "EL", "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Maccabi Rapyd Tel Aviv", "away": "Olympiacos Piraeus", "label": "Νίκη Olympiacos Piraeus", "odds": 1.39, "ko": "2026-11-17T17:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}]</script>
+<script id="data" type="application/json" data-gen="2026-11-16T16:01:11Z">[{"id": "2026-11-16#recommended", "list": "recommended", "name": "Προτεινόμενο", "odds": 1.8626, "p": 0.5020722079545609, "fair": false, "day": "2026-11-16", "status": "open", "legs": [{"eid": "E2026-111", "lg": "EL", "sport": "basketball", "market": "ML", "sel": "HOME", "line": null, "home": "Dubai Basketball", "away": "Anadolu Efes Istanbul", "label": "Νίκη Dubai Basketball", "odds": 1.34, "ko": "2026-11-17T16:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}, {"eid": "E2026-113", "lg": "EL", "sport": "basketball", "market": "ML", "sel": "AWAY", "line": null, "home": "Maccabi Rapyd Tel Aviv", "away": "Olympiacos Piraeus", "label": "Νίκη Olympiacos Piraeus", "odds": 1.39, "ko": "2026-11-17T17:00:00Z", "res": "open", "sc": null, "dbst": "scheduled"}]}]</script>
 <script>
 // Κοινός κώδικας live (live σελίδα + κύρια σελίδα): κρίση επιλογής, ρώτημα ESPN ΜΟΝΟ όσο παίζεται αγώνας, χρονοδιάγραμμα.
 window.BetbotLive = (function(){
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/';
-const SPORT = {football: 'soccer', basketball: 'basketball'};
+const SPORT = {football: 'soccer', basketball: 'basketball', nfl: 'football'};
 const cache = {};                       // κλειδί αγώνα -> κατάσταση από ESPN
 let legs = [], onUpdate = function(){}, timer = null, lastOk = null, lastErr = null, browserOk = false;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -66,7 +66,7 @@ function parseSummary(d) {
 
 // Κρίση επιλογής: [κωδικός, κείμενο προόδου]. Ίδια λογική με το selector.settle_leg + live (sure/dead/ok/bad).
 // Χωρίς ζωντανά δεδομένα: εκτίμηση από την ώρα. ○ ΜΟΝΟ πριν την έναρξη· μετά ● (παίζεται) ή ◆ (τελείωσε, περιμένω αποτέλεσμα).
-const END_MIN = {football: 150, basketball: 180};
+const END_MIN = {football: 150, basketball: 180, nfl: 210};
 function byTime(l) {
   const ko = l.ko ? Date.parse(l.ko) : NaN;
   if (isNaN(ko) || Date.now() < ko) return ['pending', ''];

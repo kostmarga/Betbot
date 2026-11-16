@@ -30,6 +30,38 @@ def fetch(m):
         return m, None
 
 
+def fit_median(games):
+    """Ίδιο τεστ, αλλά με «γραμμή» τον κυλιόμενο ΔΙΑΜΕΣΟ των 10 τελευταίων αγώνων και αναζήτηση του καλύτερου σ = max(min_sd, k·γραμμή)."""
+    import statistics
+    hist = defaultdict(list)
+    obs = []
+    for _, rows in games:
+        for r in rows:
+            h = hist[r["player"]]
+            if r["minutes"] and r["minutes"] >= 10 and len(h) >= 8:
+                last = [p for mn, p in h[-10:] if mn >= 10]
+                if len(last) >= 7 and statistics.median(last) >= 8:
+                    obs.append((math.floor(statistics.median(last)) + 0.5, r["points"]))
+            if r["minutes"] is not None:
+                h.append((r["minutes"], r["points"]))
+    print(f"\nΕπανάληψη με γραμμή = κυλιόμενος διάμεσος ({len(obs)} παρατηρήσεις): μέσος log-loss για Over/Under σε L0±2..6, κανονική κατανομή")
+    res = []
+    for k in (0.30, 0.35, 0.40, 0.45, 0.50):
+        for mn in (3.5, 4.5, 5.5, 6.5, 7.5):
+            tot = n = 0
+            for l0, p in obs:
+                sd = max(mn, k * l0)
+                for d in (-6, -4, -3, -2, 2, 3, 4, 6):
+                    po = min(max(1 - ND.cdf((l0 - d - l0) / sd), 1e-4), 1 - 1e-4)
+                    tot += -math.log(po if p > l0 - d else 1 - po); n += 1
+            res.append((tot / n, k, mn))
+    for v, k, mn in sorted(res)[:6]:
+        print(f"  k={k:.2f} min_sd={mn:.1f}: {v:.4f}")
+    cur = next(v for v, k, mn in res if k == 0.30 and mn == 3.5)
+    print(f"  (τωρινή υπόθεση k=0.30, min_sd=3.5: {cur:.4f})")
+    print("  ΣΗΜΕΙΩΣΗ: ο κυλιόμενος διάμεσος είναι χειρότερη εκτίμηση από τη γραμμή της αγοράς, άρα το πραγματικό σ γύρω από την αγορά είναι μικρότερο· το αποτέλεσμα είναι ΑΝΩ ΟΡΙΟ.")
+
+
 def main(db):
     c = sqlite3.connect(db)
     c.row_factory = sqlite3.Row
@@ -103,6 +135,7 @@ def main(db):
         hit = sum(p > math.floor(mu - 3.5) + 0.5 for mu, p in s) / len(s)
         pm = sum(1 - ND.cdf((math.floor(mu - 3.5) + 0.5 - mu) / sd_model(mu)) for mu, _ in s) / len(s)
         print(f"  μ {lo}–{hi}: n={len(s)}  μοντέλο {pm * 100:.1f}%  πραγματικό {hit * 100:.1f}%")
+    fit_median(games)
 
 
 if __name__ == "__main__":

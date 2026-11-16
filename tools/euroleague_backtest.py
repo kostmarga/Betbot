@@ -79,6 +79,10 @@ def main():
         v = [(max(p, 1 - p), (y if p >= 0.5 else 1 - y)) for _, p, y, *_ in rows if max(p, 1 - p) >= t]
         if len(v) >= 30:
             print(f"  ≥{t:.2f}: n={len(v):4d} μοντέλο {sum(a for a, _ in v) / len(v) * 100:5.1f}% πραγματικό {sum(b for _, b in v) / len(v) * 100:5.1f}%")
+    print("\nΣυστολή πιθανότητας προς 50% (p' = 0.5 + (p−0.5)·s): Brier και log-loss — ποιο s είναι το καλύτερο;")
+    for sh in (0.80, 0.85, 0.90, 0.95, 1.00, 1.05):
+        pp = [(min(max(0.5 + (r[1] - 0.5) * sh, 1e-4), 1 - 1e-4), r[2]) for r in rows]
+        print(f"  s={sh:.2f}: Brier {sum((a - b) ** 2 for a, b in pp) / n:.4f}  log-loss {-sum(math.log(a if b else 1 - a) for a, b in pp) / n:.4f}")
     print("\nΣύνολο πόντων: κάλυψη των διαστημάτων του μοντέλου (κανονική κατανομή):")
     for z in (0.5, 1.0, 1.5):
         cov = np.mean([abs(r[6] - r[5]) <= z * r[8] for r in rows])

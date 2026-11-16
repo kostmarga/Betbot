@@ -288,12 +288,11 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         inj = ctx.injury_note()
         if not inj:
             # Να ξέρεις αν «δεν βρέθηκε τίποτα» σημαίνει «κανείς δεν λείπει» ή «δεν έχουμε δεδομένα για αυτή τη λίγκα»
-            if ctx.sport == "basketball" or ctx.m["league"] == "EPL":
+            if ctx.sport in ("basketball", "nfl") or ctx.m["league"] == "EPL":
                 inj = "Τραυματισμοί · κανένας βασικός δηλωμένος (ESPN/FPL)"
             elif ctx.sport == "football":
                 inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για αυτή τη λίγκα — έλεγξε τα νέα των ομάδων πριν παίξεις"
-            elif ctx.sport == "nfl":
-                inj = "Τραυματισμοί · ΔΕΝ έχουμε δεδομένα για NFL — έλεγξε το injury report (ιδίως τον quarterback) πριν παίξεις"
+
         ln, lw = ctx.lineup_note()
         nn = ctx.news_note()
         rf = (f"Διαιτητές (Euroleague): {ctx.referee} · ενημερωτικό, δεν επηρεάζει τον υπολογισμό"

@@ -29,7 +29,7 @@ CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "combo", "corners"
 CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
             "overs": "Over", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες",
             "fair_corners": "🚩 Κόρνερ (χωρίς απόδοση)", "fair_cards": "🟨 Κάρτες (χωρίς απόδοση)", "fair_players": "👤 Παίκτες (χωρίς απόδοση)"}
-LOTTERY = ("x30", "x100")
+LOTTERY = ("x10", "x30", "x100")      # 1€ ανά δελτίο (όπως στο πλάνο και στη σελίδα· πριν 16/11/2026 το 10+ μετριόταν με 2€)
 
 
 def leg_sig(legs) -> tuple:

@@ -138,11 +138,12 @@ def save_lists(db, cfg, now, lists, suffix=""):
 def results_due_iso(db, now):
     """Πότε αναμένεται να τελειώσει ο πρώτος αγώνας δελτίου που ακόμα δεν έχει αποτέλεσμα (για τον φύλακα του live workflow)."""
     from datetime import timedelta
-    from betbot.stats import real_slips
     from betbot.util import parse_iso
     end = {"football": 150, "basketball": 180, "nfl": 210}
     best = None
-    for sl in real_slips(db.slips()):
+    # ΟΛΑ τα δελτία (και επίπεδα ~s/~b, επιπλέον δελτία, «χωρίς απόδοση»)· πριν 17/11/2026 μετρούσαν μόνο τα «πραγματικά» και το βράδυ δεν ξεκινούσε
+    # νέος γύρος όταν τελείωνε αγώνας που υπήρχε μόνο σε δελτίο επιπέδου -> ❌/✅ έμεναν ασημείωτα για ώρες
+    for sl in db.slips():
         for l in sl["legs"]:
             if l.get("result") not in (None, "open"):
                 continue

@@ -166,8 +166,15 @@ def build(db, cfg, now):
             last_day = max(_day(s, tz) for s in prev)
             cand = [s for s in prev if _day(s, tz) == last_day]
             yesterday[lid] = dict(max(cand, key=lambda s: s["created_at"]), day=last_day)
-    todays = {s["list_name"]: s for s in slips + tier_slips if _day(s, tz) == today}
+    todays, today_extra = {}, {}
+    for s in slips + tier_slips:
+        if _day(s, tz) != today:
+            continue
+        if "+" in str(s["slip_id"]).split("#")[-1]:          # «επιπλέον δελτίο» μέσα στην ημέρα (id: ...+N)
+            today_extra.setdefault(s["list_name"], []).append(s)
+        else:
+            todays[s["list_name"]] = s
     return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
-            "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays,
+            "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays, "today_extra": today_extra,
             "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),
             "recent": [s for s in sorted(slips, key=lambda s: s["created_at"], reverse=True) if _day(s, tz) < today][:60]}

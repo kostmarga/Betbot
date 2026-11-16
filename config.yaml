@@ -17,6 +17,7 @@ slip:
   alternatives: 2            # πόσα εναλλακτικά δελτία εκτός από το κύριο
   stake: 2.0                 # ποντάρισμα ανά δελτίο (μόνο για το ιστορικό Κ/Ζ)
   hours_ahead: 30            # αγώνες που ξεκινούν μέσα στις επόμενες Χ ώρες
+  extra_per_day: 1           # «Επιπλέον δελτίο» ανά κατηγορία/επίπεδο αν βγει αργότερα μέσα στην ημέρα (0 = κλειστό)
 
 # ---------- Φίλτρα επιλογών ----------
 selection:
@@ -65,22 +66,22 @@ models:
 # sofascore: id διοργάνωσης στο Sofascore (uniqueTournament). Αν κάποιο είναι λάθος, ο collector
 #            ταιριάζει και με το όνομα της διοργάνωσης (βλ. README §6).
 leagues:
-  - {id: EPL,  name: Premier League,    sport: football,   espn: eng.1, fdco: E0,  sofascore: 17,  odds_api: soccer_epl}
-  - {id: LIGA, name: LaLiga,            sport: football,   espn: esp.1, fdco: SP1, sofascore: 8,   odds_api: soccer_spain_la_liga}
-  - {id: SA,   name: Serie A,           sport: football,   espn: ita.1, fdco: I1,  sofascore: 23,  odds_api: soccer_italy_serie_a}
-  - {id: BL,   name: Bundesliga,        sport: football,   espn: ger.1, fdco: D1,  sofascore: 35,  odds_api: soccer_germany_bundesliga}
-  - {id: L1,   name: Ligue 1,           sport: football,   espn: fra.1, fdco: F1,  sofascore: 34,  odds_api: soccer_france_ligue_one}
-  - {id: GSL,  name: Super League,      sport: football,   espn: gre.1, fdco: G1,  sofascore: 185, odds_api: soccer_greece_super_league}
+  - {id: EPL, oddspapi: 17,  name: Premier League,    sport: football,   espn: eng.1, fdco: E0,  sofascore: 17,  odds_api: soccer_epl}
+  - {id: LIGA, oddspapi: 8, name: LaLiga,            sport: football,   espn: esp.1, fdco: SP1, sofascore: 8,   odds_api: soccer_spain_la_liga}
+  - {id: SA, oddspapi: 23,   name: Serie A,           sport: football,   espn: ita.1, fdco: I1,  sofascore: 23,  odds_api: soccer_italy_serie_a}
+  - {id: BL, oddspapi: 35,   name: Bundesliga,        sport: football,   espn: ger.1, fdco: D1,  sofascore: 35,  odds_api: soccer_germany_bundesliga}
+  - {id: L1, oddspapi: 34,   name: Ligue 1,           sport: football,   espn: fra.1, fdco: F1,  sofascore: 34,  odds_api: soccer_france_ligue_one}
+  - {id: GSL, oddspapi: 185,  name: Super League,      sport: football,   espn: gre.1, fdco: G1,  sofascore: 185, odds_api: soccer_greece_super_league}
   # Επιπλέον λίγκες (06/11/2026) – έχουν ESPN (αγώνες/κόρνερ/κάρτες) + football-data (αποδόσεις στο fixtures.csv)
-  - {id: EFL1, name: Championship,      sport: football,   espn: eng.2, fdco: E1,  odds_api: soccer_efl_champ}
-  - {id: EFL2, name: League One,        sport: football,   espn: eng.3, fdco: E2,  odds_api: soccer_england_league1}
-  - {id: EFL3, name: League Two,        sport: football,   espn: eng.4, fdco: E3,  odds_api: soccer_england_league2}
+  - {id: EFL1, oddspapi: 18, name: Championship,      sport: football,   espn: eng.2, fdco: E1,  odds_api: soccer_efl_champ}
+  - {id: EFL2, oddspapi: 24, name: League One,        sport: football,   espn: eng.3, fdco: E2,  odds_api: soccer_england_league1}
+  - {id: EFL3, oddspapi: 25, name: League Two,        sport: football,   espn: eng.4, fdco: E3,  odds_api: soccer_england_league2}
   - {id: SCO,  name: Scottish Premiership, sport: football, espn: sco.1, fdco: SC0, odds_api: soccer_spl}
   - {id: BEL,  name: Jupiler Pro League, sport: football,  espn: bel.1, fdco: B1,  odds_api: soccer_belgium_first_div}
-  - {id: NED,  name: Eredivisie,        sport: football,   espn: ned.1, fdco: N1,  odds_api: soccer_netherlands_eredivisie}
+  - {id: NED, oddspapi: 37,  name: Eredivisie,        sport: football,   espn: ned.1, fdco: N1,  odds_api: soccer_netherlands_eredivisie}
   - {id: POR,  name: Primeira Liga,     sport: football,   espn: por.1, fdco: P1,  odds_api: soccer_portugal_primeira_liga}
-  - {id: TUR,  name: Süper Lig,         sport: football,   espn: tur.1, fdco: T1,  odds_api: soccer_turkey_super_league}
-  - {id: LIGA2, name: LaLiga 2,         sport: football,   espn: esp.2, fdco: SP2, odds_api: soccer_spain_segunda_division}
+  - {id: TUR, oddspapi: 52,  name: Süper Lig,         sport: football,   espn: tur.1, fdco: T1,  odds_api: soccer_turkey_super_league}
+  - {id: LIGA2, oddspapi: 54, name: LaLiga 2,         sport: football,   espn: esp.2, fdco: SP2, odds_api: soccer_spain_segunda_division}
   - {id: SB,   name: Serie B,           sport: football,   espn: ita.2, fdco: I2,  odds_api: soccer_italy_serie_b}
   - {id: BL2,  name: 2. Bundesliga,     sport: football,   espn: ger.2, fdco: D2,  odds_api: soccer_germany_bundesliga2}
   - {id: L2,   name: Ligue 2,           sport: football,   espn: fra.2, fdco: F2,  odds_api: soccer_france_ligue_two}
@@ -106,6 +107,7 @@ collectors:
   fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
   espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
+  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 3, reserve: 25, max_leagues: 6, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
   odds_api:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
     regions: eu

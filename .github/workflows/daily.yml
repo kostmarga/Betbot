@@ -59,6 +59,8 @@ jobs:
       - name: Εκτέλεση BetBot
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          ODDSPAPI_KEY_2: ${{ secrets.ODDSPAPI_KEY_2 }}     # δεύτερος λογαριασμός OddsPapi (προαιρετικό): χρησιμοποιείται όταν το πρώτο φτάσει στο όριο
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}

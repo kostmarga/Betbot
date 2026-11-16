@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import random
+import re
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
@@ -88,7 +89,7 @@ def build(db, cfg, now) -> dict:
     loc = now.astimezone(tz)
     monday = (loc - timedelta(days=loc.weekday())).date()
     by = {}
-    for sl in drop_tier_dups(db.slips()):
+    for sl in drop_tier_dups([x for x in db.slips() if not re.search(r"-\d+$", str(x["slip_id"]))]):   # χωρίς δελτία παλιάς μορφής (-N)
         ln = sl.get("list_name") or ""
         tier, cat = "balanced", ln
         for t, suf in SUFFIX.items():

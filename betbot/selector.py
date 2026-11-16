@@ -704,9 +704,9 @@ def settle_leg(leg, match, db=None):
         ts = db.team_stats_for_match(match["match_id"])
         hv = next((r[col] for r in ts if r["is_home"] == 1), None)
         av = next((r[col] for r in ts if r["is_home"] == 0), None)
-        if m == "CARDS" and hv is not None and av is not None:      # «κάρτες» = κίτρινες + κόκκινες (1 η καθεμία) — όπως τα περισσότερα πρακτορεία
-            hv += next((r["red"] or 0 for r in ts if r["is_home"] == 1), 0)
-            av += next((r["red"] or 0 for r in ts if r["is_home"] == 0), 0)
+        if m == "CARDS" and hv is not None and av is not None:      # «κάρτες» = πόντοι κράτησης: κίτρινη 1, κόκκινη 2 (όπως τα πρακτορεία)
+            hv += 2 * next((r["red"] or 0 for r in ts if r["is_home"] == 1), 0)
+            av += 2 * next((r["red"] or 0 for r in ts if r["is_home"] == 0), 0)
         if hv is None or av is None:
             return "open"           # θα ξαναδοκιμάσει όταν έρθουν τα στατιστικά
         if m == "CORNERS_MORE":
@@ -730,7 +730,7 @@ def settle_leg(leg, match, db=None):
 
 
 def resettle_cards(db) -> int:
-    """Ξαναϋπολογίζει σκέλη «κάρτες» που είχαν κριθεί μόνο με κίτρινες (πριν 16/11/2026)· ενημερώνει και το δελτίο. Idempotent."""
+    """Ξαναϋπολογίζει σκέλη «κάρτες» που είχαν κριθεί μόνο με κίτρινες (πριν 16/11/2026, κόκκινη = 2 πόντοι)· ενημερώνει και το δελτίο. Idempotent."""
     fixed = 0
     for sl in db.slips():
         legs = sl["legs"]

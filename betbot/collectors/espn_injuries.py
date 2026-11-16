@@ -84,7 +84,7 @@ class EspnInjuriesCollector(Collector):
             for team in (m["home"], m["away"]):
                 for nm, st, com in by_team.get(team, []):
                     tag = ", ".join(key.get((team, nm), []))
-                    rows.append(LineupRow(m["match_id"], team, nm, st, None, (tag + "|" + com) if tag else com, 1, "espn"))
+                    rows.append(LineupRow(m["match_id"], team, nm, st, None, (tag + "|" + com) if tag else com, 1, "espn", iso(ctx.now)))
             if rows:
                 n_m += 1
                 n_rows += ctx.db.upsert_lineups(rows)

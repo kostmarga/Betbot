@@ -72,14 +72,17 @@ class EuroleagueCollector(Collector):
     name = "euroleague"
 
     def run(self, ctx: Context) -> str:
-        total = 0
+        total, errs = 0, []
         # σεζόν ξεκινά Οκτώβριο: Οκτ 2026 -> 2026, Μάρτιος 2027 -> 2026
         season = ctx.now.year if ctx.now.month >= 8 else ctx.now.year - 1
         for lg in ctx.leagues(euroleague=True):
             comp = lg["euroleague"]
             for year in (season - 1, season):
-                data, _ = http_get(URL.format(comp=comp, year=year))
-                total += ctx.db.upsert_matches(_parse(lg, comp, year, data))
+                try:
+                    data, _ = http_get(URL.format(comp=comp, year=year))
+                    total += ctx.db.upsert_matches(_parse(lg, comp, year, data))
+                except Exception as e:      # παροδικά κενή απάντηση του API: συνεχίζουμε με το επόμενο έτος/τους διαιτητές
+                    errs.append(f"{comp}{year}: {str(e)[:60]}")
         # Διαιτητές για αγώνες των επόμενων 48 ωρών (αν το API τους έχει ήδη)
         from datetime import timedelta
         refs = 0
@@ -92,4 +95,4 @@ class EuroleagueCollector(Collector):
             if names:
                 ctx.db.set_referee(m["match_id"], " · ".join(names), "euroleague")
                 refs += 1
-        return f"{total} αγώνες · διαιτητές σε {refs}"
+        return f"{total} αγώνες · διαιτητές σε {refs}" + (" | σφάλματα: " + "; ".join(errs) if errs else "")

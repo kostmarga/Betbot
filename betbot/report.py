@@ -231,10 +231,15 @@ EXTRA_CSS = ""      # όλο το CSS είναι στο betbot/theme.py
 INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
+document.addEventListener('change', e => {
+  const i = e.target.closest('.oddsin'); if (!i || !window.BetbotOdds) return;
+  const v = parseFloat(String(i.value).replace(',', '.'));
+  window.BetbotOdds.push(i.dataset.id, v > 1 ? v : '', i.closest('.oddsrow').querySelector('.oddssync'));
+});
 document.addEventListener('input', e => {
   const i = e.target.closest('.oddsin'); if (!i || !window.BetbotOdds) return;
   const BO = window.BetbotOdds, m = BO.load(), v = parseFloat(String(i.value).replace(',', '.'));
-  if (v > 1) m[i.dataset.id] = v; else delete m[i.dataset.id];
+  if (v > 1) m[i.dataset.id] = v; else m[i.dataset.id] = 0;
   BO.save(m);
   const r = i.closest('.oddsrow').querySelector('.oddsres'); if (r) r.textContent = BO.res(i.dataset.s, v > 1 ? v : 0);
   const sm = document.querySelector('.oddssum');
@@ -686,7 +691,22 @@ CAL_JS = """
     load:function(){try{return JSON.parse(localStorage.getItem('betbot_odds')||'{}');}catch(e){return {};}},
     save:function(m){try{localStorage.setItem('betbot_odds',JSON.stringify(m));}catch(e){}},
     res:function(st,o){if(!o)return '';if(st==='won')return 'κέρδος +'+(2*(o-1)).toFixed(2)+'€';if(st==='lost')return 'ζημιά −2.00€';if(st==='void')return 'άκυρο';return 'σε εξέλιξη';},
-    row:function(s){var v=this.load()[s.id]||'';return '<div class="oddsrow"><label>Η απόδοση που βρήκα: <input type="number" step="0.01" min="1" inputmode="decimal" class="oddsin" data-id="'+s.id+'" data-s="'+s.s+'" value="'+v+'" placeholder="π.χ. 1.85"></label> <b class="oddsres">'+this.res(s.s,v)+'</b></div>';},
+    row:function(s){var v=this.load()[s.id]||'';return '<div class="oddsrow"><label>Η απόδοση που βρήκα: <input type="number" step="0.01" min="1" inputmode="decimal" class="oddsin" data-id="'+s.id+'" data-s="'+s.s+'" value="'+v+'" placeholder="π.χ. 1.85"></label> <b class="oddsres">'+this.res(s.s,v)+'</b> <span class="muted oddssync"></span></div>';},
+    // Συγχρονισμός μεταξύ συσκευών: η απόδοση στέλνεται στο repo (workflow odds.yml → docs/odds_user.json) με κλειδί GitHub που αποθηκεύεται ΜΟΝΟ σε αυτό τον browser.
+    msg:function(el,t){if(el)el.textContent=t;},
+    push:function(id,v,el){var self=this,tk=null;try{tk=localStorage.getItem('betbot_gh');}catch(e){}
+      if(tk===null){var k=window.prompt('Για να φαίνονται οι αποδόσεις σε ΟΛΕΣ τις συσκευές βάλε το κλειδί GitHub (fine-grained, μόνο το repo Betbot, Actions: Read and write). Αποθηκεύεται μόνο σε αυτή τη συσκευή. Άφησέ το κενό για να μένουν μόνο εδώ.');
+        tk=(k||'').trim();try{localStorage.setItem('betbot_gh',tk);}catch(e){}}
+      if(!tk){self.msg(el,'μόνο σε αυτή τη συσκευή');return;}
+      self.msg(el,'αποστολή…');
+      fetch('https://api.github.com/repos/kostmarga/Betbot/actions/workflows/odds.yml/dispatches',{method:'POST',headers:{'Authorization':'Bearer '+tk,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main',inputs:{id:id,odds:v?String(v):''}})})
+        .then(function(r){self.msg(el,r.status===204?'συγχρονίστηκε ✓ (στις άλλες συσκευές σε 1–2 λεπτά)':'δεν στάλθηκε ('+r.status+'): έλεγξε το κλειδί');})
+        .catch(function(){self.msg(el,'δεν στάλθηκε (δίκτυο)');});},
+    pull:function(){var self=this;fetch('odds_user.json?t='+Date.now()).then(function(r){return r.ok?r.json():{};}).then(function(rm){
+      var m=self.load(),ch=false;Object.keys(rm||{}).forEach(function(k){if(m[k]===undefined){m[k]=rm[k];ch=true;}});
+      if(ch)self.save(m);
+      Array.prototype.forEach.call(document.querySelectorAll('.oddsin'),function(i){var v=m[i.dataset.id];if(v&&!i.value){i.value=v;var r=i.closest('.oddsrow').querySelector('.oddsres');if(r)r.textContent=self.res(i.dataset.s,v);}});
+    }).catch(function(){});},
     sum:function(list){var m=this.load(),n=0,p=0;list.forEach(function(s){var o=m[s.id];if(!o)return;if(s.s==='won'){n++;p+=2*(o-1);}else if(s.s==='lost'){n++;p-=2;}});return n?('Με τις αποδόσεις που έβαλες: '+n+' δελτία · '+(p>=0?'κέρδος +':'ζημιά ')+p.toFixed(2)+'€ (2€ ανά δελτίο)'):'Βάλε την απόδοση που βρήκες στο πρακτορείο για να δεις κέρδος/ζημιά.';}
   };
   var el=document.getElementById('caldata');
@@ -726,6 +746,7 @@ CAL_JS = """
     out.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
   draw(); if(last) show(last);
+  window.BetbotOdds.pull();
 })();
 """
 

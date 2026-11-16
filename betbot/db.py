@@ -571,7 +571,7 @@ class DB:
             c.execute("DELETE FROM odds_history WHERE fetched_at < ?", (cut,))
             c.execute("DELETE FROM runs WHERE run_at < ?", (cut2,))
             c.execute("DELETE FROM lineups WHERE fetched_at < ?", (cut,))
-            c.execute("DELETE FROM props WHERE fetched_at < ?", (cut,))
+            c.execute("DELETE FROM props WHERE fetched_at < ?", ((datetime.now(timezone.utc) - timedelta(days=400)).strftime("%Y-%m-%dT%H:%M:%SZ"),))      # κρατιούνται για backtest (tools/closing_backtest.py)
         self.conn.execute("VACUUM")
 
     # ---------- log ----------

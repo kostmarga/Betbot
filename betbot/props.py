@@ -5,7 +5,7 @@
 ΠΙΘΑΝΟΤΗΤΑ (το πιο ευαίσθητο σημείο — δεν έχει backtest):
   • Στην ΚΥΡΙΑ γραμμή του Pinnacle (≈50/50) παίρνουμε την πιθανότητα Over από το devig των δύο τιμών.
   • Για ΑΛΛΕΣ γραμμές του ίδιου παίκτη (Stoiximan) υποθέτουμε κανονική κατανομή με μέση τιμή που ταιριάζει στην κύρια γραμμή και τυπική απόκλιση
-    σ = max(3.5, 0.30·γραμμή) (προσέγγιση για πόντους NBA)· η πιθανότητα συστέλλεται προς το 50% (`shrink`) γιατί είναι εκτίμηση χωρίς έλεγχο.
+    σ = max(7.0, 0.42·γραμμή) (backtest 17/11/2026 σε 18.022 παρατηρήσεις: το αρχικό σ=max(3.5,0.30·γραμμή) υπερτιμούσε τα Over κατά ~10 μονάδες· βλ. docs/nba_props_backtest.txt)· η πιθανότητα συστέλλεται προς το 50% (`shrink`) γιατί είναι εκτίμηση χωρίς έλεγχο.
   • Χωρίς γραμμή Pinnacle για τον παίκτη -> δεν υπάρχει επιλογή (δεν εμπιστευόμαστε το Stoiximan μόνο του).
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ def devig2(over: float, under: float) -> float:
     return a / (a + b)
 
 
-def p_over_at(line: float, base_line: float, p_base: float, k_sd: float = 0.30, min_sd: float = 3.5) -> float:
+def p_over_at(line: float, base_line: float, p_base: float, k_sd: float = 0.42, min_sd: float = 7.0) -> float:
     """Πιθανότητα Over `line`, δοσμένης της πιθανότητας Over στην κύρια γραμμή (κανονική προσέγγιση)."""
     if abs(line - base_line) < 1e-9:
         return p_base
@@ -78,7 +78,7 @@ def build(ctx, db, cfg) -> list[dict]:
                 if edge < pc.get("min_edge", -0.06):
                     continue
                 why = [f"Βάση: Pinnacle {pl} Over/Under {base['line']:g} → Over {p_main * 100:.0f}%"
-                       + ("" if abs(ln - base["line"]) < 1e-9 else f" · γραμμή {ln:g} εκτιμάται με κανονική κατανομή (σ≈{max(3.5, 0.30 * base['line']):.1f}), συστολή {int((1 - shrink) * 100)}% προς 50%"),
+                       + ("" if abs(ln - base["line"]) < 1e-9 else f" · γραμμή {ln:g} εκτιμάται με κανονική κατανομή (σ≈{max(7.0, 0.42 * base['line']):.1f}), συστολή {int((1 - shrink) * 100)}% προς 50%"),
                        "Τραυματισμοί ESPN: ο παίκτης δεν είναι δηλωμένος ως απών/αμφίβολος",
                        f"Τιμή {src.capitalize()}" + ("" if act else " — ΔΕΝ δηλώνεται ενεργή τώρα· έλεγξε την απόδοση πριν παίξεις"),
                        "Κατηγορία πειραματική: τα props έχουν μεγάλο περιθώριο και δεν υπάρχει backtest — μόνο εικονικά χρήματα"]

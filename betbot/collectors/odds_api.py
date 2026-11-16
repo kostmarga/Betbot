@@ -56,9 +56,20 @@ class OddsApiCollector(Collector):
         horizon = ctx.now + timedelta(hours=ctx.cfg["slip"]["hours_ahead"])
 
         remaining = None
-        spent, rows, notes = 0, [], []
+        # ημερήσιο ταμείο (ΣΥΝΟΛΙΚΑ όλων των εκτελέσεων της ημέρας) — πριν ήταν ανά εκτέλεση, άρα οι 11 εκτελέσεις/μέρα δεν είχαν κοινό πλαφόν
+        day = f"{ctx.now:%Y-%m-%d}"
+        part = "am" if ctx.now.hour < 10 else "mid" if ctx.now.hour < 15 else "pm"
+        try:
+            spent = int(ctx.db.ext_id("oddsapi:spent", day) or 0)
+        except Exception:
+            spent = 0
+        spent0 = spent
+        rows, notes = [], []
         for lg in ctx.leagues(odds_api=True):
             if cc.get("skip_if_fdco_covers") and fdco_on and lg.get("fdco"):
+                continue
+            gate = f"oddsapi:{lg['id']}:{day}:{part}"           # ένας γύρος ανά λίγκα ανά μέρος της ημέρας (πρωί/μεσημέρι/απόγευμα)
+            if ctx.db.cached(gate):
                 continue
             # 1) δωρεάν: υπάρχουν αγώνες;
             try:
@@ -70,6 +81,7 @@ class OddsApiCollector(Collector):
             soon = [e for e in events if parse_iso(e["commence_time"]) <= horizon
                     and parse_iso(e["commence_time"]) >= ctx.now]
             if not soon:
+                ctx.db.mark_cached(gate, iso(ctx.now))
                 continue
             mk = [m for m in markets_by_sport[lg["sport"]] if m in cc["markets"] or m == "spreads"]
             cost = len(mk) * len(cc["regions"].split(","))
@@ -80,18 +92,25 @@ class OddsApiCollector(Collector):
                 notes.append(f"{lg['id']}: παράλειψη για εξοικονόμηση credits (απομένουν {total_left})")
                 continue
             key, remaining = avail[0]
-            if not self._budget_ok(ctx, total_left, cost, spent):
+            if not self._budget_ok(ctx, total_left, cost, spent):      # spent = συνολικά σήμερα
                 notes.append(f"{lg['id']}: παράλειψη για εξοικονόμηση credits (απομένουν {total_left})")
                 continue
             # 2) αποδόσεις
-            data, resp = http_get(f"{BASE}/{lg['odds_api']}/odds", params={
-                "apiKey": key, "regions": cc["regions"], "markets": ",".join(mk),
-                "oddsFormat": "decimal", "commenceTimeFrom": iso(ctx.now), "commenceTimeTo": iso(horizon)})
+            try:
+                data, resp = http_get(f"{BASE}/{lg['odds_api']}/odds", params={
+                    "apiKey": key, "regions": cc["regions"], "markets": ",".join(mk),
+                    "oddsFormat": "decimal", "commenceTimeFrom": iso(ctx.now), "commenceTimeTo": iso(horizon)})
+            except Exception as e:           # μία λίγκα που αποτυγχάνει δεν ρίχνει τις υπόλοιπες
+                notes.append(f"{lg['id']}: ΣΦΑΛΜΑ αποδόσεων: {str(e)[:70]}")
+                continue
             remaining = int(resp.headers.get("x-requests-remaining", remaining))
             rem[keys.index(key)] = remaining
             spent += int(resp.headers.get("x-requests-last", cost))
             rows += self._parse(ctx, lg, data)
+            ctx.db.mark_cached(gate, iso(ctx.now))
         ctx.db.upsert_odds(rows)
+        ctx.db.set_ext_id("oddsapi:spent", day, str(spent))
+        spent = spent - spent0
         msg = f"{len(rows)} αποδόσεις, ξοδεύτηκαν {spent} credits"
         if remaining is not None:
             msg += f", απομένουν {sum(v for v in rem if v)}" + (f" (λογαριασμοί: {', '.join(str(v) for v in rem)})" if len(keys) > 1 else "")
@@ -138,6 +157,8 @@ class OddsApiCollector(Collector):
                 return ("1X2", sel, None)
             sel = "HOME" if name == ev["home_team"] else "AWAY"
             return ("ML", sel, None)
+        if mkey == "btts" and sport == "football":
+            return ("BTTS", "YES" if str(name).lower() == "yes" else "NO", None)
         if mkey == "totals" and point is not None:
             return ("OU" if sport == "football" else "TOTAL", name.upper(), float(point))
         if mkey == "spreads" and point is not None:

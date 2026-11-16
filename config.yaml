@@ -107,7 +107,7 @@ collectors:
   fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
   espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
-  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 8, reserve: 3, max_leagues: 12, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
+  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 8, reserve: 3, max_leagues: 12, warn_below: 40, no_pinnacle: [EL]}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
   odds_api:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
     regions: eu

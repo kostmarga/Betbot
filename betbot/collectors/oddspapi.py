@@ -132,7 +132,8 @@ class OddsPapiCollector(Collector):
     # ---- χαμηλού επιπέδου ----
     def _get(self, key, path, **params):
         time.sleep(1.1)                       # όριο ρυθμού: 1 κλήση/δευτ.
-        data, _ = http_get(BASE + path, params={**params, "apiKey": key}, timeout=60, retries=2)
+        # retries=1: κάθε προσπάθεια (και τα 4xx) μετράει στο όριο κλήσεων — ΔΕΝ ξαναδοκιμάζουμε αυτόματα
+        data, _ = http_get(BASE + path, params={**params, "apiKey": key}, timeout=60, retries=1)
         return data
 
     def _quota(self, key):
@@ -216,16 +217,24 @@ class OddsPapiCollector(Collector):
             tl = [l for l in top if leagues[l]["sport"] == sp]
             groups += [tl[i:i + 3] for i in range(0, len(tl), 3)]
         fetched, calls, n_fx, n_rows, no_mkts = iso(ctx.now), 0, 0, 0, 0
-        per_book = {}
+        per_book, notes = {}, []
+        no_pin = set(cc.get("no_pinnacle") or [])          # λίγκες που το Pinnacle ΔΕΝ καλύπτει στο OddsPapi (τεστ 17/11/2026: Euroleague -> 404)
         for book in [bk for bk in (cc.get("bookmakers") or [cc.get("bookmaker", "stoiximan"), "pinnacle"]) if bk in BOOKS]:
-            for g in groups:
+            for g0 in groups:
+                g = [l for l in g0 if not (book == "pinnacle" and l in no_pin)]
+                if not g:
+                    continue
                 if calls >= max_calls:
                     break
                 tids = ",".join(str(leagues[l]["oddspapi"]) for l in g)
                 try:
                     data = self._get(key, "/odds-by-tournaments", tournamentIds=tids, bookmaker=book, verbosity=3)
                 except Exception as e:
-                    return f"ΣΦΑΛΜΑ κλήσης ({book}): {e}"
+                    calls += 1
+                    if "404" in str(e) or "FIXTURE_NOT_FOUND" in str(e):      # δεν υπάρχουν αγώνες για αυτό το πρακτορείο: συνεχίζουμε
+                        notes.append(f"{book}: χωρίς αγώνες για {tids}")
+                        continue
+                    return f"ΣΦΑΛΜΑ κλήσης ({book}): {str(e)[:120]}"
                 calls += 1
                 for fx in data if isinstance(data, list) else []:
                     cands = [m for l in g for m in by_lg.get(l, [])]
@@ -247,5 +256,5 @@ class OddsPapiCollector(Collector):
                     per_book[book] = per_book.get(book, 0) + 1
                     n_rows += ctx.db.upsert_odds([OddsRow(hit["m"]["match_id"], mk, sel, ln, pr, 1, book, fetched) for mk, sel, ln, pr in rows])
         ctx.db.mark_cached(f"oddspapi:{slot}", iso(ctx.now))
-        return (f"{n_fx} αγώνες-πρακτορεία {per_book}, {n_rows} γραμμές · {no_mkts} χωρίς ακόμα αγορές · "
+        return (f"{n_fx} αγώνες-πρακτορεία {per_book}, {n_rows} γραμμές · {no_mkts} χωρίς ακόμα αγορές" + (" · " + "; ".join(notes) if notes else "") + " · "
                 f"κλήσεις {calls} · όριο: μένουν {left - calls}/{limit} (λογαριασμός που χρησιμοποιήθηκε)")

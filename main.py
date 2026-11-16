@@ -298,6 +298,9 @@ def main(argv=None):
             import json as _json
             qi = _json.loads(db.ext_id("oddspapi:quota", "info") or "null")
             if qi and qi.get("accounts"):
+                bad = [a["n"] for a in qi["accounts"] if a.get("ok") is False]
+                if bad:
+                    st["quota_warn"] = (st.get("quota_warn", "") + f" ΠΡΟΒΛΗΜΑ: ο λογαριασμός {', '.join(map(str, bad))} του OddsPapi δεν διαβάζεται (λάθος key ή δίκτυο).").strip()
                 tot_left = sum(a["left"] for a in qi["accounts"])
                 if tot_left <= int(qi.get("warn_below", 40)):
                     st["quota_warn"] = (f"Το OddsPapi πλησιάζει το όριο κλήσεων: μένουν {tot_left} για τον μήνα (ανανεώνεται την 1η). "
@@ -308,6 +311,9 @@ def main(argv=None):
             import json as _json
             qo = _json.loads(db.ext_id("oddsapi:quota", "info") or "null")
             if qo and qo.get("accounts"):
+                badq = [a["n"] for a in qo["accounts"] if a.get("ok") is False]
+                if badq:
+                    st["quota_warn"] = (st.get("quota_warn", "") + f" ΠΡΟΒΛΗΜΑ: ο λογαριασμός {', '.join(map(str, badq))} του The Odds API δεν διαβάζεται (λάθος key ή δίκτυο).").strip()
                 tl = sum(a["left"] for a in qo["accounts"])
                 if tl <= int(qo.get("warn_below", 60)):
                     w = (f"Το The Odds API πλησιάζει το όριο: μένουν {tl} credits για τον μήνα. "

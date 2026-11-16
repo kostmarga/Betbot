@@ -123,18 +123,20 @@ class OddsPapiCollector(Collector):
         for i, k in enumerate(keys, 1):
             q = self._quota(k)
             if q is None:
+                info.append({"n": i, "limit": 0, "used": 0, "left": 0, "ok": False})      # δεν διαβάστηκε: λάθος key ή πρόβλημα δικτύου -> σφάλμα στη σελίδα
                 continue
             lim, us = q
             info.append({"n": i, "limit": lim, "used": us, "left": lim - us})
             if key is None and lim - us > reserve:
                 key, limit, used, left = k, lim, us, lim - us
         ctx.db.set_ext_id("oddspapi:quota", "info", json.dumps({"at": iso(ctx.now), "accounts": info, "warn_below": int(cc.get("warn_below", 40))}))
-        if not info:
-            return "δεν διαβάστηκε το όριο κλήσεων (/account)· καμία κλήση"
+        if not info or not any(a.get("ok", True) for a in info):
+            return "ΣΦΑΛΜΑ: δεν διαβάστηκε το όριο κλήσεων (/account)· έλεγξε το ODDSPAPI_KEY· καμία κλήση"
         days_left = max(1, (31 - ctx.now.day))
         if key is None:
             return "όριο κλήσεων: " + ", ".join(f"λογαριασμός {a['n']}: μένουν {a['left']}" for a in info) + f" (αποθεματικό {reserve})· καμία κλήση"
-        if left / days_left < 4 and not slot.endswith("am"):
+        tot_left = sum(a["left"] for a in info)
+        if tot_left / days_left < 2 and not slot.endswith("am"):
             return f"εξοικονόμηση κλήσεων: {left} για {days_left} μέρες· παράλειψη γύρου {part}"
         mmap = self._markets(ctx, key)
         if not mmap:

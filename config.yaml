@@ -107,12 +107,12 @@ collectors:
   fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
   espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
-  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 3, reserve: 25, max_leagues: 6, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
+  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 6, reserve: 3, max_leagues: 9, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
   odds_api:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
     regions: eu
     markets: [h2h, totals]
-    monthly_budget: 480                 # κρατάμε 20 credits περιθώριο από τα 500 (ανά λογαριασμό)
+    monthly_budget: 497                 # αποθεματικό 3 credits ανά λογαριασμό: τρώμε όλα τα credits του 1ου και μετά περνάμε στον 2ο (απόφαση χρήστη 17/11/2026)
     warn_below: 60                      # κίτρινη προειδοποίηση στη σελίδα όταν τα συνολικά credits ≤ 60
     skip_if_fdco_covers: true           # μην ξοδεύεις credits για λίγκες που καλύπτει το fdco
   sofascore:

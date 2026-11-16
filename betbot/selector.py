@@ -399,6 +399,15 @@ def build_candidates(db, cfg, models, now):
     sel_cfg = cfg["selection"]
     leagues = {lg["id"]: lg for lg in cfg["leagues"]}
     horizon = now + timedelta(hours=cfg["slip"]["hours_ahead"])
+    if cfg["slip"].get("single_day", True):
+        # ΜΟΝΟ αγώνες της τρέχουσας «ημέρας στοιχημάτων» (ως 06:00 ώρα Ελλάδας της επόμενης): κάθε δελτίο ανήκει σε μία ημέρα (17/11/2026)
+        from zoneinfo import ZoneInfo
+        from .util import DAY_START_HOUR
+        loc = now.astimezone(ZoneInfo(cfg["timezone"]))
+        edge = loc.replace(hour=DAY_START_HOUR, minute=0, second=0, microsecond=0)
+        if loc >= edge:
+            edge += timedelta(days=1)
+        horizon = min(horizon, edge)
     upcoming = [m for m in db.matches(status="scheduled", since=iso(now + timedelta(minutes=20)),
                                       until=iso(horizon)) if m["league"] in leagues]
     b = sel_cfg["market_blend"]

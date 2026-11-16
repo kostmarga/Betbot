@@ -87,3 +87,21 @@ def match_fixture(home: str, away: str, candidates: list[dict], aliases: dict, t
         if score > best_score:
             best, best_score = c, score
     return (best, best_score) if best_score >= threshold else (None, best_score)
+
+
+DAY_START_HOUR = 6      # «ημέρα στοιχημάτων»: από 06:00 ώρα Ελλάδας ως 05:59 της επόμενης (ώστε τα νυχτερινά NBA να ανήκουν στη βραδιά της ημέρας τους)
+
+
+def sport_day(dt, tz):
+    """Η «ημέρα στοιχημάτων» (date) μιας στιγμής: ώρα Ελλάδας μείον 6 ώρες. Π.χ. NBA 17/11 02:00 -> ημέρα 16/11."""
+    from datetime import timedelta
+    return (dt.astimezone(tz) - timedelta(hours=DAY_START_HOUR)).date()
+
+
+def slip_day(sl, tz):
+    """Σε ποια ημέρα ανήκει ένα δελτίο: η ημέρα στοιχημάτων του ΠΡΩΤΟΥ αγώνα του (όχι η ώρα δημιουργίας)· χωρίς σκέλη -> ώρα δημιουργίας."""
+    ks = [l["kickoff"] for l in sl.get("legs") or [] if l.get("kickoff")]
+    try:
+        return sport_day(parse_iso(min(ks)) if ks else parse_iso(sl["created_at"]), tz)
+    except (ValueError, TypeError, KeyError):
+        return sport_day(parse_iso(sl["created_at"]), tz)

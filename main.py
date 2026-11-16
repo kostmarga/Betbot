@@ -81,9 +81,10 @@ def save_lists(db, cfg, now, lists, suffix=""):
     """Καταγράφει κάθε λίστα «στα χαρτιά» (1 μονάδα) για το ιστορικό ανά λίστα."""
     from zoneinfo import ZoneInfo
     tz_ = ZoneInfo(cfg["timezone"])
-    day = now.astimezone(tz_).strftime("%Y-%m-%d")    # ώρα Ελλάδας (όχι UTC): η «μέρα» είναι ίδια παντού
+    from betbot.util import sport_day
+    day = sport_day(now, tz_).strftime("%Y-%m-%d")    # «ημέρα στοιχημάτων» (06:00–05:59 ώρα Ελλάδας): η ίδια παντού
     # Το πρωινό δελτίο κλειδώνει όλη μέρα· ό,τι φτιάχτηκε πριν τις 06:00 (νυχτερινή εκτέλεση) θεωρείται ξεπερασμένο.
-    fresh_after = iso(now.astimezone(tz_).replace(hour=6, minute=0, second=0, microsecond=0))
+    fresh_after = iso(datetime.strptime(day, "%Y-%m-%d").replace(hour=6, tzinfo=tz_))
     stake = 1.0
     created = iso(now)
 

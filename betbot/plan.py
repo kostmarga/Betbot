@@ -44,7 +44,8 @@ def week_state(db, cfg, now):
     """Λογιστική της εβδομάδας ΠΡΙΝ από σήμερα (τα σημερινά δελτία είναι η πρόταση, όχι ιστορικό)."""
     br = cfg["bankroll"]
     tz = ZoneInfo(cfg["timezone"])
-    loc = now.astimezone(tz)
+    from .util import slip_day, DAY_START_HOUR
+    loc = now.astimezone(tz) - timedelta(hours=DAY_START_HOUR)      # ημέρα στοιχημάτων
     monday = (loc - timedelta(days=loc.weekday())).date()
     today = loc.date()
     settled_loss = open_stake = 0.0
@@ -52,7 +53,7 @@ def week_state(db, cfg, now):
     for sl in db.slips():
         if sl.get("list_name") not in PLAN_LISTS:
             continue
-        d = parse_iso(sl["created_at"]).astimezone(tz).date()
+        d = slip_day(sl, tz)
         if not (monday <= d < today):
             continue
         if sl["list_name"] == "x30":
@@ -79,7 +80,7 @@ def build_plan(db, cfg, now) -> dict:
     tz = ZoneInfo(cfg["timezone"])
     ws = week_state(db, cfg, now)
     todays = {s["list_name"]: s for s in db.slips()
-              if s["list_name"] in PLAN_LISTS and parse_iso(s["created_at"]).astimezone(tz).date() == ws["today"]}
+              if s["list_name"] in PLAN_LISTS and __import__("betbot.util", fromlist=["slip_day"]).slip_day(s, tz) == ws["today"]}
     unit, lot = float(br["unit"]), float(br["lottery_stake"])
     plan = {"week": ws, "items": [], "notes": [], "total": 0.0}
     if ws["stop"]:

@@ -22,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from .live import CORE_JS
-from .util import iso, parse_iso
+from .util import iso, parse_iso, sport_day
 
 BLUE, ORANGE, MUTED = "#2a78d6", "#eb6834", "#898781"
 SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)", "var(--s8)"]
@@ -93,8 +93,9 @@ def day_tag(legs, now, tz) -> str:
     """«ΣΗΜΕΡΑ» / «ΑΥΡΙΟ Τρι 17/11» / «Σήμερα–Αύριο» ανάλογα με το πότε παίζονται οι αγώνες του δελτίου (ώρα Ελλάδας)."""
     if not legs or now is None:
         return ""
-    today = now.astimezone(ZoneInfo(tz)).date()
-    days = sorted({_local(l["kickoff"], tz).date() for l in legs})
+    z = ZoneInfo(tz)
+    today = sport_day(now, z)         # «ημέρα στοιχημάτων» (06:00–05:59)· τα νυχτερινά NBA ανήκουν στη βραδιά της ημέρας τους
+    days = sorted({sport_day(parse_iso(l["kickoff"]), z) for l in legs})
     def nm(d):
         k = (d - today).days
         if k == 0:

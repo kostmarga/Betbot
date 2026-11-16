@@ -107,11 +107,12 @@ def add_live_states(data: list[dict], now, fetch=fetch_state) -> int:
 def build_data(db, cfg: dict, now) -> list[dict]:
     """Τα δελτία που φαίνονται στη live σελίδα: σημερινά + όσα έχουν ακόμα σκέλη σε εξέλιξη."""
     tz = ZoneInfo(cfg["timezone"])
-    today = now.astimezone(tz).date()
+    from .util import slip_day, sport_day
+    today = sport_day(now, tz)
     lg_espn = {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}
     out = []
     for sl in real_slips(db.slips()):
-        day = parse_iso(sl["created_at"]).astimezone(tz).date()
+        day = slip_day(sl, tz)
         any_open = any(l.get("result") in (None, "open") for l in sl["legs"])
         if not (day == today or sl["status"] == "open" or (any_open and day >= today - timedelta(days=1))):
             continue

@@ -11,7 +11,7 @@ from collections import defaultdict
 from datetime import timedelta
 from zoneinfo import ZoneInfo
 
-from .util import parse_iso
+from .util import parse_iso, slip_day, sport_day
 
 LISTS = ["recommended", "safe", "x10", "x30", "x100", "overs", "btts", "nba_pts", "combo", "corners", "cards",
          "fair_corners", "fair_cards", "fair_throw_ins", "fair_players"]
@@ -31,7 +31,7 @@ def real_slips(slips):
 
 
 def _day(sl, tz):
-    return parse_iso(sl["created_at"]).astimezone(tz).date()
+    return slip_day(sl, tz)      # ημέρα του πρώτου αγώνα (ημέρα στοιχημάτων, ώρα Ελλάδας)
 
 
 def _fair(lid):
@@ -147,7 +147,7 @@ def leg_stats(slips):
 def build(db, cfg, now):
     """Όλα τα στατιστικά + «χθες» ανά κατηγορία + σκορ αγώνων, έτοιμα για την αναφορά."""
     tz = ZoneInfo(cfg["timezone"])
-    today = now.astimezone(tz).date()
+    today = sport_day(now, tz)
     slips = real_slips(db.slips())
     from .paper import SUFFIX
     tier_slips = [s for s in db.slips() if not _LEGACY.search(s["slip_id"]) and any(

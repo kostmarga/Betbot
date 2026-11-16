@@ -21,6 +21,7 @@ ATTACK = {"F", "M"}
 
 def apply(c, ctx, cfg):
     R = cfg["rules"]
+    hard = False      # αυστηρός αποκλεισμός (φόρμα, απουσίες, rotation, κίνηση αγοράς): ισχύει ΚΑΙ για 10+/30+/100+/Over/Συνδυαστικό
     side = WIN_SELECTIONS.get((c["market"], c["selection"]))
     team = ctx.home if side == "home" else ctx.away if side == "away" else None
 
@@ -28,14 +29,14 @@ def apply(c, ctx, cfg):
     if team and c["sport"] == "football":
         ppg = ctx.ppg(team)
         if ppg is not None and ppg < R["min_ppg_for_win"]:
-            c["blocked"] |= {"recommended", "safe"}
+            c["blocked"] |= {"recommended", "safe"}; hard = True
             c["warnings"].append(f"{team}: κακή φόρμα ({ppg:.1f} β/ματς στα 5 τελευταία)")
     if team and c["sport"] in ("basketball", "nfl"):
         form = ctx.form_home if side == "home" else ctx.form_away
         if form:
             wins = sum(1 for f in form[:5] if f["r"] == "Ν") / min(5, len(form))
             if wins < R["min_basket_win_rate"]:
-                c["blocked"] |= {"recommended", "safe"}
+                c["blocked"] |= {"recommended", "safe"}; hard = True
                 c["warnings"].append(f"{team}: {wins * 100:.0f}% νίκες στα 5 τελευταία")
 
     # ── Κανόνας 2 (05/11/2026 – Leverkusen 0-1 με 8 απουσίες): πολλές απουσίες στην επίθεση
@@ -48,10 +49,10 @@ def apply(c, ctx, cfg):
     if heavy:
         txt = "; ".join(f"{t}: {n} απουσίες ({na} επιθετικοί/μέσοι)" for t, n, na in heavy)
         if (c["market"] in ("OU", "TOTAL") and c["selection"] == "OVER") or (c["market"] == "BTTS" and c["selection"] == "YES"):
-            c["blocked"] |= {"recommended", "safe"}
+            c["blocked"] |= {"recommended", "safe"}; hard = True
             c["warnings"].append(txt)
         if team and any(h[0] == team for h in heavy):
-            c["blocked"] |= {"recommended", "safe"}
+            c["blocked"] |= {"recommended", "safe"}; hard = True
             c["warnings"].append(txt)
 
     # ── Κανόνας 7 (14/11/2026 – ο έλεγχος τραυματισμών πρέπει να ΑΠΟΦΑΣΙΖΕΙ): βασικός/κορυφαίος παίκτης της ομάδας που στοιχηματίζουμε
@@ -59,7 +60,7 @@ def apply(c, ctx, cfg):
     if team:
         ka = ctx.key_absences(team)
         if ka:
-            c["blocked"] |= {"recommended", "safe"}
+            c["blocked"] |= {"recommended", "safe"}; hard = True
             c["warnings"].append(f"{team}: " + ", ".join(f"{p} ({'εκτός' if st == 'missing' else 'αμφίβολος'})" for p, st in ka[:3]) + " — βασικός παίκτης")
 
     # ── Κανόνας 8 (14/11/2026): μεγάλη αλλαγή στην ενδεκάδα/πεντάδα της ομάδας που στοιχηματίζουμε (rotation) → όχι στο Προτεινόμενο/Safe
@@ -68,7 +69,7 @@ def apply(c, ctx, cfg):
         need_ch = 3 if c["sport"] == "basketball" else 6
         ch = ctx.rotation.get(team)
         if ch is not None and ch >= need_ch:
-            c["blocked"] |= {"recommended", "safe"}
+            c["blocked"] |= {"recommended", "safe"}; hard = True
             c["warnings"].append(f"{team}: {ch} αλλαγές στην αρχική {'πεντάδα' if c['sport'] == 'basketball' else 'ενδεκάδα'} (rotation)")
 
     # ── Κανόνας 3 (05/11/2026 – Efes/Hapoel/ASVEL όλοι έχασαν): μπάσκετ ≠ «σίγουρο»
@@ -84,7 +85,7 @@ def apply(c, ctx, cfg):
     # ── Κανόνας 5: η αγορά πάει κόντρα (απόδοση ανεβαίνει πολύ)
     mv = c.get("move")
     if mv and mv["pct"] >= R["max_drift_against"]:
-        c["blocked"] |= {"recommended", "safe"}
+        c["blocked"] |= {"recommended", "safe"}; hard = True
         c["warnings"].append(f"η απόδοση ανέβηκε {mv['pct'] * 100:.0f}% (από {mv['open']:.2f} σε {mv['now']:.2f})")
 
     # ── Κανόνας 6: πολύ μικρό δείγμα για κόρνερ/κάρτες/πλάγια
@@ -93,6 +94,9 @@ def apply(c, ctx, cfg):
         cm = ctx.counts.get(metric)
         if cm is None:
             c["blocked"].add("slips")
+
+    if hard:
+        c["blocked"].add("slips")
 
 
 def reasons(c, ctx, count_models) -> list[str]:

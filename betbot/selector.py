@@ -704,6 +704,9 @@ def settle_leg(leg, match, db=None):
         ts = db.team_stats_for_match(match["match_id"])
         hv = next((r[col] for r in ts if r["is_home"] == 1), None)
         av = next((r[col] for r in ts if r["is_home"] == 0), None)
+        if m == "CARDS" and hv is not None and av is not None:      # «κάρτες» = κίτρινες + κόκκινες (1 η καθεμία) — όπως τα περισσότερα πρακτορεία
+            hv += next((r["red"] or 0 for r in ts if r["is_home"] == 1), 0)
+            av += next((r["red"] or 0 for r in ts if r["is_home"] == 0), 0)
         if hv is None or av is None:
             return "open"           # θα ξαναδοκιμάσει όταν έρθουν τα στατιστικά
         if m == "CORNERS_MORE":
@@ -724,6 +727,33 @@ def settle_leg(leg, match, db=None):
             return "void"           # η πηγή δεν έδωσε αυτό το στατιστικό -> δεν μετράει
         return "won" if v >= L else "lost"
     return "open"
+
+
+def resettle_cards(db) -> int:
+    """Ξαναϋπολογίζει σκέλη «κάρτες» που είχαν κριθεί μόνο με κίτρινες (πριν 16/11/2026)· ενημερώνει και το δελτίο. Idempotent."""
+    fixed = 0
+    for sl in db.slips():
+        legs = sl["legs"]
+        ch = False
+        for l in legs:
+            if l.get("market") == "CARDS" and l.get("result") in ("won", "lost"):
+                r = settle_leg(l, db.get_match(l["match_id"]), db)
+                if r in ("won", "lost", "void") and r != l["result"]:
+                    l["result"] = r
+                    ch = True
+        if not ch:
+            continue
+        res = [l.get("result") or "open" for l in legs]
+        if "lost" in res:
+            status, payout = "lost", 0.0
+        elif all(x in ("won", "void") for x in res):
+            status = "void" if all(x == "void" for x in res) else "won"
+            payout = sl["stake"] * math.prod(l["odds"] for l in legs if l["result"] == "won")
+        else:
+            status, payout = "open", 0.0
+        db.update_slip(sl["slip_id"], status, payout, legs)
+        fixed += 1
+    return fixed
 
 
 def settle_slips(db):

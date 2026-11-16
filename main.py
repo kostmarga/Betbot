@@ -213,6 +213,12 @@ def main(argv=None):
                 db.log(iso(now), c.name, False, traceback.format_exc())
 
     # 2) Εκκαθάριση προηγούμενων δελτίων
+    try:
+        rc = selector.resettle_cards(db)
+        if rc:
+            log.info("Επανακρίση κάρτες (κίτρινες+κόκκινες): %d δελτία", rc)
+    except Exception as e:
+        log.warning("resettle_cards: %s", e)
     settled = selector.settle_slips(db)
     if settled:
         log.info("Εκκαθαρίστηκαν %d δελτία", settled)

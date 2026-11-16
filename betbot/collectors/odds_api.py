@@ -7,7 +7,8 @@
   1. /events είναι ΔΩΡΕΑΝ → πρώτα ελέγχουμε αν η διοργάνωση έχει αγώνες στις επόμενες ώρες.
   2. Μόνο τότε καλούμε /odds.
   3. Σεβόμαστε ημερήσιο πλαφόν = credits που απομένουν / μέρες που απομένουν στον μήνα.
-Το κλειδί διαβάζεται από τη μεταβλητή περιβάλλοντος ODDS_API_KEY.
+Το κλειδί διαβάζεται από τη μεταβλητή περιβάλλοντος ODDS_API_KEY· προαιρετικός ΔΕΥΤΕΡΟΣ λογαριασμός: ODDS_API_KEY_2 (χρησιμοποιείται όταν το πρώτο
+μείνει χωρίς credits). Το υπόλοιπο κάθε λογαριασμού διαβάζεται δωρεάν από την κλήση /sports (header x-requests-remaining).
 """
 from __future__ import annotations
 
@@ -27,10 +28,29 @@ class OddsApiCollector(Collector):
     name = "odds_api"
 
     def run(self, ctx: Context) -> str:
-        key = os.environ.get("ODDS_API_KEY", "").strip()
-        if not key:
+        keys = [k.strip() for k in (os.environ.get("ODDS_API_KEY", ""), os.environ.get("ODDS_API_KEY_2", "")) if k and k.strip()]
+        if not keys:
             return "παράλειψη: δεν υπάρχει ODDS_API_KEY"
         cc = ctx.cfg["collectors"]["odds_api"]
+        reserve = 500 - cc["monthly_budget"]
+        # υπόλοιπο ανά λογαριασμό (ΔΩΡΕΑΝ κλήση /sports)
+        rem = []
+        for k in keys:
+            try:
+                _d, r0 = http_get(BASE, params={"apiKey": k}, timeout=20, retries=2)
+                rem.append(int(r0.headers.get("x-requests-remaining", 0)))
+            except Exception:
+                rem.append(None)
+        info = [{"n": i + 1, "left": (v if v is not None else 0), "ok": v is not None} for i, v in enumerate(rem)]
+        try:
+            import json as _j
+            ctx.db.set_ext_id("oddsapi:quota", "info", _j.dumps({"at": iso(ctx.now), "accounts": info, "warn_below": int(cc.get("warn_below", 60))}))
+        except Exception:
+            pass
+        if not any(v for v in rem if v):
+            return "δεν διαβάστηκε το υπόλοιπο credits· καμία κλήση"
+        pick = lambda: next((k for k, v in zip(keys, rem) if v is not None and v - reserve > 0), None)
+        key = pick() or keys[0]
         markets_by_sport = {"football": ["h2h", "totals"], "basketball": ["h2h", "totals", "spreads"]}
         fdco_on = ctx.cfg["collectors"]["fdco_odds"]["enabled"]
         horizon = ctx.now + timedelta(hours=ctx.cfg["slip"]["hours_ahead"])
@@ -53,20 +73,28 @@ class OddsApiCollector(Collector):
                 continue
             mk = [m for m in markets_by_sport[lg["sport"]] if m in cc["markets"] or m == "spreads"]
             cost = len(mk) * len(cc["regions"].split(","))
-            if not self._budget_ok(ctx, remaining, cost, spent):
-                notes.append(f"{lg['id']}: παράλειψη για εξοικονόμηση credits (απομένουν {remaining})")
+            # επιλογή λογαριασμού: ο πρώτος που έχει αρκετά credits πάνω από το αποθεματικό (ο 2ος μπαίνει όταν τελειώσει ο 1ος)
+            avail = [(k2, v) for k2, v in zip(keys, rem) if v is not None and v - reserve >= cost]
+            total_left = sum(v for v in rem if v)
+            if not avail:
+                notes.append(f"{lg['id']}: παράλειψη για εξοικονόμηση credits (απομένουν {total_left})")
+                continue
+            key, remaining = avail[0]
+            if not self._budget_ok(ctx, total_left, cost, spent):
+                notes.append(f"{lg['id']}: παράλειψη για εξοικονόμηση credits (απομένουν {total_left})")
                 continue
             # 2) αποδόσεις
             data, resp = http_get(f"{BASE}/{lg['odds_api']}/odds", params={
                 "apiKey": key, "regions": cc["regions"], "markets": ",".join(mk),
                 "oddsFormat": "decimal", "commenceTimeFrom": iso(ctx.now), "commenceTimeTo": iso(horizon)})
             remaining = int(resp.headers.get("x-requests-remaining", remaining))
+            rem[keys.index(key)] = remaining
             spent += int(resp.headers.get("x-requests-last", cost))
             rows += self._parse(ctx, lg, data)
         ctx.db.upsert_odds(rows)
         msg = f"{len(rows)} αποδόσεις, ξοδεύτηκαν {spent} credits"
         if remaining is not None:
-            msg += f", απομένουν {remaining}"
+            msg += f", απομένουν {sum(v for v in rem if v)}" + (f" (λογαριασμοί: {', '.join(str(v) for v in rem)})" if len(keys) > 1 else "")
         return msg + (" | " + "; ".join(notes) if notes else "")
 
     def _budget_ok(self, ctx, remaining, cost, spent_today):

@@ -304,6 +304,18 @@ def main(argv=None):
                                         "Φτιάξε νέο λογαριασμό στο oddspapi.io και βάλε το key στο GitHub ως ODDSPAPI_KEY_2.")
         except Exception:
             pass
+        try:                   # προειδοποίηση για το όριο credits του The Odds API
+            import json as _json
+            qo = _json.loads(db.ext_id("oddsapi:quota", "info") or "null")
+            if qo and qo.get("accounts"):
+                tl = sum(a["left"] for a in qo["accounts"])
+                if tl <= int(qo.get("warn_below", 60)):
+                    w = (f"Το The Odds API πλησιάζει το όριο: μένουν {tl} credits για τον μήνα. "
+                         + ("Έχεις και δεύτερο λογαριασμό (ODDS_API_KEY_2)." if len(qo["accounts"]) > 1 else
+                            "Βάλε δεύτερο λογαριασμό στο GitHub ως ODDS_API_KEY_2."))
+                    st["quota_warn"] = (st.get("quota_warn", "") + " " + w).strip()
+        except Exception:
+            pass
     except Exception as e:     # τα στατιστικά δεν πρέπει να ρίχνουν τη σελίδα
         log.warning("Στατιστικά: %s", e)
         st = None

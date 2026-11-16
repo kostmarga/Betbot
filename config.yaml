@@ -112,7 +112,8 @@ collectors:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
     regions: eu
     markets: [h2h, totals]
-    monthly_budget: 480                 # κρατάμε 20 credits περιθώριο από τα 500
+    monthly_budget: 480                 # κρατάμε 20 credits περιθώριο από τα 500 (ανά λογαριασμό)
+    warn_below: 60                      # κίτρινη προειδοποίηση στη σελίδα όταν τα συνολικά credits ≤ 60
     skip_if_fdco_covers: true           # μην ξοδεύεις credits για λίγκες που καλύπτει το fdco
   sofascore:
     enabled: true                       # πλάγια, κόρνερ, κάρτες, παίκτες, ενδεκάδες, απουσίες, αρχικές αποδόσεις

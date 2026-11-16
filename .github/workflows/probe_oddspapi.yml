@@ -1,0 +1,20 @@
+# ΠΡΟΣΩΡΙΝΟ τεστ (17/11/2026): Pinnacle στην Euroleague. Θα διαγραφεί μετά το τεστ.
+name: Probe OddsPapi Euroleague
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Τεστ
+        env:
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+        run: python tools/probe_oddspapi.py

@@ -183,15 +183,15 @@ lists:
                 single_min_prob: 0.65}
   safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.75, min_total: 1.85, max_total: 2.30, min_legs: 2, max_legs: 4,
                 max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)
-  x10:         {min_leg_prob: 0.62, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
-  x30:         {min_leg_prob: 0.60, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
-  x100:        {min_leg_prob: 0.55, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
-  overs:       {min_leg_prob: 0.60, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
+  x10:         {min_leg_prob: 0.65, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
+  x30:         {min_leg_prob: 0.63, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
+  x100:        {min_leg_prob: 0.60, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
+  overs:       {min_leg_prob: 0.62, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
   corners:     {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   players:     {min_leg_prob: 0.55, count: 15, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: false}
-  combo:       {min_leg_prob: 0.58, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
+  combo:       {min_leg_prob: 0.62, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
 
 # ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
 bankroll:

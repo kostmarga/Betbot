@@ -86,7 +86,8 @@ def build(db, cfg, now) -> dict:
     pc = cfg.get("paper") or {}
     weekly, need = float(pc.get("weekly", 20)), int(pc.get("min_settled", 30))
     tz = ZoneInfo(cfg["timezone"])
-    loc = now.astimezone(tz)
+    from .util import DAY_START_HOUR, slip_day
+    loc = now.astimezone(tz) - timedelta(hours=DAY_START_HOUR)      # ημέρα στοιχημάτων
     monday = (loc - timedelta(days=loc.weekday())).date()
     by = {}
     for sl in drop_tier_dups([x for x in db.slips() if not re.search(r"-\d+$", str(x["slip_id"]))]):   # χωρίς δελτία παλιάς μορφής (-N)
@@ -105,7 +106,7 @@ def build(db, cfg, now) -> dict:
             spent_w, week_spent = {}, {}
             bets = []
             for sl in slips:
-                d = parse_iso(sl["created_at"]).astimezone(tz).date()
+                d = slip_day(sl, tz)
                 wk = d - timedelta(days=d.weekday())
                 if spent_w.get(wk, 0.0) + st > weekly + 1e-9:
                     continue                                   # το ταμείο της εβδομάδας εξαντλήθηκε

@@ -25,7 +25,7 @@ from ..util import norm_team, parse_iso
 
 METRICS = {   # μετρική -> (στήλη στο team_stats, συνηθισμένες γραμμές)
     "corners": ("corners", [7.5, 8.5, 9.5, 10.5, 11.5, 12.5]),
-    "cards": ("yellow", [2.5, 3.5, 4.5, 5.5, 6.5]),
+    "cards": ("bookings", [2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5]),      # «κάρτες» = πόντοι κράτησης: κίτρινη 1 + κόκκινη 2 (όπως τα πρακτορεία και η κρίση του bot)· backtest 17/11/2026: με μόνο κίτρινες τα Under ήταν υπερβολικά σίγουρα κατά ~5 μονάδες
     "throw_ins": ("throw_ins", [32.5, 35.5, 38.5, 40.5, 42.5, 44.5, 47.5]),
 }
 LABEL = {"corners": "κόρνερ", "cards": "κάρτες", "throw_ins": "πλάγια"}
@@ -50,6 +50,8 @@ class CountModel:
 
     def fit(self, rows: list[dict], now) -> "CountModel":
         hl = self.cfg["half_life_days"]
+        if self.col == "bookings":          # πόντοι κράτησης από κίτρινες + κόκκινες
+            rows = [dict(r, bookings=(r["yellow"] + 2 * (r.get("red") or 0)) if r.get("yellow") is not None else None) for r in rows]
         # ζευγάρια (γηπεδούχος, φιλοξενούμενος) ανά αγώνα
         by_ev = defaultdict(dict)
         for r in rows:
@@ -160,7 +162,8 @@ class CountModel:
             if L <= 0 or L % 1 == 0:
                 continue
             over = float(1 - cdf[int(np.floor(L))]) if int(np.floor(L)) < len(cdf) else 0.0
-            out["lines"][L] = over
+            sh = (self.cfg.get("p_shrink") or {}).get(self.metric, 1.0)      # συστολή προς 50% όπου το backtest έδειξε υπερβολική σιγουριά
+            out["lines"][L] = 0.5 + (over - 0.5) * sh
         # ποιος θα κάνει περισσότερα
         joint = np.outer(ph, pa)
         out["more_home"] = float(np.tril(joint, -1).sum())

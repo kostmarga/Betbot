@@ -20,7 +20,7 @@ import numpy as np
 
 from . import movement, rules
 from .models import COUNT_LABEL, PROP_LABEL
-from .util import iso, norm_team
+from .util import iso, log, norm_team
 
 GROUPS = {"1X2": ["1", "X", "2"], "OU": ["OVER", "UNDER"], "BTTS": ["YES", "NO"],
           "ML": ["HOME", "AWAY"], "TOTAL": ["OVER", "UNDER"], "SPREAD": ["HOME", "AWAY"],
@@ -29,7 +29,7 @@ COUNT_MARKET = {"corners": "CORNERS", "cards": "CARDS", "throw_ins": "THROWINS"}
 MARKET_FAMILY = {"1X2": "result", "DC": "result", "ML": "result", "SPREAD": "result",
                  "OU": "goals", "BTTS": "goals", "TOTAL": "points",
                  "CORNERS": "corners", "CORNERS_MORE": "corners", "CARDS": "cards", "THROWINS": "throw_ins",
-                 "PLAYER": "players"}
+                 "PLAYER": "players", "PTS": "nba_pts"}
 
 
 def label(market, sel, line, home, away, extra=None):
@@ -405,7 +405,7 @@ def build_candidates(db, cfg, models, now):
     b_fb = sel_cfg.get("market_blend_football", b)    # ποδόσφαιρο: backtest -> βάρος μοντέλου 0
     avoid = sel_cfg.get("avoid") or []
     min_g = sel_cfg["min_team_matches"]
-    with_odds, fair, contexts = [], [], {}
+    with_odds, fair, contexts, prop_cands = [], [], {}, []
     fm, bms, cms, pm = models.get("football"), models.get("basketball", {}), models.get("counts", {}), models.get("players")
 
     for m in upcoming:
@@ -485,6 +485,13 @@ def build_candidates(db, cfg, models, now):
                 ctx.exp = f"{pred.exp_home:.0f} – {pred.exp_away:.0f} πόντοι"
                 ctx.form_home, ctx.form_away = bm.form(m["home"], 10), bm.form(m["away"], 10)
                 ctx.h2h = bm.h2h(m["home"], m["away"])
+        try:
+            from . import props as _props
+            pc_ = _props.build(ctx, db, cfg)
+        except Exception as e:                       # πειραματική κατηγορία: ποτέ δεν χαλάει τις υπόλοιπες
+            pc_ = []
+            log.error("Πόντοι NBA %s: %s", m["match_id"], e)
+        prop_cands += pc_
         if not probs:
             continue
         contexts[m["match_id"]] = ctx
@@ -508,7 +515,7 @@ def build_candidates(db, cfg, models, now):
                 if pm_ >= sel_cfg["fair_min_prob"] and fair_o >= sel_cfg["fair_min_odds"]:
                     c["play_if"] = round((1 / pm_) * (1 + sel_cfg["fair_value_margin"]), 2)
                     fair.append(c)
-    return {"with_odds": with_odds, "fair": fair, "contexts": contexts}
+    return {"with_odds": with_odds, "fair": fair, "contexts": contexts, "props": prop_cands}
 
 
 def pm_key(pm, team):
@@ -664,6 +671,12 @@ def build_lists(cands: dict, cfg) -> dict:
     else:
         out["btts"] = {"picks": [], "slip": None}
 
+    # 🏀 Πόντοι παικτών NBA (πειραματικό, μόνο παπέρ): ένα σκέλος ανά αγώνα
+    nc = L.get("nba_pts")
+    pp = [c for c in cands.get("props", []) if c["p"] >= nc.get("min_leg_prob", 0)] if nc else []
+    out["nba_pts"] = {"picks": sorted(pp, key=lambda c: -c["p"])[:nc["count"]] if nc else [],
+                      "slip": build_slip(pp, nc["min_total"], nc["max_total"], nc["min_legs"], nc["max_legs"], cfg, max_basket=99) if nc and len(pp) >= nc["min_legs"] else None}
+
     # 🚩 Κόρνερ · 🟨 Κάρτες · ↔️ Πλάγια · 👤 Παίκτες (με ή χωρίς απόδοση)
     for lid, fam in (("corners", "corners"), ("cards", "cards"), ("throw_ins", "throw_ins"), ("players", "players")):
         x = L[lid]
@@ -752,6 +765,9 @@ def settle_leg(leg, match, db=None):
             return "won" if (hv > av) == (s == "HOME") else "lost"
         t = hv + av
         return "won" if (t > L) == (s == "OVER") else "lost"
+    if m == "PTS" and db is not None:
+        from . import props
+        return props.settle(leg, match, db)
     if m == "PLAYER" and db is not None:
         player, prop = s.split("|")
         col = {"SOT": "sot", "SHOTS": "shots", "FOULS": "fouls", "CARD": "yellow", "GOAL": "goals"}[prop]

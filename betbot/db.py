@@ -61,6 +61,30 @@ CREATE TABLE IF NOT EXISTS odds_history (
 );
 CREATE INDEX IF NOT EXISTS ix_oh_match ON odds_history(match_id);
 
+-- Πρόβολες πρακτορείων για παίκτες (NBA: πόντοι)· μία γραμμή ανά (αγώνας, παίκτης, στατιστικό, γραμμή, πρακτορείο)
+CREATE TABLE IF NOT EXISTS props (
+    match_id   TEXT NOT NULL,
+    player     TEXT NOT NULL,          -- κανονικοποιημένο όνομα «Όνομα Επώνυμο»
+    stat       TEXT NOT NULL,          -- PTS
+    line       REAL NOT NULL,
+    over_price REAL NOT NULL,
+    under_price REAL NOT NULL,
+    active     INTEGER,                -- 1 = το πρακτορείο δηλώνει ενεργή τιμή
+    source     TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (match_id, player, stat, line, source)
+);
+
+-- Boxscore NBA ανά παίκτη (για την κρίση των δελτίων «Πόντοι NBA»)
+CREATE TABLE IF NOT EXISTS nba_box (
+    match_id TEXT NOT NULL,
+    team     TEXT NOT NULL,
+    player   TEXT NOT NULL,
+    minutes  REAL,
+    points   INTEGER,
+    PRIMARY KEY (match_id, team, player)
+);
+
 -- Στατιστικά ομάδας ανά αγώνα (κόρνερ, κάρτες, πλάγια, σουτ, φάουλ)
 CREATE TABLE IF NOT EXISTS team_stats (
     event_key  TEXT NOT NULL,          -- '<πηγή>:<id αγώνα στην πηγή>'
@@ -396,6 +420,31 @@ class DB:
                 f"INSERT OR REPLACE INTO player_stats({','.join(cols)}) VALUES({','.join(':' + k for k in cols)})", rows)
         return len(rows)
 
+    def upsert_props(self, rows) -> int:
+        rows = list(rows)
+        if not rows:
+            return 0
+        with self.tx() as c:
+            c.executemany("""INSERT INTO props(match_id,player,stat,line,over_price,under_price,active,source,fetched_at)
+                VALUES(:match_id,:player,:stat,:line,:over_price,:under_price,:active,:source,:fetched_at)
+                ON CONFLICT(match_id,player,stat,line,source) DO UPDATE SET over_price=excluded.over_price,
+                  under_price=excluded.under_price, active=excluded.active, fetched_at=excluded.fetched_at""", rows)
+        return len(rows)
+
+    def props_for(self, match_id):
+        return [dict(r) for r in self.conn.execute("SELECT * FROM props WHERE match_id=?", (match_id,))]
+
+    def upsert_box(self, rows) -> int:
+        rows = list(rows)
+        if not rows:
+            return 0
+        with self.tx() as c:
+            c.executemany("INSERT OR REPLACE INTO nba_box(match_id,team,player,minutes,points) VALUES(:match_id,:team,:player,:minutes,:points)", rows)
+        return len(rows)
+
+    def box_for(self, match_id):
+        return [dict(r) for r in self.conn.execute("SELECT * FROM nba_box WHERE match_id=?", (match_id,))]
+
     def team_stats(self, since=None, league=None):
         q, p = "SELECT * FROM team_stats WHERE 1=1", []
         if since:
@@ -522,6 +571,7 @@ class DB:
             c.execute("DELETE FROM odds_history WHERE fetched_at < ?", (cut,))
             c.execute("DELETE FROM runs WHERE run_at < ?", (cut2,))
             c.execute("DELETE FROM lineups WHERE fetched_at < ?", (cut,))
+            c.execute("DELETE FROM props WHERE fetched_at < ?", (cut,))
         self.conn.execute("VACUUM")
 
     # ---------- log ----------

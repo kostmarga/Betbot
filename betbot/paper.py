@@ -24,10 +24,10 @@ from .util import parse_iso
 TIERS = ("strong", "balanced", "bold")
 SUFFIX = {"strong": "~s", "balanced": "", "bold": "~b"}
 TIER_NAME = {"strong": "Υψηλή πιθανότητα", "balanced": "Μέση πιθανότητα", "bold": "Χαμηλή πιθανότητα"}   # ονόματα επιπέδων βάσει πιθανότητας σκέλους (16/11/2026· πριν: Δυνατό/Ισορροπημένο/Τολμηρό)
-CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "btts", "combo", "corners", "cards",
+CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "btts", "nba_pts", "combo", "corners", "cards",
         "fair_corners", "fair_cards", "fair_players")
 CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-            "overs": "Over", "btts": "BTTS", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες",
+            "overs": "Over", "btts": "BTTS", "nba_pts": "🏀 Πόντοι NBA", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες",
             "fair_corners": "🚩 Κόρνερ (χωρίς απόδοση)", "fair_cards": "🟨 Κάρτες (χωρίς απόδοση)", "fair_players": "👤 Παίκτες (χωρίς απόδοση)"}
 LOTTERY = ("x10", "x30", "x100")      # 1€ ανά δελτίο (όπως στο πλάνο και στη σελίδα· πριν 16/11/2026 το 10+ μετριόταν με 2€)
 

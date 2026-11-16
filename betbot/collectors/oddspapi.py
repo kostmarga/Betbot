@@ -25,9 +25,9 @@ from .base import Collector, Context
 
 BASE = "https://api.oddspapi.io/v4"
 MARKET_TYPES = {"totals-corners": "CORNERS", "totals-bookings": "CARDS"}
-MAP_VERSION = 3
+MAP_VERSION = 4
 # ποια αγορές θέλουμε από κάθε πρακτορείο: Stoiximan = οι τιμές που παίζεις· Pinnacle = πρακτορείο αναφοράς για τις πιθανότητες (devig)
-BOOKS = {"stoiximan": {"CORNERS", "CARDS", "1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD"}, "pinnacle": {"1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD"}}
+BOOKS = {"stoiximan": {"CORNERS", "CARDS", "1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD", "PTS"}, "pinnacle": {"1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD", "PTS"}}
 SPORT_ID = {"football": 10, "basketball": 11, "nfl": 14}      # sportId του OddsPapi
 # Μπάσκετ/NFL: οι κύριες αγορές έχουν περίοδο «result» και όνομα «… (incl. overtime)» (επιβεβαιώθηκε με τεστ 17/11/2026)
 US_TOTAL_NAME = {11: "Over Under (incl. overtime)", 14: "Total (incl. overtime)"}
@@ -42,6 +42,12 @@ def build_market_map(markets: list) -> dict:
     out = {}
     for m in markets or []:
         if m.get("playerProp"):
+            # NBA: «Over Under Player Points (incl. overtime)» — μία αγορά ανά (παίκτης, γραμμή)· η γραμμή είναι το handicap (τεστ 17/11/2026)
+            if m.get("sportId") == 11 and m.get("marketType") == "playertotals-points" and m.get("period") == "result" and m.get("handicap") is not None:
+                oraw = {str(o.get("outcomeName") or "").strip().lower(): str(o.get("outcomeId")) for o in (m.get("outcomes") or [])}
+                h = float(m["handicap"])
+                if {"over", "under"} <= set(oraw) and abs(h % 1 - 0.5) < 1e-9:
+                    out[str(m.get("marketId"))] = {"m": "PTS", "line": h, "outs": {oraw["over"]: "OVER", oraw["under"]: "UNDER"}}
             continue
         sid, name = m.get("sportId"), (m.get("marketName") or "").strip()
         if sid in (11, 14) and m.get("period") == "result":          # NBA/NFL: νικητής, χάντικαπ, totals ΜΕ παράταση
@@ -124,6 +130,38 @@ def parse_fixture_odds(fx: dict, bookmaker: str, mmap: dict, allowed=None) -> li
     if any(r[0] == "SPREAD" for r in rows) and not spreads_consistent(rows):
         rows = [r for r in rows if r[0] != "SPREAD"]
     return rows
+
+
+def norm_player(name: str) -> str:
+    """«Wagner, Franz» -> «Franz Wagner»· χωρίς τόνους/τελείες, ώστε να ταιριάζει με το ESPN."""
+    import unicodedata
+    n = (name or "").strip()
+    if "," in n:
+        a, b = n.split(",", 1)
+        n = f"{b.strip()} {a.strip()}"
+    n = "".join(ch for ch in unicodedata.normalize("NFKD", n) if not unicodedata.combining(ch))
+    return " ".join(n.replace(".", "").replace("'", "").split())
+
+
+def parse_fixture_props(fx: dict, bookmaker: str, mmap: dict) -> list[dict]:
+    """[{player, line, over, under, active}] για πόντους παικτών ενός αγώνα. Μόνο πλήρη ζεύγη Over/Under με τιμές > 1."""
+    bo = ((fx.get("bookmakerOdds") or {}).get(bookmaker) or {}).get("markets") or {}
+    out = []
+    for mid, m in bo.items():
+        d = mmap.get(str(mid))
+        if not d or d["m"] != "PTS":
+            continue
+        per = {}
+        for oid, sel in d["outs"].items():
+            for pid, pl in (((m.get("outcomes") or {}).get(oid) or {}).get("players") or {}).items():
+                if pid == "0" or not pl.get("price") or float(pl["price"]) <= 1.0:
+                    continue
+                per.setdefault(pid, {"name": pl.get("playerName") or "", "act": True})[sel] = float(pl["price"])
+                per[pid]["act"] = per[pid]["act"] and pl.get("active") is not False
+        for pid, v in per.items():
+            if "OVER" in v and "UNDER" in v and v["name"]:
+                out.append({"player": norm_player(v["name"]), "line": d["line"], "over": round(v["OVER"], 3), "under": round(v["UNDER"], 3), "active": int(v["act"])})
+    return out
 
 
 class OddsPapiCollector(Collector):
@@ -216,7 +254,7 @@ class OddsPapiCollector(Collector):
         for sp in SPORT_ID:
             tl = [l for l in top if leagues[l]["sport"] == sp]
             groups += [tl[i:i + 3] for i in range(0, len(tl), 3)]
-        fetched, calls, n_fx, n_rows, no_mkts = iso(ctx.now), 0, 0, 0, 0
+        fetched, calls, n_fx, n_rows, no_mkts, n_props = iso(ctx.now), 0, 0, 0, 0, 0
         per_book, notes = {}, []
         no_pin = set(cc.get("no_pinnacle") or [])          # λίγκες που το Pinnacle ΔΕΝ καλύπτει στο OddsPapi (τεστ 17/11/2026: Euroleague -> 404)
         for book in [bk for bk in (cc.get("bookmakers") or [cc.get("bookmaker", "stoiximan"), "pinnacle"]) if bk in BOOKS]:
@@ -248,6 +286,10 @@ class OddsPapiCollector(Collector):
                         dt = 0
                     if dt > 4 * 3600:
                         continue
+                    pr_rows = parse_fixture_props(fx, book, mmap) if leagues[hit["m"]["league"]]["sport"] == "basketball" else []
+                    if pr_rows:
+                        n_props += ctx.db.upsert_props([{"match_id": hit["m"]["match_id"], "player": r["player"], "stat": "PTS", "line": r["line"], "over_price": r["over"],
+                                                         "under_price": r["under"], "active": r["active"], "source": book, "fetched_at": fetched} for r in pr_rows])
                     rows = parse_fixture_odds(fx, book, mmap, BOOKS[book])
                     if not rows:
                         no_mkts += 1
@@ -256,5 +298,5 @@ class OddsPapiCollector(Collector):
                     per_book[book] = per_book.get(book, 0) + 1
                     n_rows += ctx.db.upsert_odds([OddsRow(hit["m"]["match_id"], mk, sel, ln, pr, 1, book, fetched) for mk, sel, ln, pr in rows])
         ctx.db.mark_cached(f"oddspapi:{slot}", iso(ctx.now))
-        return (f"{n_fx} αγώνες-πρακτορεία {per_book}, {n_rows} γραμμές · {no_mkts} χωρίς ακόμα αγορές" + (" · " + "; ".join(notes) if notes else "") + " · "
+        return (f"{n_fx} αγώνες-πρακτορεία {per_book}, {n_rows} γραμμές, {n_props} πρόβολες παικτών · {no_mkts} χωρίς ακόμα αγορές" + (" · " + "; ".join(notes) if notes else "") + " · "
                 f"κλήσεις {calls} · όριο: μένουν {left - calls}/{limit} (λογαριασμός που χρησιμοποιήθηκε)")

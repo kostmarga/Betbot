@@ -124,7 +124,7 @@ def save_lists(db, cfg, now, lists, suffix=""):
     if rec["slip"]:
         put("recommended", rec["slip"]["legs"], rec["slip"]["total_odds"], rec["slip"]["p_win"])
     # Ένα δελτίο ανά κατηγορία (ο χρήστης παίζει ΜΟΝΟ δελτία): safe, over, κόρνερ, κάρτες, πλάγια, παίκτες
-    for lid in ("safe", "overs"):
+    for lid in ("safe", "overs", "btts"):
         sl = lists[lid].get("slip")
         if sl:
             put(lid, sl["legs"], sl["total_odds"], sl["p_win"])

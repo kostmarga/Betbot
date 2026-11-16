@@ -13,12 +13,12 @@ from zoneinfo import ZoneInfo
 
 from .util import parse_iso
 
-LISTS = ["recommended", "safe", "x10", "x30", "x100", "overs", "combo",
+LISTS = ["recommended", "safe", "x10", "x30", "x100", "overs", "btts", "combo", "corners", "cards",
          "fair_corners", "fair_cards", "fair_throw_ins", "fair_players"]
 NAMES = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-         "overs": "Over", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
+         "overs": "Over", "btts": "BTTS", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "combo": "🔀 Συνδυαστικό", "fair_corners": "🚩 Κόρνερ", "fair_cards": "🟨 Κάρτες",
          "fair_throw_ins": "↔️ Πλάγια", "fair_players": "👤 Παίκτες"}
-TAB_LIST = {"recommended": "recommended", "safe": "safe", "x10": "x10", "x30": "x30", "x100": "x100", "overs": "overs",
+TAB_LIST = {"recommended": "recommended", "safe": "safe", "x10": "x10", "x30": "x30", "x100": "x100", "overs": "overs", "btts": "btts",
             "combo": "combo", "corners": "fair_corners", "cards": "fair_cards", "throw_ins": "fair_throw_ins",
             "players": "fair_players"}
 _LEGACY = re.compile(r"-\d+$")

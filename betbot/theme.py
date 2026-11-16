@@ -118,6 +118,7 @@ table.picks td.o b,table.picks td.q b{font-family:var(--mono)}
 .tk[data-c=play],.tk[data-c=ok]{color:var(--s1)}.tk[data-c=bad]{color:var(--s2)}.tk[data-c=wait],.tk[data-c=pending],.tk[data-c=na],.tk[data-c=void]{color:var(--muted)}
 .scr{font-size:12.5px;color:var(--muted)}.cnt{font-size:13px;margin:8px 0;color:var(--ink2)}
 .banner{background:#fff4d6;color:#5c4400;border:1px solid #efd37a;border-radius:8px;padding:9px 12px;margin:10px 0;font-size:13.5px}.banner a{color:inherit;font-weight:700}
+.daytag{margin-left:4px}.daytag.fut{background:var(--accent);color:#fff}
 .vd{font-size:11.5px;padding:2px 8px;border-radius:5px;background:var(--chip);white-space:nowrap;font-weight:700;vertical-align:middle;letter-spacing:.02em}
 .b-won{color:var(--goodtxt);background:var(--accent-soft)}.b-lost{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
 .b-live{color:var(--s1);background:color-mix(in srgb,var(--s1) 13%,transparent)}.b-wait,.b-pending{color:var(--muted)}

@@ -23,9 +23,11 @@ from .util import parse_iso
 TIERS = ("strong", "balanced", "bold")
 SUFFIX = {"strong": "~s", "balanced": "", "bold": "~b"}
 TIER_NAME = {"strong": "Δυνατό", "balanced": "Ισορροπημένο", "bold": "Τολμηρό"}
-CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "combo", "corners", "cards")
+CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "combo", "corners", "cards",
+        "fair_corners", "fair_cards", "fair_players")
 CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",
-            "overs": "Over", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες"}
+            "overs": "Over", "combo": "🔀 Συνδυαστικό", "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες",
+            "fair_corners": "🚩 Κόρνερ (χωρίς απόδοση)", "fair_cards": "🟨 Κάρτες (χωρίς απόδοση)", "fair_players": "👤 Παίκτες (χωρίς απόδοση)"}
 LOTTERY = ("x30", "x100")
 
 
@@ -107,7 +109,10 @@ def build(db, cfg, now) -> dict:
                 if spent_w.get(wk, 0.0) + st > weekly + 1e-9:
                     continue                                   # το ταμείο της εβδομάδας εξαντλήθηκε
                 spent_w[wk] = spent_w.get(wk, 0.0) + st
-                profit = (st * sl["total_odds"] - st) if sl["status"] == "won" else (-st if sl["status"] == "lost" else (0.0 if sl["status"] == "void" else None))
+                if cat.startswith("fair_"):      # χωρίς απόδοση πρακτορείου: μετράμε μόνο επιτυχία (το «κέρδος» 0 είναι placeholder και δεν εμφανίζεται)
+                    profit = 0.0 if sl["status"] in ("won", "lost", "void") else None
+                else:
+                    profit = (st * sl["total_odds"] - st) if sl["status"] == "won" else (-st if sl["status"] == "lost" else (0.0 if sl["status"] == "void" else None))
                 bets.append({"day": d, "wk": wk, "stake": st, "profit": profit, "status": sl["status"], "odds": sl["total_odds"], "p": sl["model_prob"]})
             settled = [b for b in bets if b["profit"] is not None and b["status"] != "void"]
             won = sum(1 for b in settled if b["status"] == "won")
@@ -115,7 +120,12 @@ def build(db, cfg, now) -> dict:
             profit = sum(b["profit"] for b in settled)
             roi = (profit / staked) if staked else None
             ci = _boot([b["profit"] / b["stake"] for b in settled]) if len(settled) >= need else None
-            vkey, vtxt = _verdict(len(settled), ci, need)
+            fair = cat.startswith("fair_")
+            if fair:                                   # δεν υπάρχει απόδοση πρακτορείου: ούτε ROI ούτε κρίση κέρδους
+                roi, ci = None, None
+                vkey, vtxt = "wait", (f"⏳ {len(settled)}/{need}" if len(settled) < need else "μετράμε επιτυχία")
+            else:
+                vkey, vtxt = _verdict(len(settled), ci, need)
             wk_bets = [b for b in bets if b["wk"] == monday]
             wk_open = sum(b["stake"] for b in wk_bets if b["profit"] is None)
             wk_pl = sum(b["profit"] for b in wk_bets if b["profit"] is not None)
@@ -123,15 +133,21 @@ def build(db, cfg, now) -> dict:
             for b in settled:
                 day_pl[b["day"]] = day_pl.get(b["day"], 0.0) + b["profit"]
             green_days = (sum(1 for v in day_pl.values() if v > 0) / len(day_pl)) if day_pl else None
+            if fair:
+                day_pl = {}
+                green_days = None
             wk_pl_all = {}
             for b in settled:
                 if b["wk"] < monday:
                     wk_pl_all[b["wk"]] = wk_pl_all.get(b["wk"], 0.0) + b["profit"]
             green_weeks = (sum(1 for v in wk_pl_all.values() if v > 0) / len(wk_pl_all)) if wk_pl_all else None
+            if fair:
+                green_weeks = None
             cum, series = 0.0, []
             for b in sorted((b for b in bets if b["profit"] is not None), key=lambda b: b["day"]):
                 cum += b["profit"]
-                series.append([b["day"].isoformat(), round(cum, 2)])
+                if not cat.startswith("fair_"):
+                    series.append([b["day"].isoformat(), round(cum, 2)])
             weeks = {}
             for b in bets:
                 if b["profit"] is not None:
@@ -146,7 +162,7 @@ def build(db, cfg, now) -> dict:
                     w[0] += b["status"] == "won"
                     w[1] += 1
             avg_days = (sum(w[0] / w[1] * 7 for w in done_weeks.values()) / len(done_weeks)) if done_weeks else None
-            rows.append({"cat": cat, "tier": tier, "n": len(bets), "settled": len(settled), "won": won,
+            rows.append({"fair": cat.startswith("fair_"), "be_odds": (1 / (won / len(settled))) if (settled and won) else None, "cat": cat, "tier": tier, "n": len(bets), "settled": len(settled), "won": won,
                          "lost": len(settled) - won, "open": len(bets) - len([b for b in bets if b["profit"] is not None]),
                          "hit": (won / len(settled)) if settled else None, "staked": staked, "profit": profit, "roi": roi,
                          "ci": ci, "verdict": vkey, "verdict_text": vtxt, "avg_odds": (sum(b["odds"] for b in settled) / len(settled)) if settled else None,

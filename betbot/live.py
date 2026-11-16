@@ -220,7 +220,7 @@ function judge(l, st) {
   if (m === 'OU') return ou(h + a, 'γκολ');
   if (m === 'TOTAL') return ou(h + a, 'πόντοι');
   if (m === 'CORNERS') return ou(tot('corners'), 'κόρνερ');
-  if (m === 'CARDS') return ou(tot('yellow'), 'κίτρινες');
+  if (m === 'CARDS') { const y = tot('yellow'), r = tot('red'); return ou(y == null ? null : y + (r || 0), 'κάρτες'); }
   if (m === 'CORNERS_MORE') {
     const x = st.stats.home && st.stats.home.corners, y = st.stats.away && st.stats.away.corners;
     if (x == null || y == null) return ['na', 'κόρνερ: χωρίς στοιχεία'];

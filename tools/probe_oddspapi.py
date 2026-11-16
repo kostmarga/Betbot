@@ -1,9 +1,10 @@
-"""ΠΡΟΣΩΡΙΝΟ τεστ #2 (17/11/2026): δίνουν τιμές Stoiximan/Bet365 στο δωρεάν πακέτο; Υπάρχουν κόρνερ/κάρτες σε μεγάλη λίγκα;
-Υπάρχουν props NFL/NBA/τένις; Το key έρχεται από το secret ODDSPAPI_KEY και ΔΕΝ τυπώνεται· ΔΕΝ τυπώνουμε στοιχεία λογαριασμού. Θα σβηστεί μετά."""
+"""ΠΡΟΣΩΡΙΝΟ τεστ #3 (17/11/2026): κόρνερ/κάρτες σε αγώνα που ξεκινά σύντομα, Bet365, NFL, δομή τιμών props NBA.
+Με παύσεις (όριο ρυθμού). Το key έρχεται από το secret ODDSPAPI_KEY και ΔΕΝ τυπώνεται· δεν τυπώνουμε στοιχεία λογαριασμού. Θα σβηστεί μετά."""
 import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 import requests
 
@@ -12,98 +13,109 @@ B = "https://api.oddspapi.io/v4"
 calls = 0
 
 
-def get(path, quiet=False, **p):
+def get(path, quiet=True, **p):
     global calls
-    calls += 1
     p["apiKey"] = KEY
-    try:
-        r = requests.get(B + path, params=p, timeout=60)
-    except Exception as e:
-        print("  ΣΦΑΛΜΑ δικτύου", path, type(e).__name__)
+    for attempt in range(4):
+        calls += 1
+        time.sleep(1.3)
+        try:
+            r = requests.get(B + path, params=p, timeout=60)
+        except Exception as e:
+            print("  ΣΦΑΛΜΑ δικτύου", path, type(e).__name__)
+            return None
+        if r.status_code == 200:
+            try:
+                return r.json()
+            except Exception:
+                return None
+        if "RATE_LIMITED" in r.text:
+            time.sleep(2.5)
+            continue
+        print(f"  {path} {r.status_code}: {r.text[:160]}".replace(KEY, "***"))
         return None
-    if not quiet:
-        print(f"GET {path} { {k: v for k, v in p.items() if k not in ('apiKey',)} } -> {r.status_code}")
-    if r.status_code != 200:
-        print("   ", r.text[:200].replace(KEY, "***"))
-        return None
-    try:
-        return r.json()
-    except Exception:
-        return None
+    print("  rate limit συνεχίστηκε", path)
+    return None
 
 
 if not KEY:
     sys.exit("Δεν υπάρχει ODDSPAPI_KEY")
-mk = get("/markets", quiet=True) or []
+mk = get("/markets") or []
 names = {str(m.get("marketId")): (m.get("marketName") or "") for m in mk if isinstance(m, dict)}
-sets = {
-    "corners": {k for k, v in names.items() if re.search(r"corner", v, re.I)},
-    "cards": {k for k, v in names.items() if re.search(r"card|booking", v, re.I)},
-    "player_props": {k for k, v in names.items() if re.search(r"player|passing|rushing|receiving|points \(player|assists \(player|rebounds \(player", v, re.I)},
-}
-print("κατάλογος αγορών:", len(names), {k: len(v) for k, v in sets.items()})
+sets = {"corners": {k for k, v in names.items() if re.search(r"corner", v, re.I)},
+        "cards": {k for k, v in names.items() if re.search(r"card|booking", v, re.I)}}
 now = datetime.now(timezone.utc)
 
 
-def fixtures(sport, tname_re, days=4, limit=1):
-    t = get("/tournaments", quiet=True, sportId=sport) or []
-    cand = [x for x in t if isinstance(x, dict) and re.search(tname_re, x.get("tournamentName") or "", re.I) and "U2" not in (x.get("tournamentName") or "")]
-    cand = sorted(cand, key=lambda x: -(x.get("futureFixtures") or 0))
+def upcoming(sport, within_h, tre=None, max_t=12, max_f=8):
+    t = get("/tournaments", sportId=sport) or []
+    t = [x for x in t if isinstance(x, dict) and (x.get("upcomingFixtures") or 0) > 0 and (not tre or re.search(tre, x.get("tournamentName") or "", re.I))]
+    t = sorted(t, key=lambda x: -(x.get("upcomingFixtures") or 0))[:max_t]
     out = []
-    for tt in cand[:4]:
-        f = get("/fixtures", quiet=True, tournamentId=tt["tournamentId"]) or []
+    for tt in t:
+        f = get("/fixtures", tournamentId=tt["tournamentId"]) or []
         for x in f if isinstance(f, list) else []:
             try:
                 st = datetime.fromisoformat(x["startTime"].replace("Z", "+00:00"))
             except Exception:
                 continue
-            if x.get("hasOdds") and now < st < now + timedelta(days=days):
-                out.append((tt.get("tournamentName"), x))
-        if len(out) >= limit:
+            if x.get("hasOdds") and now < st < now + timedelta(hours=within_h):
+                out.append((tt["tournamentName"], x))
+        if len(out) >= max_f:
             break
-    return out[:limit]
+    return out
 
 
-def probe(label, sport, tre, books, days=4):
-    fl = fixtures(sport, tre, days)
-    if not fl:
-        print(f"[{label}] δεν βρέθηκε αγώνας με αποδόσεις στις επόμενες {days} μέρες")
-        return
-    tname, fx = fl[0]
-    print(f"[{label}] {tname}: {fx.get('participant1Name')} - {fx.get('participant2Name')} ({fx.get('startTime')})")
+def books_report(fx, books, label):
     for bk in books:
-        d = get("/odds", quiet=True, fixtureId=fx["fixtureId"], bookmakers=bk)
-        if not isinstance(d, dict):
-            print(f"   {bk}: ΚΑΜΙΑ απάντηση / περιορισμένο")
-            continue
-        bo = (d.get("bookmakerOdds") or {}).get(bk) or {}
+        d = get("/odds", fixtureId=fx["fixtureId"], bookmakers=bk)
+        bo = ((d or {}).get("bookmakerOdds") or {}).get(bk) or {}
         ms = bo.get("markets") or {}
         info = {"αγορές": len(ms)}
         for nm, st in sets.items():
-            ids = [m for m in ms if str(m) in st]
-            if ids:
-                info[nm] = len(ids)
-        print(f"   {bk}: {info}")
-        # δείγμα τιμών κόρνερ/κάρτες/props
-        for nm in ("corners", "cards", "player_props"):
-            ids = [m for m in ms if str(m) in sets[nm]][:2]
-            for m in ids:
-                outs = (ms[m].get("outcomes") or {})
-                sample = []
-                for oid, o in list(outs.items())[:3]:
-                    pr = ((o.get("players") or {}).get("0") or {}).get("price")
-                    sample.append(pr)
-                print(f"        {nm}: {names.get(str(m))} | τιμές {sample}")
+            n = sum(1 for m in ms if str(m) in st)
+            if n:
+                info[nm] = n
+        print(f"   [{label}] {bk}: {info}" + ("" if d else "  (καμία απάντηση)"))
+        yield bk, ms
 
 
-books = ["stoiximan", "bet365", "pinnacle", "novibet"]
-print("== ΠΟΔΟΣΦΑΙΡΟ (μεγάλη λίγκα)")
-for lab, tre in (("EPL", r"^Premier League$"), ("LaLiga", r"^LaLiga$"), ("Bundesliga", r"^Bundesliga$")):
-    probe(lab, 10, tre, books, days=5)
-print("== NFL")
-probe("NFL", 14, r"^NFL$", ["stoiximan", "bet365", "pinnacle", "draftkings"], days=5)
-print("== NBA")
-probe("NBA", 11, r"^NBA$", ["stoiximan", "bet365", "pinnacle", "draftkings"], days=3)
-print("== ΤΕΝΙΣ")
-probe("ATP", 12, r"ATP", ["stoiximan", "bet365", "pinnacle"], days=2)
+print("== ΠΟΔΟΣΦΑΙΡΟ: αγώνες που ξεκινούν σε <48 ώρες")
+fl = upcoming(10, 48)
+print("  βρέθηκαν:", [(t, f.get("participant1Name"), f.get("participant2Name"), f.get("startTime")[:16]) for t, f in fl[:8]])
+done = 0
+for t, fx in fl:
+    if done >= 3:
+        break
+    print(f"  --- {t}: {fx.get('participant1Name')} - {fx.get('participant2Name')} ({fx.get('startTime')})")
+    had = False
+    sample_printed = False
+    for bk, ms in books_report(fx, ["stoiximan", "bet365", "pinnacle"], "soccer"):
+        for nm in ("corners", "cards"):
+            ids = [m for m in ms if str(m) in sets[nm]]
+            if ids and not sample_printed:
+                m = ids[0]
+                print(f"      δείγμα {nm}: {names.get(str(m))} | JSON:", json.dumps(ms[m])[:420])
+                sample_printed = True
+            had = had or bool(ids)
+    done += 1
+print("== NFL (Ravens-Chargers)")
+fl = upcoming(14, 30, tre=r"^NFL$", max_t=2, max_f=1)
+if fl:
+    t, fx = fl[0]
+    print(f"  {fx.get('participant1Name')} - {fx.get('participant2Name')}")
+    for bk, ms in books_report(fx, ["stoiximan", "bet365", "pinnacle", "draftkings"], "nfl"):
+        pass
+else:
+    print("  δεν βρέθηκε")
+print("== NBA: δομή τιμής props (stoiximan)")
+fl = upcoming(11, 30, tre=r"^NBA$", max_t=2, max_f=1)
+if fl:
+    t, fx = fl[0]
+    d = get("/odds", fixtureId=fx["fixtureId"], bookmakers="stoiximan")
+    ms = (((d or {}).get("bookmakerOdds") or {}).get("stoiximan") or {}).get("markets") or {}
+    pp = [m for m in ms if re.search(r"player", names.get(str(m), ""), re.I)]
+    print("  props αγορές:", len(pp), [names.get(str(m)) for m in pp[:6]])
+    if pp:
+        print("  JSON δείγμα:", json.dumps(ms[pp[0]])[:600])
 print("κλήσεις:", calls)

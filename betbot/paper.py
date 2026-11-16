@@ -23,7 +23,7 @@ from .util import parse_iso
 
 TIERS = ("strong", "balanced", "bold")
 SUFFIX = {"strong": "~s", "balanced": "", "bold": "~b"}
-TIER_NAME = {"strong": "Δυνατό", "balanced": "Ισορροπημένο", "bold": "Τολμηρό"}
+TIER_NAME = {"strong": "Υψηλή πιθανότητα", "balanced": "Μέση πιθανότητα", "bold": "Χαμηλή πιθανότητα"}   # ονόματα επιπέδων βάσει πιθανότητας σκέλους (16/11/2026· πριν: Δυνατό/Ισορροπημένο/Τολμηρό)
 CATS = ("recommended", "safe", "x10", "x30", "x100", "overs", "combo", "corners", "cards",
         "fair_corners", "fair_cards", "fair_players")
 CAT_NAME = {"recommended": "⭐ Προτεινόμενο", "safe": "Safe", "x10": "🎯 10+", "x30": "🔥 30+", "x100": "🎰 100+",

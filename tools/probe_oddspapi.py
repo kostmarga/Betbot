@@ -1,5 +1,4 @@
-"""ΠΡΟΣΩΡΙΝΟ τεστ (17/11/2026): πώς ονομάζονται οι κύριες αγορές NBA (sportId 11) και NFL (sportId 14) στο OddsPapi; 1 μετρημένη κλήση (/markets).
-Το key ΔΕΝ τυπώνεται. Θα σβηστεί μετά."""
+"""ΠΡΟΣΩΡΙΝΟ τεστ (17/11/2026): κύριες αγορές NBA (sportId 11) και NFL (sportId 14) στο OddsPapi — συμπαγής έξοδος. 1 μετρημένη κλήση. Το key ΔΕΝ τυπώνεται."""
 import collections
 import os
 import sys
@@ -13,16 +12,15 @@ time.sleep(1.3)
 r = requests.get("https://api.oddspapi.io/v4/markets", params={"apiKey": KEY}, timeout=120)
 print("markets ->", r.status_code)
 mk = r.json() if r.status_code == 200 else []
-for sid, nm in ((11, "ΜΠΑΣΚΕΤ/NBA"), (14, "NFL")):
+for sid, nm in ((11, "NBA"), (14, "NFL")):
     ms = [m for m in mk if m.get("sportId") == sid and not m.get("playerProp")]
-    print(f"== {nm}: {len(ms)} αγορές (χωρίς props)")
-    names = collections.Counter(m.get("marketName") for m in ms)
-    print("  πιο συχνά ονόματα:", names.most_common(14))
-    types = collections.Counter((m.get("marketType"), m.get("period")) for m in ms)
-    print("  (marketType, period):", types.most_common(16))
+    grp = collections.defaultdict(list)
     for m in ms:
-        n = (m.get("marketName") or "").lower()
-        if m.get("period") in ("fulltime", "full time", "ft", None) and any(k in n for k in ("moneyline", "winner", "match", "handicap", "spread", "total", "over under")) and "team" not in n and "quarter" not in n and "half" not in n:
-            print("   ", {k: m.get(k) for k in ("marketId", "marketName", "marketType", "period", "handicap")}, [o.get("outcomeName") for o in (m.get("outcomes") or [])][:3])
-            if sum(1 for _ in range(0)) > 0:
-                break
+        grp[(m.get("marketName"), m.get("marketType"), m.get("period"))].append(m)
+    print(f"== {nm}: {len(ms)} αγορές, {len(grp)} διαφορετικά (όνομα, τύπος, περίοδος)")
+    for (n, t, p), lst in sorted(grp.items(), key=lambda x: (str(x[0][2]), str(x[0][0]))):
+        if p not in ("fulltime", "full time", "ft", None):
+            continue
+        hs = sorted({x.get("handicap") for x in lst if x.get("handicap") is not None})
+        o = [oc.get("outcomeName") for oc in (lst[0].get("outcomes") or [])][:3]
+        print(f"   [{p}] {n} | {t} | αγορές {len(lst)} | γραμμές {hs[:3]}..{hs[-3:]} | outcomes {o} | πρώτο id {lst[0].get('marketId')}")

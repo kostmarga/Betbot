@@ -141,7 +141,7 @@ def leg_stats(slips):
         return "—"
 
     return {"n": len(legs), "by_market": agg(mk), "by_league": agg(lambda l: l.get("league_name") or l.get("league"), 5),
-            "by_sport": agg(lambda l: {"football": "Ποδόσφαιρο", "basketball": "Μπάσκετ"}.get(l.get("sport"), l.get("sport") or "—"), 1), "by_p": sorted(agg(bucket, 5), key=lambda r: r["key"])}
+            "by_sport": agg(lambda l: {"football": "Ποδόσφαιρο", "basketball": "Μπάσκετ", "nfl": "NFL"}.get(l.get("sport"), l.get("sport") or "—"), 1), "by_p": sorted(agg(bucket, 5), key=lambda r: r["key"])}
 
 
 def build(db, cfg, now):

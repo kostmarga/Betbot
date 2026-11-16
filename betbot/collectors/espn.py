@@ -15,7 +15,7 @@ from ..util import http_get, log, iso, parse_iso
 from .base import Collector, Context
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard"
-SPORT = {"football": "soccer", "basketball": "basketball"}
+SPORT = {"football": "soccer", "basketball": "basketball", "nfl": "football"}
 
 
 def _parse(league: dict, data: dict) -> list[Match]:

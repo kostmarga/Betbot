@@ -27,7 +27,7 @@ from .util import http_get, iso, parse_iso
 
 E = html.escape
 URL = "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/summary"
-SPORT = {"football": "soccer", "basketball": "basketball"}
+SPORT = {"football": "soccer", "basketball": "basketball", "nfl": "football"}
 MAX_FETCH = 40
 
 
@@ -157,7 +157,7 @@ CORE_JS = r"""
 // Κοινός κώδικας live (live σελίδα + κύρια σελίδα): κρίση επιλογής, ρώτημα ESPN ΜΟΝΟ όσο παίζεται αγώνας, χρονοδιάγραμμα.
 window.BetbotLive = (function(){
 const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/';
-const SPORT = {football: 'soccer', basketball: 'basketball'};
+const SPORT = {football: 'soccer', basketball: 'basketball', nfl: 'football'};
 const cache = {};                       // κλειδί αγώνα -> κατάσταση από ESPN
 let legs = [], onUpdate = function(){}, timer = null, lastOk = null, lastErr = null, browserOk = false;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -192,7 +192,7 @@ function parseSummary(d) {
 
 // Κρίση επιλογής: [κωδικός, κείμενο προόδου]. Ίδια λογική με το selector.settle_leg + live (sure/dead/ok/bad).
 // Χωρίς ζωντανά δεδομένα: εκτίμηση από την ώρα. ⏳ ΜΟΝΟ πριν την έναρξη· μετά ⚽ (παίζεται) ή 🏁 (τελείωσε, περιμένω αποτέλεσμα).
-const END_MIN = {football: 150, basketball: 180};
+const END_MIN = {football: 150, basketball: 180, nfl: 210};
 function byTime(l) {
   const ko = l.ko ? Date.parse(l.ko) : NaN;
   if (isNaN(ko) || Date.now() < ko) return ['pending', ''];

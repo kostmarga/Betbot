@@ -45,3 +45,18 @@ for book in ("stoiximan", "pinnacle"):
         for oid, o in list(outs.items())[:2]:
             for pid, pl in list((o.get("players") or {}).items())[:3]:
                 print(f"      outcome {oid} player {pid}: {pl.get('playerName')} price {pl.get('price')} active={pl.get('active')} mainLine={pl.get('mainLine')}")
+
+# --- Euroleague: ποια πρακτορεία έχουν αγορά; ---
+fxs = get("/fixtures", tournamentId="138")
+fxs = fxs if isinstance(fxs, list) else (fxs or {}).get("fixtures", []) if isinstance(fxs, dict) else []
+print("Euroleague fixtures:", len(fxs))
+if fxs:
+    f0 = fxs[0]
+    fid = f0.get("fixtureId") or f0.get("id")
+    print("fixture", fid, f0.get("participant1Name"), "-", f0.get("participant2Name"))
+    o = get("/odds", fixtureId=fid)
+    bo = (o or {}).get("bookmakerOdds") or {}
+    print("πρακτορεία με δεδομένα:", len(bo))
+    for slug, b in sorted(bo.items()):
+        ms = b.get("markets") or {}
+        print("   ", slug, "αγορές:", len(ms))

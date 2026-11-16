@@ -11,6 +11,7 @@ from .espn import EspnCollector
 from .euroleague import EuroleagueCollector
 from .fdco_odds import FdcoOddsCollector
 from .espn_odds import EspnOddsCollector
+from .oddspapi import OddsPapiCollector
 from .odds_api import OddsApiCollector
 from .sofascore import SofascoreCollector
 from .espn_stats import EspnStatsCollector
@@ -22,5 +23,5 @@ from .espn_news import EspnNewsCollector
 from .fdco_history import FdcoHistoryCollector
 from .greek_site import GreekSiteCollector
 
-ALL = [EspnCollector, EuroleagueCollector, FdcoOddsCollector, EspnOddsCollector, OddsApiCollector,
+ALL = [EspnCollector, EuroleagueCollector, FdcoOddsCollector, EspnOddsCollector, OddsPapiCollector, OddsApiCollector,
        SofascoreCollector, EspnStatsCollector, EspnLineupsCollector, EspnStandingsCollector, EspnInjuriesCollector, FplCollector, EspnNewsCollector, FdcoHistoryCollector, GreekSiteCollector]

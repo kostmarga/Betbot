@@ -1090,6 +1090,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     P.now = now
     tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
     today_slips = (st or {}).get("today_slips") or {}
+    today_extra = (st or {}).get("today_extra") or {}
 
     def view(listname, current, fair=False):
         """Το δελτίο που ΚΑΤΑΓΡΑΦΕΤΑΙ στο ιστορικό σήμερα (κλειδωμένο), με ✅/❌ ανά αγώνα· αλλιώς το τωρινό (μη καταγεγραμμένο)."""
@@ -1178,6 +1179,16 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
             sec[lid] = body
         _cb = view("combo" + sfx, lists["combo"]["slip"])
         sec["combo"] = P.slip_block(_cb, "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"], lock_note(_cb))
+        # «Επιπλέον δελτίο»: βγήκε αργότερα μέσα στην ημέρα, με άλλους αγώνες, και περνά όλα τα όρια της κατηγορίας
+        for tid in ("recommended", "safe", "x10", "x30", "x100", "overs", "combo"):
+            for k, fz in enumerate(today_extra.get(tid + sfx, []), 2):
+                st_ = br["lottery_stake"] if tid in ("x10", "x30", "x100") else br["unit"]
+                ex = {"legs": _enrich(fz["legs"], cidx, fair=False, tctx=tctx), "total_odds": fz["total_odds"], "p_win": fz["model_prob"],
+                      "p_market": None, "fair": False, "locked": fz["created_at"], "list": f"{tid}{sfx}+{k}"}
+                hh = parse_iso(fz["created_at"]).astimezone(ZoneInfo(cfg["timezone"])).strftime("%H:%M")
+                sec[tid] = sec[tid] + P.slip_block(ex, f"➕ Επιπλέον δελτίο ({hh})", st_,
+                                                    "<p class='muted'>Βγήκε αργότερα μέσα στην ημέρα, με άλλους αγώνες από το κύριο δελτίο, και περνά όλα τα όρια της κατηγορίας. "
+                                                    "Δεν είναι μέρος του πλάνου των 3€ — παίξ' το μόνο αν θες.</p>")
 
         return sec
 
@@ -1305,7 +1316,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 <meta name="generated" content="{iso(now)}"><style>{CSS}{EXTRA_CSS}</style></head><body><main>
 <header class="appbar"><div class="logo">B</div><div class="t"><b>BetBot</b><span>{GR_DAYS[loc.weekday()]} {loc:%d/%m} · ενημέρωση {loc:%H:%M}</span></div>
 <a class="pill live" href="live.html"><i></i>Live</a></header>
-<div id="stale" class="banner" hidden></div>
+<div id="stale" class="banner" hidden></div>{('<div class="banner warn">' + E((st or {}).get("quota_warn")) + '</div>') if (st or {}).get("quota_warn") else ""}
 {"<div class='warn' style='border-left-color:var(--bad);margin-bottom:8px'><b>DEMO</b> – φανταστικές ομάδες και παίκτες, μόνο για να δεις πώς δουλεύει η σελίδα. Δεν είναι πραγματικό δελτίο.</div>" if cfg.get("_demo") else ""}
 {chips_html}{body}
 <div class="livestat" id="espnchk"></div>

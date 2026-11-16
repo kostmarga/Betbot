@@ -91,6 +91,30 @@ def save_lists(db, cfg, now, lists, suffix=""):
         lid = lid + suffix
         legs = [slim(l, (odds_override or {}).get(id(l))) for l in legs_full]
         db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True, fresh_after=fresh_after)
+        _extra(lid, legs, total, p)
+
+    def _extra(lid, legs, total, p):
+        """«Επιπλέον δελτίο»: αν σε μεταγενέστερη εκτέλεση της ημέρας βγει ΔΙΑΦΟΡΕΤΙΚΟ δελτίο (που περνά όλα τα όρια της κατηγορίας) με αγώνες που δεν
+        έχουν μπει στο κλειδωμένο και δεν έχουν ξεκινήσει, αποθηκεύεται ως `<μέρα>#<λίστα>+N` (το κλειδωμένο μένει ως έχει)."""
+        mx = int((cfg.get("slip") or {}).get("extra_per_day", 1))
+        if mx <= 0 or lid.startswith("fair_"):
+            return
+        row = db.conn.execute("SELECT legs_json, created_at FROM slips WHERE slip_id=?", (f"{day}#{lid}",)).fetchone()
+        if not row or row["created_at"] < fresh_after:
+            return                                              # δεν υπάρχει κλειδωμένο σημερινό (ή μόλις φτιάχτηκε αυτό)
+        import json as _j
+        prim = _j.loads(row["legs_json"])
+        pm, nm = {l["match_id"] for l in prim}, {l["match_id"] for l in legs}
+        if pm & nm:
+            return
+        soon = iso(now + timedelta(minutes=45))
+        if any((l.get("kickoff") or "") < soon for l in legs):
+            return
+        have = db.conn.execute("SELECT slip_id, legs_json FROM slips WHERE slip_id LIKE ?", (f"{day}#{lid}+%",)).fetchall()
+        sig = sorted(l["match_id"] + "|" + str(l.get("label")) for l in legs)
+        if len(have) >= mx or any(sorted(x["match_id"] + "|" + str(x.get("label")) for x in _j.loads(h["legs_json"])) == sig for h in have):
+            return
+        db.save_slip(f"{day}#{lid}+{len(have) + 2}", created, lid, total, p, stake, legs)
 
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
@@ -270,6 +294,16 @@ def main(argv=None):
     try:
         from betbot import stats as stats_mod
         st = stats_mod.build(db, cfg, now)
+        try:                   # προειδοποίηση για το όριο κλήσεων OddsPapi (ο χρήστης ανοίγει δεύτερο λογαριασμό εγκαίρως)
+            import json as _json
+            qi = _json.loads(db.ext_id("oddspapi:quota", "info") or "null")
+            if qi and qi.get("accounts"):
+                tot_left = sum(a["left"] for a in qi["accounts"])
+                if tot_left <= int(qi.get("warn_below", 40)):
+                    st["quota_warn"] = (f"Το OddsPapi πλησιάζει το όριο κλήσεων: μένουν {tot_left} για τον μήνα (ανανεώνεται την 1η). "
+                                        "Φτιάξε νέο λογαριασμό στο oddspapi.io και βάλε το key στο GitHub ως ODDSPAPI_KEY_2.")
+        except Exception:
+            pass
     except Exception as e:     # τα στατιστικά δεν πρέπει να ρίχνουν τη σελίδα
         log.warning("Στατιστικά: %s", e)
         st = None

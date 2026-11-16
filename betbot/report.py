@@ -71,6 +71,26 @@ def _when(iso_s, tz):
     return f"{GR_DAYS[d.weekday()]} {d:%H:%M}"
 
 
+def day_tag(legs, now, tz) -> str:
+    """«ΣΗΜΕΡΑ» / «ΑΥΡΙΟ Τρι 17/11» / «Σήμερα–Αύριο» ανάλογα με το πότε παίζονται οι αγώνες του δελτίου (ώρα Ελλάδας)."""
+    if not legs or now is None:
+        return ""
+    today = now.astimezone(ZoneInfo(tz)).date()
+    days = sorted({_local(l["kickoff"], tz).date() for l in legs})
+    def nm(d):
+        k = (d - today).days
+        if k == 0:
+            return "Σήμερα"
+        if k == 1:
+            return "ΑΥΡΙΟ " + f"{GR_DAYS[d.weekday()]} {d:%d/%m}"
+        if k < 0:
+            return f"{GR_DAYS[d.weekday()]} {d:%d/%m}"
+        return f"{GR_DAYS[d.weekday()]} {d:%d/%m}"
+    txt = nm(days[0]) if len(days) == 1 else f"{nm(days[0])} → {nm(days[-1])}"
+    warn = any(d > today for d in days) and all(d > today for d in days)
+    return f" <span class='vd daytag{' fut' if warn else ''}' title='Πότε παίζονται οι αγώνες του δελτίου'>{E(txt)}</span>"
+
+
 def _badges(form):
     cls = {"Ν": "w", "Ι": "d", "Η": "l"}
     return "".join(f'<span class="fb {cls[f["r"]]}" title="{E(f["date"])} {f["venue"]} vs {E(f["opp"])} '
@@ -179,7 +199,7 @@ class Page:
         copy_btn = f'<button type="button" class="copybtn" data-copy="{E(chr(10).join(lines))}">Αντιγραφή δελτίου</button>'
         stake_v = f"{stake:.2f}€" if stake else "—"
         ret_v = f"{stake * sl['total_odds']:.2f}€" if stake else "—"
-        return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}</div>
+        return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}{day_tag(sl['legs'], getattr(self, 'now', None), self.tz)}</div>
 <div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b>{minp_total}</div></div>
 <div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'], find=True)}</div>
 <div class="slip-stub"><div><small>Ποντάρισμα</small><b>{stake_v}</b></div><div><small>Αν κερδίσει</small><b class="pos">{ret_v}</b></div>

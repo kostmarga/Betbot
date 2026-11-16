@@ -162,7 +162,7 @@ def build(db, cfg, now) -> dict:
                     w[0] += b["status"] == "won"
                     w[1] += 1
             avg_days = (sum(w[0] / w[1] * 7 for w in done_weeks.values()) / len(done_weeks)) if done_weeks else None
-            rows.append({"fair": cat.startswith("fair_"), "be_odds": (1 / (won / len(settled))) if (settled and won) else None, "cat": cat, "tier": tier, "n": len(bets), "settled": len(settled), "won": won,
+            rows.append({"funded": 0.0 if cat.startswith("fair_") else len(spent_w) * weekly, "fair": cat.startswith("fair_"), "be_odds": (1 / (won / len(settled))) if (settled and won) else None, "cat": cat, "tier": tier, "n": len(bets), "settled": len(settled), "won": won,
                          "lost": len(settled) - won, "open": len(bets) - len([b for b in bets if b["profit"] is not None]),
                          "hit": (won / len(settled)) if settled else None, "staked": staked, "profit": profit, "roi": roi,
                          "ci": ci, "verdict": vkey, "verdict_text": vtxt, "avg_odds": (sum(b["odds"] for b in settled) / len(settled)) if settled else None,

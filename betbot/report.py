@@ -231,6 +231,15 @@ EXTRA_CSS = ""      # όλο το CSS είναι στο betbot/theme.py
 INDEX_JS = r"""
 (function(){
 const B = window.BetbotLive;
+document.addEventListener('input', e => {
+  const i = e.target.closest('.oddsin'); if (!i || !window.BetbotOdds) return;
+  const BO = window.BetbotOdds, m = BO.load(), v = parseFloat(String(i.value).replace(',', '.'));
+  if (v > 1) m[i.dataset.id] = v; else delete m[i.dataset.id];
+  BO.save(m);
+  const r = i.closest('.oddsrow').querySelector('.oddsres'); if (r) r.textContent = BO.res(i.dataset.s, v > 1 ? v : 0);
+  const sm = document.querySelector('.oddssum');
+  if (sm) { const el = document.getElementById('caldata'), D = JSON.parse(el.textContent), all = []; Object.keys(D).forEach(d => D[d].forEach(x => { if (x.k === sm.dataset.k) all.push(x); })); sm.textContent = BO.sum(all); }
+});
 document.addEventListener('click', e => {
   const tr = e.target.closest('.trow[data-k]'); if (!tr) return;
   const nxt = tr.nextElementSibling;
@@ -247,9 +256,9 @@ document.addEventListener('click', e => {
       '<button type="button" class="lgchip' + (flt === f ? ' on' : '') + '" data-f="' + f + '">' + n + ' (' + cnt(f) + ')</button>').join('');
     const list = all.filter(x => flt === 'all' || x.s.s === flt).map(({d, s}) =>
       '<div class="lgslip"><div class="lgh"><b>' + d.split('-').reverse().slice(0, 2).join('/') + '</b> · ' + (IC[s.s] || '⏳') + ' · απόδοση ' + s.o.toFixed(2) +
-      ' · πιθανότητα ' + Math.round(s.p * 100) + '%</div>' + s.L.map(l => '<div class="lgl">' + (IC[l.r] || '⏳') + ' ' + esc(l.h) + ' – ' + esc(l.a) +
+      ' · πιθανότητα ' + Math.round(s.p * 100) + '%</div>' + (s.f && window.BetbotOdds ? window.BetbotOdds.row(s) : '') + s.L.map(l => '<div class="lgl">' + (IC[l.r] || '⏳') + ' ' + esc(l.h) + ' – ' + esc(l.a) +
       (l.sc ? ' <span class="sc">' + esc(l.sc) + '</span>' : '') + '<span class="muted"> · ' + esc(l.lb) + (l.o ? ' @ ' + Number(l.o).toFixed(2) : '') + '</span></div>').join('') + '</div>').join('');
-    panel.innerHTML = '<div class="lgchips">' + chips + '</div>' + (list || '<p class="muted">Κανένα δελτίο σε αυτή την επιλογή.</p>');
+    panel.innerHTML = '<div class="lgchips">' + chips + '</div>' + (k.indexOf('fair_') === 0 && window.BetbotOdds ? '<p class="muted oddssum" data-k="' + k + '">' + window.BetbotOdds.sum(all.map(x => x.s)) + '</p>' : '') + (list || '<p class="muted">Κανένα δελτίο σε αυτή την επιλογή.</p>');
     panel.querySelectorAll('.lgchip').forEach(b => b.onclick = ev => { ev.stopPropagation(); flt = b.dataset.f; draw(); });
   };
   draw(); tr.after(panel); tr.classList.add('open');
@@ -672,6 +681,15 @@ def _clv_card(clv) -> str:
 CAL_JS = """
 (function(){
   var el=document.getElementById('caldata'); if(!el) return;
+  // Αποδόσεις που καταχωρεί ο χρήστης για δελτία χωρίς απόδοση πρακτορείου (μόνο σε αυτή τη συσκευή, localStorage). Στοίχημα 2€.
+  window.BetbotOdds={
+    load:function(){try{return JSON.parse(localStorage.getItem('betbot_odds')||'{}');}catch(e){return {};}},
+    save:function(m){try{localStorage.setItem('betbot_odds',JSON.stringify(m));}catch(e){}},
+    res:function(st,o){if(!o)return '';if(st==='won')return 'κέρδος +'+(2*(o-1)).toFixed(2)+'€';if(st==='lost')return 'ζημιά −2.00€';if(st==='void')return 'άκυρο';return 'σε εξέλιξη';},
+    row:function(s){var v=this.load()[s.id]||'';return '<div class="oddsrow"><label>Η απόδοση που βρήκα: <input type="number" step="0.01" min="1" inputmode="decimal" class="oddsin" data-id="'+s.id+'" data-s="'+s.s+'" value="'+v+'" placeholder="π.χ. 1.85"></label> <b class="oddsres">'+this.res(s.s,v)+'</b></div>';},
+    sum:function(list){var m=this.load(),n=0,p=0;list.forEach(function(s){var o=m[s.id];if(!o)return;if(s.s==='won'){n++;p+=2*(o-1);}else if(s.s==='lost'){n++;p-=2;}});return n?('Με τις αποδόσεις που έβαλες: '+n+' δελτία · '+(p>=0?'κέρδος +':'ζημιά ')+p.toFixed(2)+'€ (2€ ανά δελτίο)'):'Βάλε την απόδοση που βρήκες στο πρακτορείο για να δεις κέρδος/ζημιά.';}
+  };
+  var el=document.getElementById('caldata');
   var D=JSON.parse(el.textContent), box=document.getElementById('cal'), out=document.getElementById('calday');
   var MN=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος'];
   var IC={won:'✅',lost:'❌',void:'↩️',open:'⏳'};
@@ -703,7 +721,7 @@ CAL_JS = """
       s.L.forEach(function(l){h+='<div class="tk"><span class="ic">'+(IC[l.r]||'⏳')+'</span><div><b>'+esc(l.h)+' – '+esc(l.a)+'</b> <span class="sc">'+esc(l.sc)+'</span><div class="muted">'+esc(l.lb)+(l.o?' @ '+Number(l.o).toFixed(2):'')+'</div></div></div>';});
       var t=s.n+' · '+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · πιθανότητα '+Math.round(s.p*100)+'%';
       s.L.forEach(function(l){t+='\\n'+l.h+' – '+l.a+': '+l.lb+(l.o?' @ '+Number(l.o).toFixed(2):'');});
-      h+='<button type="button" class="copybtn" data-copy="'+esc(t)+'">Αντιγραφή δελτίου</button></div>';});
+      h+='<button type="button" class="copybtn" data-copy="'+esc(t)+'">Αντιγραφή δελτίου</button>'+(s.f?window.BetbotOdds.row(s):'')+'</div>';});
     out.innerHTML=h||'<p class="muted">Δεν υπάρχουν δελτία αυτή τη μέρα.</p>';
     out.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -890,6 +908,23 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
     R = {(r["cat"], r["tier"]): r for r in rows}
     tot_settled = sum(r["settled"] for r in rows if not r.get("fair"))
     need = paper["need"] if paper else 30
+    # ---- dashboard συνόλου (μόνο ταμεία με απόδοση πρακτορείου)
+    real = [r for r in rows if not r.get("fair")]
+    if real and any(r["n"] for r in real):
+        n_all = sum(r["n"] for r in real); n_set = sum(r["settled"] for r in real)
+        n_w = sum(r["won"] for r in real); n_l = sum(r["lost"] for r in real); n_o = sum(r["open"] for r in real)
+        funded = sum(r.get("funded", 0.0) for r in real); staked = sum(r["staked"] for r in real); pl = sum(r["profit"] for r in real)
+        now_b = funded + pl; roi_all = (pl / staked) if staked else None
+        tl = lambda k, v, c="": f"<div class='tile'><div class='k'>{k}</div><div class='v {c}'>{v}</div></div>"
+        out.append("<div class='card'><h3>Σύνολο μέχρι σήμερα</h3><p class='muted'>Όλα τα εικονικά ταμεία μαζί (μόνο όσα έχουν απόδοση πρακτορείου). "
+                   f"Κάθε ταμείο παίρνει {paper['weekly']:.0f}€ την εβδομάδα· «κεφάλαιο» = όσα έχουν διατεθεί συνολικά από την αρχή. Προσοχή: ένα μόνο κερδισμένο δελτίο με πολύ υψηλή απόδοση (π.χ. 30+) μπορεί να κάνει το σύνολο θετικό· το πραγματικό μέτρο είναι η επιτυχία και τα ταμεία ξεχωριστά, μετά από αρκετά δελτία.</p><div class='tiles'>"
+                   + tl("Δελτία που παίξαμε", n_all) + tl("Κερδισμένα", n_w, "pos") + tl("Χαμένα", n_l, "neg") + tl("Σε εξέλιξη", n_o)
+                   + tl("Επιτυχία", f"{n_w / n_set:.0%}" if n_set else "—")
+                   + tl("Κεφάλαιο που διατέθηκε", f"{funded:.0f}€") + tl("Στοιχηματίστηκαν (κριθέντα)", f"{staked:.0f}€")
+                   + tl("Κέρδος / ζημιά", f"{pl:+.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
+                   + tl("Υπόλοιπο τώρα", f"{now_b:.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
+                   + tl("ROI", f"{roi_all:+.0%}" if roi_all is not None else "—", "pos" if (roi_all or 0) > 0 else "neg" if (roi_all or 0) < 0 else "")
+                   + "</div></div>")
     # ---- συμπεράσματα
     ins = []
     if not tot_settled:

@@ -748,7 +748,11 @@ CAL_JS = """
     ['Δ','Τ','Τ','Π','Π','Σ','Κ'].forEach(function(x){h+='<div class="cdw">'+x+'</div>';});
     for(var i=0;i<off;i++)h+='<div></div>';
     for(var d=1;d<=n;d++){var k=iso(y,m,d),has=D[k]?' has'+cls(k):'';h+='<button class="cd'+has+'" data-d="'+k+'"'+(D[k]?'':' disabled')+'><i>'+d+'</i>'+dayBadge(k)+'</button>';}
-    box.innerHTML=h+'</div>';
+    var T={n:0,w:0,l:0,o:0,f:0,fw:0,fl:0};
+    for(var d2=1;d2<=n;d2++){(D[iso(y,m,d2)]||[]).forEach(function(s){T.n++;if(s.f){T.f++;if(s.s==='won')T.fw++;else if(s.s==='lost')T.fl++;}if(s.s==='won')T.w++;else if(s.s==='lost')T.l++;else if(s.s!=='void')T.o++;});}
+    h+='</div>';
+    if(T.n)h+='<p class="muted" style="margin:10px 2px 0">Μήνας: <b>'+T.n+' δελτία</b> · '+T.w+' ✅ · '+T.l+' ❌'+(T.o?' · '+T.o+' σε εξέλιξη':'')+'<br>Εκ των οποίων '+(T.n-T.f)+' με απόδοση πρακτορείου και '+T.f+' χωρίς (κόρνερ/κάρτες/παίκτες: '+T.fw+' ✅ '+T.fl+' ❌).</p>';
+    box.innerHTML=h;
     document.getElementById('cprev').onclick=function(){cur.setMonth(cur.getMonth()-1);draw();};
     document.getElementById('cnext').onclick=function(){cur.setMonth(cur.getMonth()+1);draw();};
     Array.prototype.forEach.call(box.querySelectorAll('.cd.has'),function(b){b.onclick=function(){show(b.getAttribute('data-d'));};});
@@ -965,7 +969,11 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                    + tl("Κέρδος / ζημιά", f"{pl:+.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
                    + tl("Υπόλοιπο τώρα", f"{now_b:.2f}€", "pos" if pl > 0 else "neg" if pl < 0 else "")
                    + tl("ROI", f"{roi_all:+.0%}" if roi_all is not None else "—", "pos" if (roi_all or 0) > 0 else "neg" if (roi_all or 0) < 0 else "")
-                   + "</div></div>")
+                   + "</div>"
+                   + (lambda fr: (f"<p class='muted' style='margin:10px 2px 0'>Δεν περιλαμβάνονται {sum(r['n'] for r in fr)} δελτία χωρίς απόδοση πρακτορείου "
+                                  f"(κόρνερ/κάρτες/παίκτες): {sum(r['won'] for r in fr)} ✅ {sum(r['lost'] for r in fr)} ❌ · δες παρακάτω. Μαζί με αυτά, ο συνολικός αριθμός δελτίων είναι {n_all + sum(r['n'] for r in fr)}.</p>") if fr else "")(
+                       [r for r in rows if r.get("fair") and r["n"]])
+                   + "</div>")
     # ---- συμπεράσματα
     ins = []
     if not tot_settled:

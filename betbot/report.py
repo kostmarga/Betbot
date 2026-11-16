@@ -738,7 +738,7 @@ def _ledger_html(pp) -> str:
     for cat in CATS:
         for tier in TIERS:
             r = R[(cat, tier)]
-            if not r["n"]:
+            if not r["n"] or cat.startswith("fair_"):
                 continue
             nm = f"{CAT_NAME[cat]} · {TIER_NAME[tier]}"
             cls = "ok" if r["wk_pl"] > 0 else "ko" if r["wk_pl"] < 0 else ""
@@ -888,7 +888,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
     out = []
     rows = paper["rows"] if paper else []
     R = {(r["cat"], r["tier"]): r for r in rows}
-    tot_settled = sum(r["settled"] for r in rows)
+    tot_settled = sum(r["settled"] for r in rows if not r.get("fair"))
     need = paper["need"] if paper else 30
     # ---- συμπεράσματα
     ins = []
@@ -906,7 +906,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             if w is not b:
                 ins.append(("!", f"Πιο αδύναμο: {CAT_NAME[w['cat']]} · {TIER_NAME[w['tier']]}",
                             f"ROI {w['roi']:+.0%} σε {w['settled']} δελτία. Αν παραμείνει χαμηλό μετά τα {need} δελτία, αφαιρείται."))
-        pe = [(r["avg_p"], r["hit"], r["settled"]) for r in rows if r["settled"] and r["avg_p"] and r["hit"] is not None]
+        pe = [(r["avg_p"], r["hit"], r["settled"]) for r in rows if r["settled"] and r["avg_p"] and r["hit"] is not None]  # περιλαμβάνει και τα «χωρίς απόδοση»: ελέγχουν τις πιθανότητες
         if pe:
             n_ = sum(x[2] for x in pe)
             exp_ = sum(x[0] * x[2] for x in pe) / n_
@@ -914,7 +914,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             msg = ("το bot είναι υπερβολικά αισιόδοξο" if act_ < exp_ - 0.08 else
                    "το bot είναι συντηρητικό" if act_ > exp_ + 0.08 else "οι εκτιμήσεις του bot είναι ρεαλιστικές")
             ins.append(("◎", "Αναμενόμενη vs πραγματική επιτυχία", f"Αναμενόταν {exp_:.0%}, βγήκε {act_:.0%}: {msg}."))
-        d5 = [r for r in rows if r["avg_days"] is not None]
+        d5 = [r for r in rows if r["avg_days"] is not None and not r.get("fair")]
         if d5:
             b5 = max(d5, key=lambda r: r["avg_days"])
             ins.append(("▦", "Στόχος 5 στις 7 ημέρες",
@@ -935,6 +935,14 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             pl = f"{r['profit']:+.2f}€"
             gd = "—" if r["green_days"] is None else f"{r['green_days']:.0%}"
             gw = "—" if r["green_weeks"] is None else f"{r['green_weeks']:.0%}"
+            if r.get("fair"):
+                ap = "—" if not r.get("avg_p") else f"{r['avg_p']:.0%}"
+                be = "—" if not r.get("be_odds") else f"{r['be_odds']:.2f}"
+                trs.append(f"<div class='trow' data-k='{cat}|{tier}' title='Πάτα για να δεις τα δελτία'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div></div>"
+                           f"<div><div class='st'>επιτυχία <b>{hit}</b> · αναμενόμενη <b>{ap}</b> · κέρδος από απόδοση <b>≥ {be}</b></div>"
+                           f"<div class='bar2' title='{r['settled']}/{need} δελτία'><i style='width:{prog * 100:.0f}%'></i></div></div>"
+                           f"<span class='badge {_verdict_badge(r['verdict'])}'>{E(r['verdict_text'])}</span></div>")
+                continue
             trs.append(f"<div class='trow' data-k='{cat}|{tier}' title='Πάτα για να δεις τα δελτία'><div><div class='nm'>{TIER_NAME[tier]}</div><div class='st'>{r['won']}✅ {r['lost']}❌ · {r['open']}⏳</div><div class='st'>πράσινες μέρες {gd} · εβδ. {gw}</div></div>"
                        f"<div><div class='st'>επιτυχία <b>{hit}</b> · ROI <b>{roi}</b> · Κ/Ζ <b class='{'pos' if r['profit'] > 0 else 'neg' if r['profit'] < 0 else ''}'>{pl}</b></div>"
                        f"<div class='bar2' title='{r['settled']}/{need} δελτία για κρίση'><i style='width:{prog * 100:.0f}%'></i></div></div>"

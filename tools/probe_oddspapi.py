@@ -1,122 +1,109 @@
-"""ΠΡΟΣΩΡΙΝΟ τεστ (17/11/2026): τι καλύπτει το OddsPapi (δωρεάν key) για κόρνερ/κάρτες, NFL, τένις και ποια πρακτορεία ανοίγουν.
-Το key έρχεται από το secret ODDSPAPI_KEY και ΔΕΝ τυπώνεται. Λίγες κλήσεις (<20). Θα σβηστεί μετά το τεστ."""
+"""ΠΡΟΣΩΡΙΝΟ τεστ #2 (17/11/2026): δίνουν τιμές Stoiximan/Bet365 στο δωρεάν πακέτο; Υπάρχουν κόρνερ/κάρτες σε μεγάλη λίγκα;
+Υπάρχουν props NFL/NBA/τένις; Το key έρχεται από το secret ODDSPAPI_KEY και ΔΕΝ τυπώνεται· ΔΕΝ τυπώνουμε στοιχεία λογαριασμού. Θα σβηστεί μετά."""
 import json
 import os
 import re
 import sys
+from datetime import datetime, timedelta, timezone
 import requests
 
 KEY = os.environ.get("ODDSPAPI_KEY", "")
 B = "https://api.oddspapi.io/v4"
+calls = 0
 
 
-def get(path, **p):
+def get(path, quiet=False, **p):
+    global calls
+    calls += 1
     p["apiKey"] = KEY
     try:
-        r = requests.get(B + path, params=p, timeout=40)
+        r = requests.get(B + path, params=p, timeout=60)
     except Exception as e:
         print("  ΣΦΑΛΜΑ δικτύου", path, type(e).__name__)
         return None
-    print(f"GET {path} {({k: v for k, v in p.items() if k != 'apiKey'})} -> {r.status_code}")
+    if not quiet:
+        print(f"GET {path} { {k: v for k, v in p.items() if k not in ('apiKey',)} } -> {r.status_code}")
     if r.status_code != 200:
-        print("   ", r.text[:300].replace(KEY, "***"))
+        print("   ", r.text[:200].replace(KEY, "***"))
         return None
     try:
         return r.json()
     except Exception:
-        print("   όχι JSON:", r.text[:200])
         return None
 
 
 if not KEY:
     sys.exit("Δεν υπάρχει ODDSPAPI_KEY")
-print("== 1) account / quota")
-a = get("/account")
-if a is not None:
-    print("  ", json.dumps(a)[:500].replace(KEY, "***"))
-print("== 2) sports")
-sp = get("/sports") or []
-ids = {}
-for s in sp if isinstance(sp, list) else []:
-    ids[s.get("sportName") or s.get("name")] = s.get("sportId") or s.get("id")
-print("  ", {k: v for k, v in ids.items() if re.search(r"soccer|football|tennis|basket|volley|mma|boxing", str(k), re.I)})
-print("== 3) bookmakers")
-bk = get("/bookmakers") or []
-slugs = {}
-for b in bk if isinstance(bk, list) else []:
-    slugs[b.get("bookmakerSlug") or b.get("slug")] = b
-want = ["stoiximan", "novibet", "bet365", "pinnacle", "betsson", "bwin", "unibet", "williamhill", "opap", "betano", "interwetten", "novibet-gr"]
-print("  σύνολο:", len(slugs), "| ζητούμενα:", {w: (w in slugs) for w in want})
-print("  παράδειγμα εγγραφής:", json.dumps(next(iter(slugs.values()), {}))[:300])
-gr = [k for k in slugs if k and re.search(r"stoix|novi|opap|betano|bwin|bet365|pinn", k, re.I)]
-print("  σχετικά slugs:", gr[:20])
+mk = get("/markets", quiet=True) or []
+names = {str(m.get("marketId")): (m.get("marketName") or "") for m in mk if isinstance(m, dict)}
+sets = {
+    "corners": {k for k, v in names.items() if re.search(r"corner", v, re.I)},
+    "cards": {k for k, v in names.items() if re.search(r"card|booking", v, re.I)},
+    "player_props": {k for k, v in names.items() if re.search(r"player|passing|rushing|receiving|points \(player|assists \(player|rebounds \(player", v, re.I)},
+}
+print("κατάλογος αγορών:", len(names), {k: len(v) for k, v in sets.items()})
+now = datetime.now(timezone.utc)
 
 
-def first_fixture(sport_id, hint=None):
-    t = get("/tournaments", sportId=sport_id) or []
-    if not isinstance(t, list) or not t:
-        return None, None
-    t = sorted(t, key=lambda x: -(x.get("upcomingFixtures") or 0) - (x.get("futureFixtures") or 0) * 0.01)
-    print("  κορυφαία τουρνουά:", [(x.get("tournamentName"), x.get("tournamentId"), x.get("upcomingFixtures"), x.get("futureFixtures")) for x in t[:4]])
-    for tt in t[:3]:
-        f = get("/fixtures", tournamentId=tt.get("tournamentId"))
-        if isinstance(f, list) and f:
-            f2 = [x for x in f if x.get("hasOdds")] or f
-            print("  fixture:", {k: f2[0].get(k) for k in ("fixtureId", "participant1Name", "participant2Name", "startTime", "hasOdds")})
-            return f2[0], tt
-    return None, None
+def fixtures(sport, tname_re, days=4, limit=1):
+    t = get("/tournaments", quiet=True, sportId=sport) or []
+    cand = [x for x in t if isinstance(x, dict) and re.search(tname_re, x.get("tournamentName") or "", re.I) and "U2" not in (x.get("tournamentName") or "")]
+    cand = sorted(cand, key=lambda x: -(x.get("futureFixtures") or 0))
+    out = []
+    for tt in cand[:4]:
+        f = get("/fixtures", quiet=True, tournamentId=tt["tournamentId"]) or []
+        for x in f if isinstance(f, list) else []:
+            try:
+                st = datetime.fromisoformat(x["startTime"].replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if x.get("hasOdds") and now < st < now + timedelta(days=days):
+                out.append((tt.get("tournamentName"), x))
+        if len(out) >= limit:
+            break
+    return out[:limit]
 
 
-def odds_summary(fx, bookmakers=None, label=""):
-    if not fx:
-        print(f"  [{label}] δεν βρέθηκε fixture")
+def probe(label, sport, tre, books, days=4):
+    fl = fixtures(sport, tre, days)
+    if not fl:
+        print(f"[{label}] δεν βρέθηκε αγώνας με αποδόσεις στις επόμενες {days} μέρες")
         return
-    p = {"fixtureId": fx["fixtureId"], "verbosity": 3}
-    if bookmakers:
-        p["bookmakers"] = bookmakers
-    d = get("/odds", **p)
-    if not isinstance(d, dict):
-        return
-    bo = d.get("bookmakerOdds") or {}
-    print(f"  [{label}] πρακτορεία με τιμές:", len(bo), sorted(bo.keys())[:25])
-    per = {}
-    for slug, v in bo.items():
-        per[slug] = len((v.get("markets") or {}))
-    print(f"  [{label}] αγορές ανά πρακτορείο (κορυφαία):", sorted(per.items(), key=lambda x: -x[1])[:8])
-    return d
+    tname, fx = fl[0]
+    print(f"[{label}] {tname}: {fx.get('participant1Name')} - {fx.get('participant2Name')} ({fx.get('startTime')})")
+    for bk in books:
+        d = get("/odds", quiet=True, fixtureId=fx["fixtureId"], bookmakers=bk)
+        if not isinstance(d, dict):
+            print(f"   {bk}: ΚΑΜΙΑ απάντηση / περιορισμένο")
+            continue
+        bo = (d.get("bookmakerOdds") or {}).get(bk) or {}
+        ms = bo.get("markets") or {}
+        info = {"αγορές": len(ms)}
+        for nm, st in sets.items():
+            ids = [m for m in ms if str(m) in st]
+            if ids:
+                info[nm] = len(ids)
+        print(f"   {bk}: {info}")
+        # δείγμα τιμών κόρνερ/κάρτες/props
+        for nm in ("corners", "cards", "player_props"):
+            ids = [m for m in ms if str(m) in sets[nm]][:2]
+            for m in ids:
+                outs = (ms[m].get("outcomes") or {})
+                sample = []
+                for oid, o in list(outs.items())[:3]:
+                    pr = ((o.get("players") or {}).get("0") or {}).get("price")
+                    sample.append(pr)
+                print(f"        {nm}: {names.get(str(m))} | τιμές {sample}")
 
 
-print("== 4) ΠΟΔΟΣΦΑΙΡΟ: κόρνερ/κάρτες")
-sid = ids.get("Soccer") or ids.get("Football") or 10
-fx, _t = first_fixture(sid)
-mk = get("/markets") or []
-names = {}
-for m in mk if isinstance(mk, list) else []:
-    mid = m.get("marketId") or m.get("id")
-    names[str(mid)] = m.get("marketName") or m.get("name") or ""
-print("  αγορές σύνολο:", len(names))
-corner = {k: v for k, v in names.items() if re.search(r"corner", v, re.I)}
-cards = {k: v for k, v in names.items() if re.search(r"card|booking", v, re.I)}
-print("  corner αγορές:", len(corner), list(corner.items())[:6])
-print("  card/booking αγορές:", len(cards), list(cards.items())[:6])
-d = odds_summary(fx, label="soccer")
-if d:
-    seen = {}
-    for slug, v in (d.get("bookmakerOdds") or {}).items():
-        for mid, m in (v.get("markets") or {}).items():
-            if str(mid) in corner:
-                seen.setdefault("corners", set()).add(slug)
-            if str(mid) in cards:
-                seen.setdefault("cards", set()).add(slug)
-    print("  πρακτορεία με κόρνερ/κάρτες σε αυτό το fixture:", {k: sorted(v)[:15] for k, v in seen.items()})
-
-print("== 5) NFL")
-nid = ids.get("American Football") or ids.get("NFL") or 14
-fx, _t = first_fixture(nid)
-odds_summary(fx, label="nfl")
-
-print("== 6) ΤΕΝΙΣ")
-tid = ids.get("Tennis") or 13
-fx, _t = first_fixture(tid)
-odds_summary(fx, label="tennis")
-print("== ΤΕΛΟΣ")
+books = ["stoiximan", "bet365", "pinnacle", "novibet"]
+print("== ΠΟΔΟΣΦΑΙΡΟ (μεγάλη λίγκα)")
+for lab, tre in (("EPL", r"^Premier League$"), ("LaLiga", r"^LaLiga$"), ("Bundesliga", r"^Bundesliga$")):
+    probe(lab, 10, tre, books, days=5)
+print("== NFL")
+probe("NFL", 14, r"^NFL$", ["stoiximan", "bet365", "pinnacle", "draftkings"], days=5)
+print("== NBA")
+probe("NBA", 11, r"^NBA$", ["stoiximan", "bet365", "pinnacle", "draftkings"], days=3)
+print("== ΤΕΝΙΣ")
+probe("ATP", 12, r"ATP", ["stoiximan", "bet365", "pinnacle"], days=2)
+print("κλήσεις:", calls)

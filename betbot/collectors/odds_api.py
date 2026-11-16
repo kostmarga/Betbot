@@ -28,7 +28,7 @@ class OddsApiCollector(Collector):
     name = "odds_api"
 
     def run(self, ctx: Context) -> str:
-        keys = [k.strip() for k in (os.environ.get("ODDS_API_KEY", ""), os.environ.get("ODDS_API_KEY_2", "")) if k and k.strip()]
+        keys = [k.strip() for k in (os.environ.get("ODDS_API_KEY", ""), os.environ.get("ODDS_API_KEY_2", "") or os.environ.get("ODDS_API_KEY_2_TEMPMAIL", "")) if k and k.strip()]
         if not keys:
             return "παράλειψη: δεν υπάρχει ODDS_API_KEY"
         cc = ctx.cfg["collectors"]["odds_api"]

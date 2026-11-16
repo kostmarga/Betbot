@@ -95,7 +95,7 @@ class OddsPapiCollector(Collector):
 
     # ---- κύριο ----
     def run(self, ctx: Context) -> str:
-        keys = [k for k in (os.environ.get("ODDSPAPI_KEY", ""), os.environ.get("ODDSPAPI_KEY_2", "")) if k]
+        keys = [k for k in (os.environ.get("ODDSPAPI_KEY", ""), os.environ.get("ODDSPAPI_KEY_2", "") or os.environ.get("ODDSPAPI_KEY_2_TEMPMAIL", "")) if k]
         if not keys:
             return "παραλείφθηκε: δεν υπάρχει ODDSPAPI_KEY"
         cc = ctx.cfg["collectors"].get("oddspapi", {})

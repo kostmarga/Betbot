@@ -60,7 +60,9 @@ jobs:
         env:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           ODDS_API_KEY_2: ${{ secrets.ODDS_API_KEY_2 }}     # δεύτερος λογαριασμός The Odds API (προαιρετικό)
+          ODDS_API_KEY_2_TEMPMAIL: ${{ secrets.ODDS_API_KEY_2_TEMPMAIL }}     # ίδιος δεύτερος λογαριασμός, με το όνομα που διάλεξε ο χρήστης
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          ODDSPAPI_KEY_2_TEMPMAIL: ${{ secrets.ODDSPAPI_KEY_2_TEMPMAIL }}
           ODDSPAPI_KEY_2: ${{ secrets.ODDSPAPI_KEY_2 }}     # δεύτερος λογαριασμός OddsPapi (προαιρετικό): χρησιμοποιείται όταν το πρώτο φτάσει στο όριο
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}

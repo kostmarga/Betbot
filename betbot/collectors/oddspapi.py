@@ -25,9 +25,14 @@ from .base import Collector, Context
 
 BASE = "https://api.oddspapi.io/v4"
 MARKET_TYPES = {"totals-corners": "CORNERS", "totals-bookings": "CARDS"}
-MAP_VERSION = 2
+MAP_VERSION = 3
 # ποια αγορές θέλουμε από κάθε πρακτορείο: Stoiximan = οι τιμές που παίζεις· Pinnacle = πρακτορείο αναφοράς για τις πιθανότητες (devig)
-BOOKS = {"stoiximan": {"CORNERS", "CARDS", "1X2", "OU", "BTTS"}, "pinnacle": {"1X2", "OU", "BTTS"}}
+BOOKS = {"stoiximan": {"CORNERS", "CARDS", "1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD"}, "pinnacle": {"1X2", "OU", "BTTS", "ML", "TOTAL", "SPREAD"}}
+SPORT_ID = {"football": 10, "basketball": 11, "nfl": 14}      # sportId του OddsPapi
+# Μπάσκετ/NFL: οι κύριες αγορές έχουν περίοδο «result» και όνομα «… (incl. overtime)» (επιβεβαιώθηκε με τεστ 17/11/2026)
+US_TOTAL_NAME = {11: "Over Under (incl. overtime)", 14: "Total (incl. overtime)"}
+US_TOTAL_RANGE = {11: (150, 300), 14: (25, 80)}           # λογικά όρια γραμμών totals
+US_SPREAD_MAX = {11: 30.0, 14: 25.0}                        # μέγιστο |χάντικαπ|
 
 
 def build_market_map(markets: list) -> dict:
@@ -36,9 +41,23 @@ def build_market_map(markets: list) -> dict:
     x.5), Both Teams To Score."""
     out = {}
     for m in markets or []:
-        if m.get("playerProp") or m.get("period") not in ("fulltime", "full time", "ft"):
+        if m.get("playerProp"):
             continue
-        name = (m.get("marketName") or "").strip()
+        sid, name = m.get("sportId"), (m.get("marketName") or "").strip()
+        if sid in (11, 14) and m.get("period") == "result":          # NBA/NFL: νικητής, χάντικαπ, totals ΜΕ παράταση
+            oraw = {str(o.get("outcomeName") or "").strip().lower(): str(o.get("outcomeId")) for o in (m.get("outcomes") or [])}
+            h = m.get("handicap")
+            if name == "Winner (incl. overtime)" and m.get("marketType") == "moneyline" and {"1", "2"} <= set(oraw):
+                out[str(m.get("marketId"))] = {"m": "ML", "line": None, "outs": {oraw["1"]: "HOME", oraw["2"]: "AWAY"}}
+            elif name == US_TOTAL_NAME[sid] and m.get("marketType") == "totals" and h is not None and {"over", "under"} <= set(oraw) \
+                    and abs(float(h) % 1 - 0.5) < 1e-9 and US_TOTAL_RANGE[sid][0] <= float(h) <= US_TOTAL_RANGE[sid][1]:
+                out[str(m.get("marketId"))] = {"m": "TOTAL", "line": float(h), "outs": {oraw["over"]: "OVER", oraw["under"]: "UNDER"}}
+            elif name == "Handicap (incl. overtime)" and m.get("marketType") == "spreads" and h is not None and {"1", "2"} <= set(oraw) \
+                    and abs(float(h) % 1 - 0.5) < 1e-9 and abs(float(h)) <= US_SPREAD_MAX[sid]:
+                out[str(m.get("marketId"))] = {"m": "SPREAD", "line": float(h), "outs": {oraw["1"]: "HOME", oraw["2"]: "AWAY"}}
+            continue
+        if m.get("period") not in ("fulltime", "full time", "ft"):
+            continue
         outs_raw = {str(o.get("outcomeName") or "").strip().lower(): str(o.get("outcomeId")) for o in (m.get("outcomes") or [])}
         h = m.get("handicap")
         mt = MARKET_TYPES.get(m.get("marketType"))
@@ -53,6 +72,35 @@ def build_market_map(markets: list) -> dict:
         elif m.get("sportId") == 10 and name == "Both Teams To Score" and {"yes", "no"} <= set(outs_raw):
             out[str(m.get("marketId"))] = {"m": "BTTS", "line": None, "outs": {outs_raw["yes"]: "YES", outs_raw["no"]: "NO"}}
     return out
+
+
+def _near_main(rows):
+    """Μπάσκετ/NFL: κρατάμε μόνο γραμμές totals/χάντικαπ όπου και οι δύο τιμές είναι 1.45–2.8 (κοντά στην κύρια γραμμή)· οι υπόλοιπες είναι θόρυβος."""
+    by = {}
+    for mk, sel, ln, pr in rows:
+        if mk in ("TOTAL", "SPREAD"):
+            by.setdefault((mk, ln), []).append(pr)
+    bad = {k for k, v in by.items() if not all(1.45 <= p <= 2.8 for p in v)}
+    return [r for r in rows if (r[0], r[2]) not in bad]
+
+
+def spreads_consistent(rows) -> bool:
+    """Έλεγχος ασφαλείας: στην «κύρια» γραμμή χάντικαπ (οι τιμές HOME/AWAY κοντύτερα), το φαβορί του νικητή πρέπει να έχει ΑΡΝΗΤΙΚΟ χάντικαπ.
+    Αν δεν επαληθεύεται (π.χ. ανάποδο πρόσημο ή λείπει ο νικητής), τα χάντικαπ δεν χρησιμοποιούνται."""
+    ml = {sel: pr for mk, sel, ln, pr in rows if mk == "ML"}
+    if len(ml) < 2:
+        return False
+    sp = {}
+    for mk, sel, ln, pr in rows:
+        if mk == "SPREAD":
+            sp.setdefault(ln, {})[sel] = pr
+    full = {ln: v for ln, v in sp.items() if len(v) == 2}
+    if not full:
+        return True
+    main = min(full, key=lambda ln: abs(full[ln]["HOME"] - full[ln]["AWAY"]))
+    if abs(main) < 1.0:
+        return True
+    return (main < 0) == (ml["HOME"] < ml["AWAY"])
 
 
 def parse_fixture_odds(fx: dict, bookmaker: str, mmap: dict, allowed=None) -> list[tuple]:
@@ -72,6 +120,9 @@ def parse_fixture_odds(fx: dict, bookmaker: str, mmap: dict, allowed=None) -> li
                 got.append((d["m"], sel, d["line"], round(float(p), 3)))
         if len(got) == len(d["outs"]):
             rows += got
+    rows = _near_main(rows)
+    if any(r[0] == "SPREAD" for r in rows) and not spreads_consistent(rows):
+        rows = [r for r in rows if r[0] != "SPREAD"]
     return rows
 
 
@@ -125,7 +176,7 @@ class OddsPapiCollector(Collector):
         part = "am" if ctx.now.hour < 10 else "mid" if ctx.now.hour < 15 else "pm"
         slot = f"{ctx.now:%Y-%m-%d}:{part}:v{MAP_VERSION}"      # η έκδοση στο κλειδί ξαναρχίζει τον γύρο όταν αλλάζουν οι αγορές που ζητάμε
         done_slot = ctx.db.cached(f"oddspapi:{slot}")
-        leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("oddspapi") and lg["sport"] == "football"}
+        leagues = {lg["id"]: lg for lg in ctx.leagues() if lg.get("oddspapi") and lg["sport"] in SPORT_ID}
         ms = ctx.db.matches(status="scheduled", since=iso(ctx.now - timedelta(hours=1)), until=iso(ctx.now + timedelta(hours=hours)))
         by_lg = {}
         for m in ms:
@@ -160,7 +211,10 @@ class OddsPapiCollector(Collector):
         if not mmap:
             return "χωρίς κατάλογο αγορών· καμία κλήση τιμών"
         top = sorted(by_lg, key=lambda l: -len(by_lg[l]))[:max_leagues]
-        groups = [top[i:i + 3] for i in range(0, len(top), 3)]
+        groups = []                       # ≤3 διοργανώσεις ανά κλήση και ΜΟΝΟ του ίδιου αθλήματος
+        for sp in SPORT_ID:
+            tl = [l for l in top if leagues[l]["sport"] == sp]
+            groups += [tl[i:i + 3] for i in range(0, len(tl), 3)]
         fetched, calls, n_fx, n_rows, no_mkts = iso(ctx.now), 0, 0, 0, 0
         per_book = {}
         for book in [bk for bk in (cc.get("bookmakers") or [cc.get("bookmaker", "stoiximan"), "pinnacle"]) if bk in BOOKS]:

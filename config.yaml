@@ -95,9 +95,9 @@ leagues:
   - {id: BRA,  name: Brasileirão,         sport: football, espn: bra.1, fdco_new: BRA}
   - {id: MEX,  name: Liga MX,             sport: football, espn: mex.1, fdco_new: MEX}
   - {id: JPN,  name: J1 League,           sport: football, espn: jpn.1, fdco_new: JPN}
-  - {id: NBA,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}
-  - {id: EL,   name: Euroleague,        sport: basketball, euroleague: E,          odds_api: basketball_euroleague}
-  - {id: NFL,  name: NFL,               sport: nfl,        espn: nfl}   # ΜΟΝΟ ML/spread/totals από ESPN (DraftKings)· backtest: docs/nfl_backtest.txt
+  - {id: NBA, oddspapi: 132,  name: NBA,               sport: basketball, espn: nba,              odds_api: basketball_nba}
+  - {id: EL, oddspapi: 138,   name: Euroleague,        sport: basketball, euroleague: E,          odds_api: basketball_euroleague}
+  - {id: NFL, oddspapi: 31,  name: NFL,               sport: nfl,        espn: nfl}   # ΜΟΝΟ ML/spread/totals από ESPN (DraftKings)· backtest: docs/nfl_backtest.txt
   - {id: GBL,  name: ΕΚΟ Basket League, sport: basketball, greek_site: true}   # μόνο μέσω ελληνικού site (βλ. README)
 
 # ---------- Πηγές (collectors / agents) ----------
@@ -107,7 +107,7 @@ collectors:
   fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
   espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
-  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 6, reserve: 3, max_leagues: 9, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
+  oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 8, reserve: 3, max_leagues: 12, warn_below: 40}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
   odds_api:
     enabled: true                       # χρειάζεται env ODDS_API_KEY (δωρεάν)
     regions: eu

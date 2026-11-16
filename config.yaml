@@ -195,7 +195,7 @@ lists:
   x100:        {min_leg_prob: 0.60, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
   overs:       {min_leg_prob: 0.62, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
   btts:        {min_leg_prob: 0.58, count: 12, min_total: 3.0, max_total: 9, min_legs: 2, max_legs: 4}   # BTTS (και οι δύο σκοράρουν): πιθανότητες από Pinnacle/αγορά· ΔΕΝ υπάρχει backtest BTTS (νέα κατηγορία, 17/11/2026)
-  nba_pts:     {min_leg_prob: 0.62, count: 12, min_total: 1.85, max_total: 3.0, min_legs: 2, max_legs: 3, min_odds: 1.20, max_odds: 1.80, shrink: 0.90, min_edge: -0.06, leagues: [NBA]}   # 🏀 Πόντοι παικτών NBA (Pinnacle βάση + Stoiximan γραμμές)· ΠΕΙΡΑΜΑΤΙΚΟ, μόνο παπέρ, ΔΕΝ υπάρχει backtest (17/11/2026)
+  nba_pts:     {min_leg_prob: 0.62, count: 12, min_total: 1.85, max_total: 4.5, min_legs: 2, max_legs: 3, min_odds: 1.20, max_odds: 1.80, shrink: 0.90, min_edge: -0.06, leagues: [NBA]}   # 🏀 Πόντοι παικτών NBA (Pinnacle βάση + Stoiximan γραμμές)· ΠΕΙΡΑΜΑΤΙΚΟ, μόνο παπέρ, ΔΕΝ υπάρχει backtest (17/11/2026)
   corners:     {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}

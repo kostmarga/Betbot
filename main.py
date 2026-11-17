@@ -245,7 +245,7 @@ def main(argv=None):
             log.info("Επανακρίση κάρτες (κίτρινες+κόκκινες): %d δελτία", rc)
     except Exception as e:
         log.warning("resettle_cards: %s", e)
-    settled = selector.settle_slips(db)
+    settled = selector.settle_slips(db, now)
     if settled:
         log.info("Εκκαθαρίστηκαν %d δελτία", settled)
 
@@ -339,7 +339,13 @@ def main(argv=None):
         log.warning("Live αξία: %s", e)
         inplay_pri = []
     cidx = {(c["match_id"], c["market"], c["selection"], c["line"]): c for c in cands["with_odds"] + cands["fair"]}
-    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper, tier_lists, inplay_pri)
+    try:
+        from betbot import health as health_mod
+        hlt = health_mod.results_health(db, now)
+    except Exception as e:     # δεν πρέπει να ρίχνει τη σελίδα
+        log.warning("Υγεία αποτελεσμάτων: %s", e)
+        hlt = None
+    page = report.render_html(cfg, now, lists, cands, moves, hist, notes, clv, plan, goals, st, cidx, paper, tier_lists, inplay_pri, hlt)
     path = report.write_page(cfg["reports_dir"], now, page)
     log.info("Αναφορά: %s", path)
     try:    # πότε έτρεξε τελευταία φορά το bot (το διαβάζει το live workflow για να δει αν η σελίδα είναι ξεπερασμένη)

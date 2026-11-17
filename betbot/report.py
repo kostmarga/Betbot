@@ -216,17 +216,17 @@ class Page:
         ttl = plain(title)
         mps = [l.get("min_play") for l in sl["legs"]]
         minp_total = (f"<div class='minp {'ok' if sl['total_odds'] >= math.prod(mps) else 'ko'}'>αξίζει από {math.prod(mps):.2f}</div>" if (mps and all(mps) and not sl.get("fair")) else "")
-        lines = [f"{ttl} · απόδοση {sl['total_odds']:.2f} · πιθανότητα {sl['p_win'] * 100:.0f}%"]
+        lines = [f"{ttl} · απόδοση {sl['total_odds']:.2f} · πιθανότητα {fmt_p(sl['p_win'])}"]
         lines += [f"{_when(l['kickoff'], self.tz)} {l['home']} – {l['away']}: {plain(l['label'])} @ {l['odds']:.2f}" if l.get("odds")
                   else f"{_when(l['kickoff'], self.tz)} {l['home']} – {l['away']}: {plain(l['label'])}" for l in sl["legs"]]
         copy_btn = f'<button type="button" class="copybtn" data-copy="{E(chr(10).join(lines))}">Αντιγραφή δελτίου</button>'
         stake_v = f"{stake:.2f}€" if stake else "—"
         ret_v = f"{stake * sl['total_odds']:.2f}€" if stake else "—"
         return f"""<div class="card slip"{dslip}><div class="slip-top"><div><div class="eyebrow">{E(ttl)}</div>{vd}{day_tag(sl['legs'], getattr(self, 'now', None), self.tz)}</div>
-<div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b>{minp_total}</div></div>
+<div class="slip-odds"><small>Συνολική απόδοση</small><b>{sl['total_odds']:.2f}</b>{minp_total}<div class="slip-prob" style="font-size:.82rem;font-weight:600">πιθανότητα {fmt_p(sl['p_win'])}</div></div></div>
 <div class="slip-body">{_cnt_html(sl['legs'], getattr(self, 'now', None))}{self.pick_table(sl['legs'], find=True)}</div>
 <div class="slip-stub"><div><small>Ποντάρισμα</small><b>{stake_v}</b></div><div><small>Αν κερδίσει</small><b class="pos">{ret_v}</b></div>
-<div><small>Πιθανότητα</small><b>{sl['p_win'] * 100:.0f}%</b></div></div>
+<div><small>Πιθανότητα</small><b>{fmt_p(sl['p_win'])}</b></div></div>
 <div class="slip-copy">{copy_btn}</div>
 <details class="slip-more"><summary>Λεπτομέρειες, σημειώσεις και διάγραμμα</summary>{note}<div class="tiles">
 <div class="tile"><div class="k">Επιλογές</div><div class="v">{len(sl['legs'])}</div></div>
@@ -304,7 +304,7 @@ document.addEventListener('click', e => {
       '<button type="button" class="lgchip' + (flt === f ? ' on' : '') + '" data-f="' + f + '">' + n + ' (' + cnt(f) + ')</button>').join('');
     const list = all.filter(x => flt === 'all' || x.s.s === flt).map(({d, s}) =>
       '<div class="lgslip"><div class="lgh"><b>' + d.split('-').reverse().slice(0, 2).join('/') + '</b> · ' + (IC[s.s] || '⏳') + ' · απόδοση ' + s.o.toFixed(2) +
-      ' · πιθανότητα ' + Math.round(s.p * 100) + '%</div>' + (s.f && window.BetbotOdds ? window.BetbotOdds.row(s) : '') + s.L.map(l => '<div class="lgl">' + (IC[l.r] || '⏳') + ' ' + esc(l.h) + ' – ' + esc(l.a) +
+      ' · πιθανότητα ' + (s.p >= 0.1 ? Math.round(s.p * 100) + '%' : (s.p * 100).toFixed(1) + '%') + ' (1 στις ' + Math.round(1 / s.p) + ')</div>' + (s.f && window.BetbotOdds ? window.BetbotOdds.row(s) : '') + s.L.map(l => '<div class="lgl">' + (IC[l.r] || '⏳') + ' ' + esc(l.h) + ' – ' + esc(l.a) +
       (l.sc ? ' <span class="sc">' + esc(l.sc) + '</span>' : '') + '<span class="muted"> · ' + esc(l.lb) + (l.o ? ' @ ' + Number(l.o).toFixed(2) : '') + '</span></div>').join('') + '</div>').join('');
     panel.innerHTML = '<div class="lgchips">' + chips + '</div>' + (k.indexOf('fair_') === 0 && window.BetbotOdds ? '<p class="muted oddssum" data-k="' + k + '">' + window.BetbotOdds.sum(all.map(x => x.s)) + '</p>' : '') + (list || '<p class="muted">Κανένα δελτίο σε αυτή την επιλογή.</p>');
     panel.querySelectorAll('.lgchip').forEach(b => b.onclick = ev => { ev.stopPropagation(); flt = b.dataset.f; draw(); });
@@ -411,6 +411,14 @@ def _cnt_html(legs, now=None) -> str:
     c = lambda *k: sum(1 for x in codes if x in k)
     return (f"<div class='cnt slipcnt'>✅ <b>{c('won')}</b> · ❌ <b>{c('lost')}</b> · ⚽ <b>{c('play')}</b> παίζονται · "
             f"🏁 <b>{c('wait')}</b> περιμένω αποτέλεσμα · ⏳ <b>{c('pending')}</b> δεν ξεκίνησαν</div>")
+
+
+def fmt_p(p) -> str:
+    """Πιθανότητα δελτίου για την οθόνη: «49% · 1 στις 2», «0,9% · 1 στις 115» (κάτω από 10% με δεκαδικό ώστε τα λαχεία να μη δείχνουν «1%»)."""
+    if not p or p <= 0:
+        return "—"
+    t = f"{p * 100:.0f}%" if p >= 0.1 else f"{p * 100:.1f}%".replace(".", ",")
+    return f"{t} · 1 στις {round(1 / p)}"
 
 
 def _enrich(legs, cidx, fair=False, tctx=None):
@@ -787,9 +795,9 @@ CAL_JS = """
     var a=D[k]||[],c=cnt(k),h='<h4>'+k.split('-').reverse().join('/')+'</h4><p class="muted">'+c.n+(c.n===1?' δελτίο':' δελτία')+' · '+c.w+' ✅ · '+c.l+' ❌'+(c.o?' · '+c.o+' σε εξέλιξη':'')+(c.v?' · '+c.v+' άκυρα':'')+'</p>';
     a.forEach(function(s){
       var v={won:'<span class="ok">✅ ΠΕΡΑΣΕ</span>',lost:'<span class="ko">❌ ΔΕΝ ΠΕΡΑΣΕ</span>',void:'↩️ Άκυρο'}[s.s]||'⏳ Σε εξέλιξη';
-      h+='<div class="card"><b>'+esc(s.n)+'</b> · '+v+'<div class="muted">'+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · εκτιμώμενη πιθανότητα '+Math.round(s.p*100)+'%</div>';
+      h+='<div class="card"><b>'+esc(s.n)+'</b> · '+v+'<div class="muted">'+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · εκτιμώμενη πιθανότητα '+(s.p>=0.1?Math.round(s.p*100)+'%':(s.p*100).toFixed(1)+'%')+' (1 στις '+Math.round(1/s.p)+')</div>';
       s.L.forEach(function(l){h+='<div class="tk"><span class="ic">'+(IC[l.r]||'⏳')+'</span><div><b>'+esc(l.h)+' – '+esc(l.a)+'</b> <span class="sc">'+esc(l.sc)+'</span><div class="muted">'+esc(l.lb)+(l.o?' @ '+Number(l.o).toFixed(2):'')+'</div></div></div>';});
-      var t=s.n+' · '+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · πιθανότητα '+Math.round(s.p*100)+'%';
+      var t=s.n+' · '+(s.f?'ελάχιστη απόδοση ':'απόδοση ')+s.o.toFixed(2)+' · πιθανότητα '+(s.p>=0.1?Math.round(s.p*100)+'%':(s.p*100).toFixed(1)+'%')+' (1 στις '+Math.round(1/s.p)+')';
       s.L.forEach(function(l){t+='\\n'+l.h+' – '+l.a+': '+l.lb+(l.o?' @ '+Number(l.o).toFixed(2):'');});
       h+='<button type="button" class="copybtn" data-copy="'+esc(t)+'">Αντιγραφή δελτίου</button>'+(s.f?window.BetbotOdds.row(s):'')+'</div>';});
     out.innerHTML=h||'<p class="muted">Δεν υπάρχουν δελτία αυτή τη μέρα.</p>';

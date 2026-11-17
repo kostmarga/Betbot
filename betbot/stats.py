@@ -87,6 +87,11 @@ def calendar_data(db, slips, tz, names, today, days=150):
             legs.append({"h": l["home"], "a": l["away"], "lb": str(l.get("label") or ""), "o": l.get("odds"),
                          "r": l.get("result") or "open", "sc": f"{sc[0]}-{sc[1]}" if sc else ""})
         name = names[base] + ("" if tier == "balanced" else " · " + TIER_NAME[tier])
+        sid = str(s["slip_id"])
+        if "+" in sid.split("#")[-1]:
+            name += " · επιπλέον"
+        elif sid.split("#")[0] != d.isoformat():
+            name += f" · εκδόθηκε {sid.split('#')[0][8:10]}/{sid.split('#')[0][5:7]}"      # δελτίο που εκδόθηκε άλλη μέρα από αυτή που παίζεται
         out[d.isoformat()].append({"n": name, "o": round(s["total_odds"], 2), "p": round(s["model_prob"] or 0, 3),
                                    "s": s["status"], "f": base.startswith("fair_"), "k": f"{base}|{tier}", "id": s["slip_id"], "L": legs})
     return dict(out)
@@ -167,13 +172,25 @@ def build(db, cfg, now):
             cand = [s for s in prev if _day(s, tz) == last_day]
             yesterday[lid] = dict(max(cand, key=lambda s: s["created_at"]), day=last_day)
     todays, today_extra = {}, {}
-    for s in slips + tier_slips:
+    # Δελτία της σημερινής ημέρας στοιχημάτων. Κύριο = αυτό που εκδόθηκε ΣΗΜΕΡΑ (id σημερινής ημέρας)· ό,τι εκδόθηκε χθες αλλά παίζεται σήμερα (παλιός ορίζοντας 30 ωρών)
+    # και τα «επιπλέον» (+N) εμφανίζονται ξεχωριστά — ΠΟΤΕ δεν χάνεται δελτίο από τη σελίδα (17/11/2026: το χθεσινό Προτεινόμενο δεν φαινόταν)
+    carried = {}
+    for s in sorted(slips + tier_slips, key=lambda x: x["created_at"]):
         if _day(s, tz) != today:
             continue
-        if "+" in str(s["slip_id"]).split("#")[-1]:          # «επιπλέον δελτίο» μέσα στην ημέρα (id: ...+N)
+        sid = str(s["slip_id"])
+        idday, suf = sid.split("#")[0], sid.split("#")[-1]
+        if "+" in suf:
             today_extra.setdefault(s["list_name"], []).append(s)
-        else:
+        elif idday == today.isoformat():
             todays[s["list_name"]] = s
+        else:
+            carried.setdefault(s["list_name"], []).append(s)
+    for ln, lst in carried.items():
+        if ln not in todays:
+            todays[ln] = lst.pop()           # δεν εκδόθηκε σημερινό: το χθεσινό που παίζεται σήμερα γίνεται το κύριο
+        if lst:
+            today_extra.setdefault(ln, [])[0:0] = lst
     return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
             "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays, "today_extra": today_extra,
             "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),

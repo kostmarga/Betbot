@@ -1235,7 +1235,8 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
                 ex = {"legs": _enrich(fz["legs"], cidx, fair=False, tctx=tctx), "total_odds": fz["total_odds"], "p_win": fz["model_prob"],
                       "p_market": None, "fair": False, "locked": fz["created_at"], "list": f"{tid}{sfx}+{k}"}
                 hh = parse_iso(fz["created_at"]).astimezone(ZoneInfo(cfg["timezone"])).strftime("%H:%M")
-                sec[tid] = sec[tid] + P.slip_block(ex, f"➕ Επιπλέον δελτίο ({hh})", st_,
+                _carried = str(fz["slip_id"]).split("#")[0] != str((st or {}).get("today"))
+                sec[tid] = sec[tid] + P.slip_block(ex, (f"📅 Δελτίο που εκδόθηκε {str(fz['slip_id']).split('#')[0][8:10]}/{str(fz['slip_id']).split('#')[0][5:7]} ({hh}) και παίζεται σήμερα" if _carried else f"➕ Επιπλέον δελτίο ({hh})"), st_,
                                                     "<p class='muted'>Βγήκε αργότερα μέσα στην ημέρα, με άλλους αγώνες από το κύριο δελτίο, και περνά όλα τα όρια της κατηγορίας. "
                                                     "Δεν είναι μέρος του πλάνου των 3€ — παίξ' το μόνο αν θες.</p>")
 

@@ -184,6 +184,10 @@ class Page:
 
     # ---------------- δελτίο ----------------
     def slip_block(self, sl, title, stake=None, note=""):
+        if sl and any(l.get("veto_now") for l in sl.get("legs") or []):
+            bad = "".join(f"<li>{E(plain(l['label']))} — {E(l['veto_now'])}</li>" for l in sl["legs"] if l.get("veto_now"))
+            note = ("<div class='card' style='border-left:4px solid #c62828'><b>🚫 ΜΗΝ το παίξεις όπως είναι.</b> Μία ή περισσότερες επιλογές δεν θα περνούσαν πια τους κανόνες "
+                    "(νέα στοιχεία μετά το κλείδωμα του δελτίου):<ul>" + bad + "</ul></div>") + note
         if not sl:
             return (f"<div class='card'><h3>{E(title)}</h3><p class='muted'>Δεν βγήκε δελτίο σήμερα: δεν υπήρχαν αρκετές "
                     "επιλογές που να περνούν τους κανόνες για αυτό το εύρος απόδοσης. Αυτό είναι καλό σημάδι – "
@@ -429,6 +433,9 @@ def _enrich(legs, cidx, fair=False, tctx=None):
             if c.get(k) is not None and not d.get(k):
                 d[k] = c[k]
         d.setdefault("league_name", l.get("league"))
+        # Έλεγχος ΞΑΝΑ τώρα: αν η επιλογή (σε κλειδωμένο δελτίο) δεν θα περνούσε πια τους κανόνες (π.χ. βασικός παίκτης εκτός), προειδοποίηση
+        if c and "slips" in (c.get("blocked") or ()) and l.get("result") in (None, "open"):
+            d["veto_now"] = "; ".join(c.get("warnings") or [])[:240] or "δεν περνά πια τους κανόνες"
         if fair and d.get("odds"):                 # σκέλος χωρίς απόδοση: «παίξ' το αν ≥»
             d["play_if"] = d["odds"]
             d["fair_odds"] = (1 / d["p"]) if d.get("p") else d["odds"]

@@ -818,13 +818,19 @@ def resettle_cards(db) -> int:
     return fixed
 
 
-def settle_slips(db):
+def settle_slips(db, now=None):
     done = 0
+    stamp = iso(now) if now is not None else None
+
+    def mark(l, r):          # πότε γράφτηκε το αποτέλεσμα (για την υγεία αποτελεσμάτων, βλ. health.py)
+        l["result"] = r
+        if stamp and r in ("won", "lost", "void") and not l.get("settled_at"):
+            l["settled_at"] = stamp
     for sl in db.slips(status="open"):
         legs = sl["legs"]
         for l in legs:
             if l.get("result") in (None, "open"):
-                l["result"] = settle_leg(l, db.get_match(l["match_id"]), db)
+                mark(l, settle_leg(l, db.get_match(l["match_id"]), db))
         res = [l["result"] for l in legs]
         if "lost" in res:
             db.update_slip(sl["slip_id"], "lost", 0.0, legs); done += 1
@@ -845,7 +851,7 @@ def settle_slips(db):
             if l.get("result") in (None, "open"):
                 r = settle_leg(l, db.get_match(l["match_id"]), db)
                 if r != "open":
-                    l["result"] = r
+                    mark(l, r)
                     changed = True
         if changed:
             db.update_slip(sl["slip_id"], sl["status"], sl["payout"], legs)

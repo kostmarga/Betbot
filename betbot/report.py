@@ -413,6 +413,27 @@ def _cnt_html(legs, now=None) -> str:
             f"🏁 <b>{c('wait')}</b> περιμένω αποτέλεσμα · ⏳ <b>{c('pending')}</b> δεν ξεκίνησαν</div>")
 
 
+def _health_card(h) -> str:
+    """Κάρτα «Υγεία αποτελεσμάτων»: γράφονται εγκαίρως τα ✅/❌;"""
+    if not h:
+        return ""
+    if h["ok"]:
+        head = "✅ Όλα τα αποτελέσματα που έπρεπε να γραφτούν, έχουν γραφτεί."
+    else:
+        head = (f"⚠️ {len(h['late'])} σκέλη εκκρεμούν πάνω από {20} λεπτά μετά το εκτιμώμενο τέλος του αγώνα"
+                + (f" · {len(h['stuck'])} με αγώνα που έχει ήδη τελειώσει αλλά δεν κρίθηκαν (ΛΑΘΟΣ — πες το)" if h["stuck"] else "") + ".")
+    rows = ""
+    if h.get("n_lat"):
+        rows = (f"<p class='muted'>Τελευταίες 14 ημέρες ({h['n_lat']} σκέλη): το αποτέλεσμα γράφεται κατά μέσο όρο <b>{h['avg']:.0f}'</b> μετά το εκτιμώμενο τέλος του αγώνα "
+                f"(διάμεσος {h['med']:.0f}', χειρότερο {h['max']:.0f}'), και το <b>{h['within30'] * 100:.0f}%</b> μέσα σε 30'.</p>")
+    else:
+        rows = "<p class='muted'>Το ιστορικό καθυστερήσεων αρχίζει να μαζεύεται από 17/11/2026 (νέα δελτία).</p>"
+    lt = "".join(f"<li>{E(x['label'])} ({E(x['slip'])}) — {x['min']}' μετά το τέλος</li>" for x in h["late"][:8])
+    lt = f"<ul class='rules'>{lt}</ul>" if lt else ""
+    return (f"<div class='card'><h3>Υγεία αποτελεσμάτων</h3><p>{head}</p>{lt}{rows}"
+            "<p class='muted'>Το «εκτιμώμενο τέλος» = έναρξη + 150' (ποδόσφαιρο), 180' (μπάσκετ), 210' (NFL). Ο φύλακας ξεκινά νέο γύρο ~10' μετά.</p></div>")
+
+
 def fmt_p(p) -> str:
     """Πιθανότητα δελτίου για την οθόνη: «49% · 1 στις 2», «0,9% · 1 στις 115» (κάτω από 10% με δεκαδικό ώστε τα λαχεία να μη δείχνουν «1%»)."""
     if not p or p <= 0:
@@ -1101,7 +1122,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
     return "".join(out)
 
 
-def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None, tier_lists=None, inplay=None) -> str:
+def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None, tier_lists=None, inplay=None, health=None) -> str:
     P = Page(cfg)
     P.now = now
     tctx = {"scores": (st or {}).get("scores") or {}, "lgmap": {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}, "now": now}
@@ -1301,7 +1322,7 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
 
     # ⚙️ Πηγές + κανόνες
     rr = cfg["rules"]
-    sec["sources"] = ("<div class='card'><h3>Κατάσταση πηγών (σημερινή εκτέλεση)</h3><div class='tbl'><table><tbody>"
+    sec["sources"] = (_health_card(health) + "<div class='card'><h3>Κατάσταση πηγών (σημερινή εκτέλεση)</h3><div class='tbl'><table><tbody>"
                       + "".join(f"<tr><td>{'✅' if ok else '⚠️'} {E(n)}</td><td class='muted'>{E(msg)}</td></tr>" for n, ok, msg in notes)
                       + "</tbody></table></div></div>"
                       + f"""<div class="card"><h3>Κανόνες που εφαρμόζονται (από τα λάθη μας)</h3><ul class="rules">

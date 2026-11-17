@@ -111,7 +111,17 @@ def build_data(db, cfg: dict, now) -> list[dict]:
     today = sport_day(now, tz)
     lg_espn = {lg["id"]: lg.get("espn") for lg in cfg["leagues"]}
     out = []
-    for sl in real_slips(db.slips()):
+    from .paper import SUFFIX, TIER_NAME, drop_tier_dups
+    from .stats import _LEGACY
+
+    def split(ln):
+        for t, suf in SUFFIX.items():
+            if suf and ln.endswith(suf):
+                return ln[:-len(suf)], t
+        return ln, "balanced"
+    # ΟΛΑ τα δελτία (και επίπεδα Υψηλή/Χαμηλή πιθανότητα, και επιπλέον +N)· πριν 17/11/2026 η live σελίδα έδειχνε μόνο τα «κύρια»
+    allslips = drop_tier_dups([s for s in db.slips() if not _LEGACY.search(s["slip_id"]) and split(s.get("list_name") or "")[0] in LISTS])
+    for sl in allslips:
         day = slip_day(sl, tz)
         any_open = any(l.get("result") in (None, "open") for l in sl["legs"])
         if not (day == today or sl["status"] == "open" or (any_open and day >= today - timedelta(days=1))):
@@ -127,11 +137,15 @@ def build_data(db, cfg: dict, now) -> list[dict]:
                          "home": l["home"], "away": l["away"], "label": l.get("label") or "", "odds": l.get("odds"),
                          "ko": l.get("kickoff"), "res": l.get("result"), "sc": score,
                          "dbst": m["status"] if m else None})
-        out.append({"id": sl["slip_id"], "list": sl["list_name"], "name": NAMES.get(sl["list_name"], sl["list_name"]),
+        base, tier = split(sl["list_name"])
+        suf = str(sl["slip_id"]).split("#")[-1]
+        nm = NAMES.get(base, base) + ("" if tier == "balanced" else " · " + TIER_NAME[tier]) + (" · επιπλέον" if "+" in suf else "") \
+            + (f" · εκδόθηκε {str(sl['slip_id'])[8:10]}/{str(sl['slip_id'])[5:7]}" if "+" not in suf and str(sl["slip_id"]).split("#")[0] != day.isoformat() else "")
+        out.append({"id": sl["slip_id"], "list": sl["list_name"] + ("+" + suf.split("+")[-1] if "+" in suf else ""), "name": nm,
                     "odds": sl["total_odds"], "p": sl["model_prob"], "fair": sl["list_name"].startswith("fair_"),
                     "day": day.isoformat(), "status": sl["status"], "legs": legs})
     order = {k: i for i, k in enumerate(LISTS)}
-    out.sort(key=lambda s: (s["day"] != today.isoformat(), s["day"], order.get(s["list"], 99)))
+    out.sort(key=lambda s: (s["day"] != today.isoformat(), s["day"], order.get(split(s["list"].split("+")[0])[0], 99), s["id"]))
     return out
 
 

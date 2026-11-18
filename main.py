@@ -133,11 +133,15 @@ def save_extras(db, cfg, now, cands, tier=None, suffix=""):
         return 0
     tz_ = ZoneInfo(cfg["timezone"])
     day = sport_day(now, tz_).strftime("%Y-%m-%d")
+    cap = int((cfg.get("slip") or {}).get("extra_total_per_day", 3))        # συνολικό όριο επιπλέον δελτίων ανά ημέρα (όλες οι κατηγορίες/επίπεδα)
+    n_today = db.conn.execute("SELECT COUNT(*) FROM slips WHERE slip_id LIKE ? AND slip_id LIKE ?", (f"{day}#%", "%+%")).fetchone()[0]
     fresh_after = iso(datetime.strptime(day, "%Y-%m-%d").replace(hour=6, tzinfo=tz_))
     cfg_t = selector.tier_cfg(cfg, tier) if tier else cfg
     soon = iso(now + timedelta(minutes=45))
     saved = 0
     for lid in EXTRA_LISTS:
+        if n_today + saved >= cap:
+            break
         if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
             continue
         name = lid + suffix

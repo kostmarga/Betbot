@@ -92,34 +92,10 @@ def save_lists(db, cfg, now, lists, suffix=""):
         lid = lid + suffix
         legs = [slim(l, (odds_override or {}).get(id(l))) for l in legs_full]
         db.save_slip(f"{day}#{lid}", created, lid, total, p, stake, legs, keep_first=True, fresh_after=fresh_after)
-        _extra(lid, legs, total, p)
-
-    def _extra(lid, legs, total, p):
-        """«Επιπλέον δελτίο»: αν σε μεταγενέστερη εκτέλεση της ημέρας βγει ΔΙΑΦΟΡΕΤΙΚΟ δελτίο (που περνά όλα τα όρια της κατηγορίας) με αγώνες που δεν
-        έχουν μπει στο κλειδωμένο και δεν έχουν ξεκινήσει, αποθηκεύεται ως `<μέρα>#<λίστα>+N` (το κλειδωμένο μένει ως έχει)."""
-        mx = int((cfg.get("slip") or {}).get("extra_per_day", 1))
-        if mx <= 0 or lid.startswith("fair_"):
-            return
-        row = db.conn.execute("SELECT legs_json, created_at FROM slips WHERE slip_id=?", (f"{day}#{lid}",)).fetchone()
-        if not row or row["created_at"] < fresh_after:
-            return                                              # δεν υπάρχει κλειδωμένο σημερινό (ή μόλις φτιάχτηκε αυτό)
-        import json as _j
-        prim = _j.loads(row["legs_json"])
-        pm, nm = {l["match_id"] for l in prim}, {l["match_id"] for l in legs}
-        if pm & nm:
-            return
-        soon = iso(now + timedelta(minutes=45))
-        if any((l.get("kickoff") or "") < soon for l in legs):
-            return
-        have = db.conn.execute("SELECT slip_id, legs_json FROM slips WHERE slip_id LIKE ?", (f"{day}#{lid}+%",)).fetchall()
-        sig = sorted(l["match_id"] + "|" + str(l.get("label")) for l in legs)
-        if len(have) >= mx or any(sorted(x["match_id"] + "|" + str(x.get("label")) for x in _j.loads(h["legs_json"])) == sig for h in have):
-            return
-        db.save_slip(f"{day}#{lid}+{len(have) + 2}", created, lid, total, p, stake, legs)
 
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
-        if sl:
+        if sl and not (lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True)):
             put(lid, sl["legs"], sl["total_odds"], sl["p_win"])
     rec = lists["recommended"]
     if rec["slip"]:
@@ -134,6 +110,57 @@ def save_lists(db, cfg, now, lists, suffix=""):
         sl = lists[fam].get("slip")
         if sl:
             put(f"fair_{fam}" if sl.get("fair") else fam, sl["legs"], sl["total_odds"], sl["p_win"])
+
+
+EXTRA_LISTS = ("recommended", "safe", "overs")      # επιπλέον δελτία μόνο στις βασικές κατηγορίες (όχι λαχεία/πειραματικά)
+
+
+def save_extras(db, cfg, now, cands, tier=None, suffix=""):
+    """«Επιπλέον δελτίο» (έως slip.extra_per_day ανά κατηγορία/επίπεδο ανά ημέρα): ΜΟΝΟ με ΕΝΤΕΛΩΣ ΔΙΑΦΟΡΕΤΙΚΟΥΣ αγώνες από το κύριο δελτίο της ίδιας κατηγορίας,
+    από τα προηγούμενα επιπλέον, και από δελτίο της ίδιας κατηγορίας που εκδόθηκε χθες και παίζεται σήμερα. Το επιπλέον ΧΤΙΖΕΤΑΙ από τους αγώνες που
+    απομένουν με ΤΑ ΙΔΙΑ όρια πιθανότητας/απόδοσης της κατηγορίας· αν δεν υπάρχει τέτοιο δελτίο, δεν βγαίνει τίποτα (17/11/2026)."""
+    import json as _j
+    from zoneinfo import ZoneInfo
+    from betbot.util import sport_day
+    mx = int((cfg.get("slip") or {}).get("extra_per_day", 1))
+    if mx <= 0:
+        return 0
+    tz_ = ZoneInfo(cfg["timezone"])
+    day = sport_day(now, tz_).strftime("%Y-%m-%d")
+    fresh_after = iso(datetime.strptime(day, "%Y-%m-%d").replace(hour=6, tzinfo=tz_))
+    cfg_t = selector.tier_cfg(cfg, tier) if tier else cfg
+    soon = iso(now + timedelta(minutes=45))
+    saved = 0
+    for lid in EXTRA_LISTS:
+        if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
+            continue
+        name = lid + suffix
+        row = db.conn.execute("SELECT legs_json, created_at FROM slips WHERE slip_id=?", (f"{day}#{name}",)).fetchone()
+        if not row or row["created_at"] < fresh_after:
+            continue                                            # δεν υπάρχει κλειδωμένο κύριο δελτίο σήμερα
+        have = db.conn.execute("SELECT slip_id, legs_json FROM slips WHERE slip_id LIKE ?", (f"{day}#{name}+%",)).fetchall()
+        if len(have) >= mx:
+            continue
+        used = {l["match_id"] for l in _j.loads(row["legs_json"])}
+        for h in have:
+            used |= {l["match_id"] for l in _j.loads(h["legs_json"])}
+        for h in db.conn.execute("SELECT legs_json FROM slips WHERE list_name=? AND created_at>=? AND slip_id NOT LIKE ?", (name, iso(now - timedelta(hours=40)), f"{day}#%")):
+            used |= {l["match_id"] for l in _j.loads(h["legs_json"])}      # χθεσινό δελτίο που παίζεται ακόμα
+        try:
+            alt = selector.build_lists(cands, cfg_t, exclude=used)
+        except Exception as e:
+            log.warning("Επιπλέον δελτίο %s: %s", name, e)
+            continue
+        sl = (alt.get(lid) or {}).get("slip")
+        if not sl or any((l.get("kickoff") or "") < soon for l in sl["legs"]):
+            continue
+        legs = [slim(l) for l in sl["legs"]]
+        sig = sorted(l["match_id"] + "|" + str(l.get("label")) for l in legs)
+        if any(sorted(x["match_id"] + "|" + str(x.get("label")) for x in _j.loads(h["legs_json"])) == sig for h in have):
+            continue
+        db.save_slip(f"{day}#{name}+{len(have) + 2}", iso(now), name, sl["total_odds"], sl["p_win"], 1.0, legs)
+        saved += 1
+    return saved
 
 
 def results_due_iso(db, now):
@@ -258,6 +285,12 @@ def main(argv=None):
     log.info("Επιλογές με απόδοση: %d · χωρίς απόδοση: %d · αγώνες: %d",
              len(cands["with_odds"]), len(cands["fair"]), len(cands["contexts"]))
     save_lists(db, cfg, now, lists)
+    try:
+        n_ex = save_extras(db, cfg, now, cands)
+        if n_ex:
+            log.info("Επιπλέον δελτία: %d", n_ex)
+    except Exception as e:
+        log.warning("Επιπλέον δελτία: %s", e)
     from betbot import paper as paper_mod
     tier_lists = {}
     for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)
@@ -270,6 +303,10 @@ def main(argv=None):
                             and paper_mod.leg_sig(x["slip"]["legs"]) == paper_mod.leg_sig(b["slip"]["legs"]):
                         tier_lists[tier][k] = {**x, "slip": None}
                 save_lists(db, cfg, now, tier_lists[tier], suffix=suf)
+                try:
+                    save_extras(db, cfg, now, cands, tier=tier, suffix=suf)
+                except Exception as e:
+                    log.warning("Επιπλέον δελτία %s: %s", tier, e)
             except Exception as e:
                 log.warning("Επίπεδο %s: %s", tier, e)
 

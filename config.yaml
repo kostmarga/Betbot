@@ -202,7 +202,7 @@ lists:
   cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   players:     {min_leg_prob: 0.55, count: 15, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: false}
-  combo:       {min_leg_prob: 0.62, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
+  combo:       {enabled: false, min_leg_prob: 0.62, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
 
 # ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
 bankroll:

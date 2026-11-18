@@ -716,7 +716,7 @@ def build_lists(cands: dict, cfg, exclude=None) -> dict:
     # 🔀 Συνδυαστικό: διαφορετικές αγορές
     cc = L["combo"]
     pool = [c for c in ok if not_blocked(c, "slips") and c["p"] >= cc.get("min_leg_prob", 0)]
-    out["combo"] = {"slip": None} if not cc.get("enabled", True) else {"slip": build_slip(pool, cc["min_total"], cc["max_total"], cc["min_legs"], cc["max_legs"], cfg,
+    out["combo"] = {"slip": None} if not (cc.get("enabled", True) or cc.get("shadow", False)) else {"slip": build_slip(pool, cc["min_total"], cc["max_total"], cc["min_legs"], cc["max_legs"], cfg,
                                        require_families=cc["min_families"])}
     return out
 

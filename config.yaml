@@ -18,6 +18,7 @@ slip:
   alternatives: 2            # πόσα εναλλακτικά δελτία εκτός από το κύριο
   stake: 2.0                 # ποντάρισμα ανά δελτίο (μόνο για το ιστορικό Κ/Ζ)
   hours_ahead: 30            # αγώνες που ξεκινούν μέσα στις επόμενες Χ ώρες
+  extra_max_p_drop: 0.05     # το επιπλέον δελτίο βγαίνει ΜΟΝΟ αν η πιθανότητά του ≥ πιθανότητα κύριου − 0.05 (18/11/2026)
   extra_per_day: 2           # «Επιπλέον δελτίο» ανά κατηγορία/επίπεδο αν βγει αργότερα μέσα στην ημέρα (0 = κλειστό)
 
 # ---------- Φίλτρα επιλογών ----------
@@ -202,7 +203,7 @@ lists:
   cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   throw_ins:   {min_leg_prob: 0.55, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   players:     {min_leg_prob: 0.55, count: 15, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: false}
-  combo:       {enabled: false, min_leg_prob: 0.62, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
+  combo:       {enabled: false, shadow: true, min_leg_prob: 0.62, min_total: 4, max_total: 8, min_legs: 2, max_legs: 4, min_families: 2}
 
 # ---------- Ταμείο (εμφανίζεται στο dashboard) ----------
 bankroll:

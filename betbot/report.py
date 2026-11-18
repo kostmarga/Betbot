@@ -1029,6 +1029,26 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                    + "</div>"
                    + f"<p class='muted' style='margin:10px 2px 0'>Από τα {n_all + fn}: {n_all} με απόδοση πρακτορείου ({n_w} ✅ {n_l} ❌ {n_o} ⏳) και {fn} χωρίς απόδοση ({fw} ✅ {fl} ❌ {fo} ⏳).</p>"
                    + "</div>")
+    # ---- ξεχωριστό dashboard: ΜΟΝΟ Προτεινόμενο · Safe · Over (χωρίς λαχεία/συνδυαστικό/πειραματικά)
+    core = [r for r in rows if r["cat"] in ("recommended", "safe", "overs") and not r.get("fair") and r["n"]]
+    if core:
+        c_set = sum(r["settled"] for r in core); c_w = sum(r["won"] for r in core); c_l = sum(r["lost"] for r in core); c_o = sum(r["open"] for r in core)
+        c_st = sum(r["staked"] for r in core); c_pl = sum(r["profit"] for r in core)
+        c_exp = sum((r["avg_p"] or 0) * r["settled"] for r in core)
+        c_roi = (c_pl / c_st) if c_st else None
+        tl2 = lambda k, v, c="": f"<div class='tile'><div class='k'>{k}</div><div class='v {c}'>{v}</div></div>"
+        trs = "".join(f"<tr><td>{E(CAT_NAME[r['cat']])} · {E(TIER_NAME[r['tier']])}</td><td>{r['n']}</td><td>{r['won']}/{r['lost']}</td>"
+                      f"<td>{(r['hit'] * 100):.0f}%</td><td>{r['profit']:+.2f}€</td><td>{(r['roi'] * 100):+.0f}%</td></tr>" if r["hit"] is not None and r["roi"] is not None else
+                      f"<tr><td>{E(CAT_NAME[r['cat']])} · {E(TIER_NAME[r['tier']])}</td><td>{r['n']}</td><td>{r['won']}/{r['lost']}</td><td>—</td><td>—</td><td>—</td></tr>" for r in core)
+        out.append("<div class='card'><h3>Βασικά δελτία: Προτεινόμενο · Safe · Over</h3><p class='muted'>Μόνο οι κατηγορίες που στοχεύουν στα πιο σίγουρα. "
+                   "ΔΕΝ περιλαμβάνονται λαχεία (10+/30+/100+), Συνδυαστικό και πειραματικά, ώστε ένα τυχερό δελτίο υψηλής απόδοσης να μη φουσκώνει το ROI. "
+                   "Στοιχηματισμένα = εικονικά ποντάρισμα 2€ ανά δελτίο.</p><div class='tiles'>"
+                   + tl2("Δελτία κριθέντα", f"{c_set}") + tl2("Πέρασαν", c_w, "pos") + tl2("Δεν πέρασαν", c_l, "neg") + tl2("Σε εξέλιξη", c_o)
+                   + tl2("Επιτυχία", f"{c_w / c_set:.0%}" if c_set else "—") + tl2("Αναμενόταν (μοντέλο)", f"{c_exp:.1f} νίκες")
+                   + tl2("Στοιχηματίστηκαν", f"{c_st:.0f}€") + tl2("Κέρδος / ζημιά", f"{c_pl:+.2f}€", "pos" if c_pl > 0 else "neg" if c_pl < 0 else "")
+                   + tl2("ROI", f"{c_roi:+.0%}" if c_roi is not None else "—", "pos" if (c_roi or 0) > 0 else "neg" if (c_roi or 0) < 0 else "")
+                   + "</div><div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>Πέρασαν/Έχασαν</th><th>Επιτυχία</th><th>Κέρδος</th><th>ROI</th></tr></thead><tbody>"
+                   + trs + "</tbody></table></div></div>")
     # ---- συμπεράσματα
     ins = []
     if not tot_settled:
@@ -1228,6 +1248,10 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
             sec[lid] = body
         _cb = view("combo" + sfx, lists["combo"]["slip"])
         sec["combo"] = P.slip_block(_cb, "🔀 Συνδυαστικό (διαφορετικές αγορές)", br["unit"], lock_note(_cb))
+        if not (L.get("combo") or {}).get("enabled", True):
+            sec["combo"] = ("<div class='card'><h3>🔀 Συνδυαστικό — σταμάτησε</h3><p>Από 17/11/2026 δεν βγαίνουν νέα δελτία Συνδυαστικού: μέχρι τότε πέρασαν 2 στα 19 "
+                            "(το μοντέλο περίμενε ~4), ROI −57%. Τα παλιά δελτία μένουν στο ιστορικό και στο ημερολόγιο. Ξανανοίγει μόνο αν βρούμε τρόπο να βελτιωθεί "
+                            "(<code>lists.combo.enabled</code> στο config).</p></div>")
         # «Επιπλέον δελτίο»: βγήκε αργότερα μέσα στην ημέρα, με άλλους αγώνες, και περνά όλα τα όρια της κατηγορίας
         for tid in ("recommended", "safe", "x10", "x30", "x100", "overs", "btts", "nba_pts", "combo"):
             for k, fz in enumerate(today_extra.get(tid + sfx, []), 2):

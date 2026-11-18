@@ -610,8 +610,14 @@ def tier_cfg(cfg, tier):
     return c
 
 
-def build_lists(cands: dict, cfg) -> dict:
-    """Όλες οι λίστες/δελτία της ημέρας. Επιστρέφει dict list_id -> περιεχόμενο."""
+def build_lists(cands: dict, cfg, exclude=None) -> dict:
+    """Όλες οι λίστες/δελτία της ημέρας. Επιστρέφει dict list_id -> περιεχόμενο.
+    exclude: σύνολο match_id που ΔΕΝ επιτρέπονται (π.χ. για «επιπλέον δελτίο» με εντελώς διαφορετικούς αγώνες από το κύριο)."""
+    if exclude:
+        ex = set(exclude)
+        cands = {**cands, "with_odds": [c for c in cands["with_odds"] if c["match_id"] not in ex],
+                 "fair": [c for c in cands["fair"] if c["match_id"] not in ex],
+                 "props": [c for c in cands.get("props", []) if c["match_id"] not in ex]}
     L = cfg["lists"]
     wo = cands["with_odds"]
     ok = [c for c in wo if (c["edge"] or 0) >= cfg["selection"]["min_edge"]]
@@ -710,7 +716,7 @@ def build_lists(cands: dict, cfg) -> dict:
     # 🔀 Συνδυαστικό: διαφορετικές αγορές
     cc = L["combo"]
     pool = [c for c in ok if not_blocked(c, "slips") and c["p"] >= cc.get("min_leg_prob", 0)]
-    out["combo"] = {"slip": build_slip(pool, cc["min_total"], cc["max_total"], cc["min_legs"], cc["max_legs"], cfg,
+    out["combo"] = {"slip": None} if not cc.get("enabled", True) else {"slip": build_slip(pool, cc["min_total"], cc["max_total"], cc["min_legs"], cc["max_legs"], cfg,
                                        require_families=cc["min_families"])}
     return out
 

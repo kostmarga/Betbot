@@ -95,7 +95,13 @@ def save_lists(db, cfg, now, lists, suffix=""):
 
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
-        if sl and not (lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True)):
+        if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
+            # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_combo_check.py
+            if sl and (cfg["lists"].get("combo") or {}).get("shadow", False) and not suffix:
+                db.save_slip(f"{day}#shadow_combo", created, "shadow_combo", sl["total_odds"], sl["p_win"], stake,
+                             [slim(l) for l in sl["legs"]], keep_first=True, fresh_after=fresh_after)
+            continue
+        if sl:
             put(lid, sl["legs"], sl["total_odds"], sl["p_win"])
     rec = lists["recommended"]
     if rec["slip"]:
@@ -135,7 +141,7 @@ def save_extras(db, cfg, now, cands, tier=None, suffix=""):
         if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
             continue
         name = lid + suffix
-        row = db.conn.execute("SELECT legs_json, created_at FROM slips WHERE slip_id=?", (f"{day}#{name}",)).fetchone()
+        row = db.conn.execute("SELECT legs_json, created_at, model_prob FROM slips WHERE slip_id=?", (f"{day}#{name}",)).fetchone()
         if not row or row["created_at"] < fresh_after:
             continue                                            # δεν υπάρχει κλειδωμένο κύριο δελτίο σήμερα
         have = db.conn.execute("SELECT slip_id, legs_json FROM slips WHERE slip_id LIKE ?", (f"{day}#{name}+%",)).fetchall()
@@ -153,6 +159,10 @@ def save_extras(db, cfg, now, cands, tier=None, suffix=""):
             continue
         sl = (alt.get(lid) or {}).get("slip")
         if not sl or any((l.get("kickoff") or "") < soon for l in sl["legs"]):
+            continue
+        # όριο ποιότητας (18/11/2026): τα επιπλέον φτιάχνονται από αγώνες που περίσσεψαν, άρα συνήθως χειρότερους· δεν βγαίνουν αν η πιθανότητά τους
+        # είναι πάνω από `slip.extra_max_p_drop` (5 μονάδες) κάτω από την πιθανότητα του κύριου δελτίου
+        if sl["p_win"] < (row["model_prob"] or 0) - float((cfg.get("slip") or {}).get("extra_max_p_drop", 0.05)):
             continue
         legs = [slim(l) for l in sl["legs"]]
         sig = sorted(l["match_id"] + "|" + str(l.get("label")) for l in legs)

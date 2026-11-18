@@ -97,8 +97,8 @@ def save_lists(db, cfg, now, lists, suffix=""):
         sl = lists[lid]["slip"]
         if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
             # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_combo_check.py
-            if sl and (cfg["lists"].get("combo") or {}).get("shadow", False) and not suffix:
-                db.save_slip(f"{day}#shadow_combo", created, "shadow_combo", sl["total_odds"], sl["p_win"], stake,
+            if sl and (cfg["lists"].get("combo") or {}).get("shadow", False):
+                db.save_slip(f"{day}#shadow_combo{suffix}", created, f"shadow_combo{suffix}", sl["total_odds"], sl["p_win"], stake,
                              [slim(l) for l in sl["legs"]], keep_first=True, fresh_after=fresh_after)
             continue
         if sl:

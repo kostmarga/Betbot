@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+"""Έλεγχος «σκιώδους» Συνδυαστικού (list_name = shadow_combo, shadow_combo~s, shadow_combo~b): ΔΕΝ εμφανίζεται στη σελίδα, φτιάχνεται και κρίνεται στο παρασκήνιο με εικονικά 2€.
+=======
 """Έλεγχος «σκιώδους» Συνδυαστικού (list_name = shadow_combo): ΔΕΝ εμφανίζεται στη σελίδα, φτιάχνεται και κρίνεται στο παρασκήνιο με εικονικά 2€.
+>>>>>>> origin/main
 Σύγκριση: πόσες νίκες περίμενε το μοντέλο (άθροισμα πιθανοτήτων δελτίων) και πόσες ήρθαν· ROI. Αξιόπιστο συμπέρασμα από 30+ κριθέντα δελτία.
 Χρήση: python tools/shadow_combo_check.py <betbot.sqlite>   (η βάση είναι στο branch data: data/betbot.sqlite)
 """
@@ -9,7 +13,11 @@ import sys
 
 def main(db):
     c = sqlite3.connect(db)
+<<<<<<< HEAD
+    rows = c.execute("select slip_id,status,total_odds,model_prob from slips where list_name like 'shadow_combo%' order by created_at").fetchall()
+=======
     rows = c.execute("select slip_id,status,total_odds,model_prob from slips where list_name='shadow_combo' order by created_at").fetchall()
+>>>>>>> origin/main
     done = [r for r in rows if r[1] in ("won", "lost")]
     print(f"Σκιώδες Συνδυαστικό: {len(rows)} δελτία συνολικά, {len(done)} κριθέντα, {len(rows) - len(done) - sum(1 for r in rows if r[1] == 'void')} ανοιχτά")
     if not done:

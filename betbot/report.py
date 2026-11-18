@@ -1049,6 +1049,18 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                    + tl2("ROI", f"{c_roi:+.0%}" if c_roi is not None else "—", "pos" if (c_roi or 0) > 0 else "neg" if (c_roi or 0) < 0 else "")
                    + "</div><div class='tbl'><table><thead><tr><th>Ταμείο</th><th>Δελτία</th><th>Πέρασαν/Έχασαν</th><th>Επιτυχία</th><th>Κέρδος</th><th>ROI</th></tr></thead><tbody>"
                    + trs + "</tbody></table></div></div>")
+    me = (paper or {}).get("main_extra")
+    if me and (me["main"]["n"] or me["extra"]["n"] or me["extra"]["open"]):
+        def _mrow(lab, v):
+            if not v["n"]:
+                return f"<tr><td>{lab}</td><td>0{f' (+{v['open']} σε εξέλιξη)' if v['open'] else ''}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>"
+            roi = v["profit"] / v["staked"]
+            return (f"<tr><td>{lab}</td><td>{v['n']}{f' (+{v['open']} σε εξέλιξη)' if v['open'] else ''}</td><td>{v['won']}</td><td>{v['exp']:.1f}</td><td>{v['won'] / v['n'] * 100:.0f}%</td>"
+                    f"<td>{v['profit']:+.2f}€</td><td>{roi * 100:+.0f}%</td></tr>")
+        out.append("<div class='card'><h3>Κύρια vs Επιπλέον δελτία</h3><p class='muted'>Προτεινόμενο · Safe · Over, όλα τα επίπεδα, εικονικά 2€ ανά δελτίο. Τα επιπλέον (μόνο με εντελώς διαφορετικούς αγώνες από το κύριο) "
+                   "μετρούν ξεχωριστά εδώ για να φαίνεται αν αξίζουν· αν πηγαίνουν χειρότερα από όσο περιμέναμε, τα κλείνουμε.</p><div class='tbl'><table><thead><tr><th></th><th>Κριθέντα</th>"
+                   "<th>Πέρασαν</th><th>Αναμενόταν</th><th>Επιτυχία</th><th>Κέρδος</th><th>ROI</th></tr></thead><tbody>"
+                   + _mrow("Κύρια", me["main"]) + _mrow("Επιπλέον", me["extra"]) + "</tbody></table></div></div>")
     # ---- συμπεράσματα
     ins = []
     if not tot_settled:

@@ -171,4 +171,20 @@ def build(db, cfg, now) -> dict:
                          "avg_p": (sum(b["p"] for b in settled) / len(settled)) if settled else None,
                          "wk_bets": len(wk_bets), "wk_spent": sum(b["stake"] for b in wk_bets), "wk_open": wk_open, "wk_pl": wk_pl,
                          "series": series, "green_days": green_days, "green_weeks": green_weeks, "wk_pass": wk_pass, "wk_fail": wk_fail, "avg_days": avg_days, "wk_left": max(0.0, weekly - sum(b["stake"] for b in wk_bets)), "weeks": dict(sorted(weeks.items())[-6:])})
-    return {"rows": rows, "weekly": weekly, "need": need, "monday": monday}
+    # Κύρια vs επιπλέον δελτία (Προτεινόμενο/Safe/Over, όλα τα επίπεδα)· χωρίς το εβδομαδιαίο όριο ταμείου, ώστε να φαίνονται όλα
+    me = {k: {"n": 0, "won": 0, "exp": 0.0, "staked": 0.0, "profit": 0.0, "open": 0} for k in ("main", "extra")}
+    for sl in drop_tier_dups([x for x in db.slips() if not re.search(r"-\d+$", str(x["slip_id"]))]):
+        base = split_list_name(sl.get("list_name") or "")[1]
+        if base not in ("recommended", "safe", "overs"):
+            continue
+        k = "extra" if "+" in str(sl["slip_id"]).split("#")[-1] else "main"
+        if sl["status"] == "open":
+            me[k]["open"] += 1
+        elif sl["status"] in ("won", "lost"):
+            stk = _stake(base, pc, cfg)
+            me[k]["n"] += 1; me[k]["exp"] += sl["model_prob"] or 0.0; me[k]["staked"] += stk
+            if sl["status"] == "won":
+                me[k]["won"] += 1; me[k]["profit"] += stk * sl["total_odds"] - stk
+            else:
+                me[k]["profit"] -= stk
+    return {"rows": rows, "weekly": weekly, "need": need, "monday": monday, "main_extra": me}

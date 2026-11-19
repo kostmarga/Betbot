@@ -96,7 +96,7 @@ def save_lists(db, cfg, now, lists, suffix=""):
     for lid in ("x10", "x30", "x100", "combo"):
         sl = lists[lid]["slip"]
         if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
-            # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_combo_check.py
+            # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_check.py
             if sl and (cfg["lists"].get("combo") or {}).get("shadow", False):
                 db.save_slip(f"{day}#shadow_combo{suffix}", created, f"shadow_combo{suffix}", sl["total_odds"], sl["p_win"], stake,
                              [slim(l) for l in sl["legs"]], keep_first=True, fresh_after=fresh_after)
@@ -116,6 +116,39 @@ def save_lists(db, cfg, now, lists, suffix=""):
         sl = lists[fam].get("slip")
         if sl:
             put(f"fair_{fam}" if sl.get("fair") else fam, sl["legs"], sl["total_odds"], sl["p_win"])
+
+
+def save_shadows(db, cfg, now, cands):
+    """«Σκιώδη» εικονικά ταμεία (list_name = shadow_<όνομα>): πειραματικοί κανόνες που φτιάχνονται και κρίνονται στο παρασκήνιο, ΔΕΝ εμφανίζονται στη σελίδα.
+    Ορίζονται στο config (`shadow:`)· κάθε μία είναι μια παραλλαγή της βασικής λίστας (π.χ. recommended) με αλλαγμένους κανόνες. Έλεγχος: tools/shadow_check.py."""
+    import copy
+    from zoneinfo import ZoneInfo
+    from betbot.util import sport_day
+    sh = cfg.get("shadow") or {}
+    if not sh:
+        return 0
+    tz_ = ZoneInfo(cfg["timezone"])
+    day = sport_day(now, tz_).strftime("%Y-%m-%d")
+    fresh_after = iso(datetime.strptime(day, "%Y-%m-%d").replace(hour=6, tzinfo=tz_))
+    n = 0
+    for name, spec in sh.items():
+        try:
+            c2 = copy.deepcopy(cfg)
+            for k, v in (spec.get("selection") or {}).items():
+                c2["selection"][k] = v
+            for lid, ov in (spec.get("lists") or {}).items():
+                c2["lists"][lid].update(ov)
+            lists_v = selector.build_lists(cands, c2)
+            base = spec.get("base", "recommended")
+            sl = (lists_v.get(base) or {}).get("slip")
+            if not sl:
+                continue
+            if db.save_slip(f"{day}#shadow_{name}", iso(now), f"shadow_{name}", sl["total_odds"], sl["p_win"], 1.0,
+                            [slim(l) for l in sl["legs"]], keep_first=True, fresh_after=fresh_after) is not False:
+                n += 1
+        except Exception as e:
+            log.warning("Σκιώδες %s: %s", name, e)
+    return n
 
 
 EXTRA_LISTS = ("recommended", "safe", "overs")      # επιπλέον δελτία μόνο στις βασικές κατηγορίες (όχι λαχεία/πειραματικά)
@@ -305,6 +338,10 @@ def main(argv=None):
             log.info("Επιπλέον δελτία: %d", n_ex)
     except Exception as e:
         log.warning("Επιπλέον δελτία: %s", e)
+    try:
+        save_shadows(db, cfg, now, cands)
+    except Exception as e:
+        log.warning("Σκιώδη ταμεία: %s", e)
     from betbot import paper as paper_mod
     tier_lists = {}
     for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)

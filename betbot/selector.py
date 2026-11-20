@@ -142,6 +142,7 @@ class MatchContext:
         self.rotation = {}
         self.form_home = self.form_away = []
         self.h2h = []
+        self.form_home_v = self.form_away_v = []      # τελευταίοι 10 ΕΝΤΟΣ για τον γηπεδούχο / ΕΚΤΟΣ για τον φιλοξενούμενο
         self.exp = ""
         self.counts = {}
         self.absent = {self.home: [], self.away: []}
@@ -444,6 +445,7 @@ def build_candidates(db, cfg, models, now):
                 ctx.exp = f"{pred.lam_home:.2f} – {pred.lam_away:.2f} γκολ"
                 ctx.form_home, ctx.form_away = fm.form(m["home"], 10), fm.form(m["away"], 10)
                 ctx.h2h = fm.h2h(m["home"], m["away"])
+                ctx.form_home_v, ctx.form_away_v = fm.form_venue(m["home"], True, 10), fm.form_venue(m["away"], False, 10)
             for metric, cm in cms.items():
                 if not (cm.known(m["home"], 5) and cm.known(m["away"], 5)):
                     continue
@@ -494,6 +496,7 @@ def build_candidates(db, cfg, models, now):
                 ctx.exp = f"{pred.exp_home:.0f} – {pred.exp_away:.0f} πόντοι"
                 ctx.form_home, ctx.form_away = bm.form(m["home"], 10), bm.form(m["away"], 10)
                 ctx.h2h = bm.h2h(m["home"], m["away"])
+                ctx.form_home_v, ctx.form_away_v = bm.form_venue(m["home"], True, 10), bm.form_venue(m["away"], False, 10)
         try:
             from . import props as _props
             pc_ = _props.build(ctx, db, cfg)

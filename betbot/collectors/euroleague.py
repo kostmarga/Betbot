@@ -77,10 +77,14 @@ class EuroleagueCollector(Collector):
         season = ctx.now.year if ctx.now.month >= 8 else ctx.now.year - 1
         for lg in ctx.leagues(euroleague=True):
             comp = lg["euroleague"]
-            for year in (season - 1, season):
+            # τρέχουσα + προηγούμενη σεζόν σε κάθε εκτέλεση· παλαιότερες (ως 8 χρόνια πίσω) ΜΙΑ φορά, για H2H/φόρμα «τελευταίοι 10» στο «γιατί»
+            old = [y for y in range(season - 8, season - 1) if not ctx.db.cached(f"el_hist:{comp}{y}")]
+            for year in old + [season - 1, season]:
                 try:
                     data, _ = http_get(URL.format(comp=comp, year=year))
                     total += ctx.db.upsert_matches(_parse(lg, comp, year, data))
+                    if year in old:
+                        ctx.db.mark_cached(f"el_hist:{comp}{year}", iso(ctx.now), ok=True)
                 except Exception as e:      # παροδικά κενή απάντηση του API: συνεχίζουμε με το επόμενο έτος/τους διαιτητές
                     errs.append(f"{comp}{year}: {str(e)[:60]}")
         # Διαιτητές για αγώνες των επόμενων 48 ωρών (αν το API τους έχει ήδη)

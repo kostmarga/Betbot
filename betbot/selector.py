@@ -72,9 +72,11 @@ def _best_odds(rows):
     `best_price`/`best_source`: η ΥΨΗΛΟΤΕΡΗ τιμή που βρέθηκε σε οποιαδήποτε πηγή (εκεί ψάχνεις να παίξεις).
     Οι πηγές που τελειώνουν σε `_max` (π.χ. fdco_max) δίνουν μόνο καλύτερη τιμή, όχι συναίνεση.
     Backtest 06/11/2026: η καλύτερη τιμή αντί του μέσου όρου βελτιώνει το ROI κατά ~3 μονάδες."""
-    best, top = {}, {}
+    best, top, stx = {}, {}, {}
     for r in rows:
         k = (r["market"], r["selection"], r["line"])
+        if r["source"] == "stoiximan":
+            stx[k] = r["price"]
         if r["price"] > top.get(k, (0, ""))[0]:
             top[k] = (r["price"], r["source"])
         if r["source"].endswith("_max"):
@@ -85,6 +87,7 @@ def _best_odds(rows):
     for k, r in best.items():
         r = dict(r)
         r["best_price"], r["best_source"] = top[k]
+        r["stx_price"] = stx.get(k)         # τιμή Stoiximan (εκεί παίζει ο χρήστης) όπου υπάρχει
         out[k] = r
     return out
 
@@ -278,7 +281,9 @@ def calibrate_football(p, cfg):
 def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     m = ctx.m
     market, sel, line = key
-    price = (odds_row.get("best_price") or odds_row["price"]) if odds_row else None
+    # ΤΙΜΗ ΔΕΛΤΙΟΥ = η τιμή του Stoiximan όπου υπάρχει (αυτή που παίζει ο χρήστης)· αλλιώς η καλύτερη που βρήκαμε. Η καλύτερη τιμή ΑΛΛΟΥ (π.χ. ψηλότερη σε πρακτορείο που
+    # ο χρήστης δεν έχει) είναι ~5% πάνω από του Stoiximan και φούσκωνε τις αποδόσεις και το ROI (βρέθηκε 19/11/2026 με το δελτίο 12 σκελών)
+    price = ((odds_row.get("stx_price") or odds_row.get("best_price") or odds_row["price"])) if odds_row else None
     p = (blend * p_model + (1 - blend) * q) if (odds_row and q is not None) else p_model
     p_raw, cal_d = p, 0.0
     if ctx.sport == "football" and market == "1X2" and odds_row and q is not None:
@@ -292,7 +297,8 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "odds": price, "p_model": p_model, "p_market": q, "p": p, "p_raw": p_raw, "cal": cal_d,
         "min_play": (round(1 / p, 2) if (price and p > 0) else None),
         "edge": (p * price - 1) if price else None,
-        "best_source": odds_row.get("best_source") if odds_row else None,
+        "best_source": ("stoiximan" if odds_row.get("stx_price") else odds_row.get("best_source")) if odds_row else None,
+        "best_other": (odds_row.get("best_price"), odds_row.get("best_source")) if odds_row else None,
         "fair_odds": 1 / p_model if p_model > 0 else None,
         "move": mv, "extra": extra or {}, "source": odds_row["source"] if odds_row else None,
         "exp": ctx.exp, "form_home": ctx.form_home, "form_away": ctx.form_away, "h2h": ctx.h2h,

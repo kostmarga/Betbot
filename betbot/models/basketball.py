@@ -41,11 +41,13 @@ class BasketballModel:
         self.coef = None
         self.sd_margin = self.sd_total = None
         self.history: list[dict] = []
+        self.archive: list[dict] = []      # ΟΛΟ το ιστορικό αγώνων (όχι μόνο το παράθυρο εκπαίδευσης): φόρμα και H2H βλέπουν όσο πίσω έχουμε
 
     def key(self, n):
         return norm_team(n, self.aliases)
 
     def fit(self, matches, now):
+        self.archive = sorted((x for x in matches if x["status"] == "finished" and x["home_score"] is not None), key=lambda x: x["kickoff"])
         rows = []
         for m in matches:
             if m["status"] != "finished" or m["home_score"] is None:
@@ -120,7 +122,7 @@ class BasketballModel:
     def form(self, team, n=6):
         k = self.key(team)
         res = []
-        for m in reversed(self.history):
+        for m in reversed(self.archive or self.history):
             hk, ak = self.key(m["home"]), self.key(m["away"])
             if k not in (hk, ak):
                 continue
@@ -133,10 +135,26 @@ class BasketballModel:
                 break
         return res
 
-    def h2h(self, home, away, limit=6):
+    def form_venue(self, team, home_flag: bool, n=10) -> list[dict]:
+        """Τελευταίοι n αγώνες της ομάδας ΜΟΝΟ εντός (home_flag=True) ή ΜΟΝΟ εκτός έδρας."""
+        k = self.key(team)
+        res = []
+        for m in reversed(self.archive or self.history):
+            hk, ak = self.key(m["home"]), self.key(m["away"])
+            if (hk if home_flag else ak) != k:
+                continue
+            gf = m["home_score"] if home_flag else m["away_score"]
+            ga = m["away_score"] if home_flag else m["home_score"]
+            res.append({"date": m["kickoff"][:10], "opp": m["away"] if home_flag else m["home"], "gf": gf, "ga": ga,
+                        "r": "Ν" if gf > ga else ("Ι" if gf == ga else "Η")})
+            if len(res) == n:
+                break
+        return res
+
+    def h2h(self, home, away, limit=10):
         kh, ka = self.key(home), self.key(away)
         res = []
-        for m in reversed(self.history):
+        for m in reversed(self.archive or self.history):
             mh, ma = self.key(m["home"]), self.key(m["away"])
             if {mh, ma} != {kh, ka}:
                 continue

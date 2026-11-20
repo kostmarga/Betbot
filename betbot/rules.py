@@ -115,11 +115,29 @@ def reasons(c, ctx, count_models) -> list[str]:
         unit = "πόντ." if ctx.sport in ("basketball", "nfl") else "γκολ"
         return f"{team}: φόρμα {rec} · {gf:.1f} {unit} υπέρ / {ga:.1f} κατά ανά ματς"
 
+    def tally(f):
+        w = sum(1 for x in f if x["r"] == "Ν"); d = sum(1 for x in f if x["r"] == "Ι"); l = sum(1 for x in f if x["r"] == "Η")
+        return w, d, l
+
     if fam in ("result", "goals", "points"):
+        unit_ = "πόντ." if ctx.sport in ("basketball", "nfl") else "γκολ"
         for t, fo in ((H, ctx.form_home), (A, ctx.form_away)):
             s = form_line(t, fo)
             if s:
                 out.append(s)
+        # Φόρμα ΜΟΝΟ εντός έδρας (γηπεδούχος) / ΜΟΝΟ εκτός (φιλοξενούμενος), τελευταίοι 10
+        for t, fo, lab in ((H, getattr(ctx, "form_home_v", []), "εντός"), (A, getattr(ctx, "form_away_v", []), "εκτός")):
+            if fo:
+                w, d, l = tally(fo)
+                out.append(f"{t} {lab} έδρας (τελευταία {len(fo)}): {w}Ν-{d}Ι-{l}Η · {sum(x['gf'] for x in fo) / len(fo):.1f} υπέρ / "
+                           f"{sum(x['ga'] for x in fo) / len(fo):.1f} κατά")
+        # Σύγκριση των δύο ομάδων μεταξύ τους (φόρμα τελευταίων 10)
+        if ctx.form_home and ctx.form_away:
+            fh, fa = ctx.form_home[:10], ctx.form_away[:10]
+            wh, dh, lh = tally(fh); wa, da, la = tally(fa)
+            dh_ = sum(x["gf"] - x["ga"] for x in fh) / len(fh); da_ = sum(x["gf"] - x["ga"] for x in fa) / len(fa)
+            out.append(f"Σύγκριση φόρμας (τελευταία {min(len(fh), len(fa))}): {H} {wh}Ν-{dh}Ι-{lh}Η ({dh_:+.1f} {unit_}/ματς) vs "
+                       f"{A} {wa}Ν-{da}Ι-{la}Η ({da_:+.1f}) · πλεονέκτημα φόρμας: " + (H if dh_ - da_ > 0.3 else A if da_ - dh_ > 0.3 else "ισόπαλο"))
         if fam == "goals":
             for t, fo in ((H, ctx.form_home), (A, ctx.form_away)):
                 if fo:
@@ -131,7 +149,11 @@ def reasons(c, ctx, count_models) -> list[str]:
                         hit = sum(1 for x in f if ((x["gf"] > 0 and x["ga"] > 0) == (c["selection"] == "YES")))
                         out.append(f"{t}: {hit}/{len(f)} τελευταία ματς έβγαλαν «{c['label']}»")
         if ctx.h2h:
-            out.append("H2H (τελευταία " + str(len(ctx.h2h[:5])) + "): " + ", ".join(m["score"] for m in ctx.h2h[:5]))
+            hh = ctx.h2h[:10]
+            wh = sum(1 for m in hh if m["gf"] > m["ga"]); dr = sum(1 for m in hh if m["gf"] == m["ga"]); wa = sum(1 for m in hh if m["gf"] < m["ga"])
+            short = f" — μόνο {len(hh)} στο ιστορικό μας, ενδεικτικό" if len(hh) < 10 else ""
+            out.append(f"Μεταξύ τους (τελευταία {len(hh)}{short}): {H} {wh}Ν-{dr}Ι-{wa}Η · μέσο σκορ "
+                       f"{sum(m['gf'] for m in hh) / len(hh):.1f}–{sum(m['ga'] for m in hh) / len(hh):.1f} · " + ", ".join(m["score"] for m in hh))
         if ctx.exp:
             out.append(f"Μοντέλο: αναμενόμενο {ctx.exp}")
     elif fam in ("corners", "cards", "throw_ins"):

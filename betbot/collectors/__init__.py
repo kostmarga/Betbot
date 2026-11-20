@@ -23,6 +23,7 @@ from .espn_news import EspnNewsCollector
 from .fdco_history import FdcoHistoryCollector
 from .greek_site import GreekSiteCollector
 from .nba_box import NbaBoxCollector
+from .history_backfill import HistoryBackfillCollector
 
 ALL = [EspnCollector, EuroleagueCollector, FdcoOddsCollector, EspnOddsCollector, OddsPapiCollector, OddsApiCollector,
-       SofascoreCollector, EspnStatsCollector, EspnLineupsCollector, EspnStandingsCollector, EspnInjuriesCollector, FplCollector, EspnNewsCollector, FdcoHistoryCollector, GreekSiteCollector, NbaBoxCollector]
+       SofascoreCollector, EspnStatsCollector, EspnLineupsCollector, EspnStandingsCollector, EspnInjuriesCollector, FplCollector, EspnNewsCollector, FdcoHistoryCollector, GreekSiteCollector, NbaBoxCollector, HistoryBackfillCollector]

@@ -109,7 +109,7 @@ leagues:
 collectors:
   espn:            {enabled: true}
   euroleague:      {enabled: true}
-  fdco_history:    {enabled: true, seasons_back: 3}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
+  fdco_history:    {enabled: true, seasons_back: 8}   # ιστορικά κόρνερ/κάρτες/φάουλ από προηγούμενες σεζόν
   espn_odds:       {enabled: true, days_ahead: 3, max_calls_per_run: 250}   # δωρεάν αποδόσεις (DraftKings/Bet365) από το ESPN
   fdco_odds:       {enabled: true}      # δωρεάν αποδόσεις top-5 + Super League
   oddspapi:        {enabled: true, bookmaker: stoiximan, hours_ahead: 36, max_calls_per_run: 8, reserve: 3, max_leagues: 12, warn_below: 40, no_pinnacle: [EL]}   # κόρνερ/κάρτες με απόδοση Stoiximan· ΟΡΙΟ 250 κλήσεις/μήνα (ανανέωση 1η)· env ODDSPAPI_KEY
@@ -145,6 +145,11 @@ collectors:
     enabled: true                       # εφεδρικά στατιστικά (κόρνερ/κάρτες/σουτ) αν το Sofascore μπλοκάρει
     lookback_days: 120
     max_calls_per_run: 400
+  history_backfill:
+    enabled: true                       # παλιό ιστορικό NBA/NFL για H2H/φόρμα στο «γιατί» (τελευταίοι 10)· σταδιακά, κάθε ομάδα×σεζόν μία φορά
+    max_calls_per_run: 40
+    nba_seasons: [2021, 2022, 2023, 2024, 2025]
+    nfl_seasons: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
   nba_box:
     enabled: true                       # boxscore NBA από το ESPN (πόντοι ανά παίκτη) για την κρίση των δελτίων «Πόντοι NBA»
     lookback_days: 5

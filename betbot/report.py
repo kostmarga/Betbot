@@ -1379,10 +1379,14 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
             if tid not in sec:
                 continue
             panes = [("balanced", sec[tid])] + [(t, sec_t[t][tid]) for t in ("strong", "bold") if t in sec_t and tid in sec_t[t]]
+            # Προεπιλογή (20/11/2026, αίτημα χρήστη): «Υψηλή πιθανότητα» (σκέλη ≥75%, το πιο σίγουρο)· αλλιώς το «Μέση»
+            dflt = (cfg.get("ui") or {}).get("default_tier", "strong")
+            if dflt not in dict(panes):
+                dflt = "balanced"
             bar = ("<div class='tiersel' role='group' aria-label='Επίπεδο ρίσκου'>"
-                   + "".join(f"<button data-tier='{t}' aria-pressed='{str(t == 'balanced').lower()}'><i class='dot d-{t}'></i><b>{n}</b><span>{E(tier_rule(cfg, t, tid) or d)}</span></button>"
+                   + "".join(f"<button data-tier='{t}' aria-pressed='{str(t == dflt).lower()}'><i class='dot d-{t}'></i><b>{n}</b><span>{E(tier_rule(cfg, t, tid) or d)}</span></button>"
                              for t, n, d in TIER_META if t in dict(panes)) + "</div>")
-            sec[tid] = bar + "".join(f"<div class='tierpane' data-tier='{t}'{'' if t == 'balanced' else ' hidden'}>{h}</div>" for t, h in panes)
+            sec[tid] = bar + "".join(f"<div class='tierpane' data-tier='{t}'{'' if t == dflt else ' hidden'}>{h}</div>" for t, h in panes)
     for tid, h in ydays.items():       # «Χθες» κάτω από το σημερινό δελτίο, εκτός των επιπέδων ρίσκου
         sec[tid] = sec[tid] + h
     body = "".join(f"<section class='tab{' on' if i == 0 else ''}' id='t-{tid}' role='tabpanel'>{sec.get(tid, '')}</section>"
@@ -1454,10 +1458,10 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
  function setTier(t){{
    document.querySelectorAll('.tierpane').forEach(p => p.hidden = (p.dataset.tier !== t));
    document.querySelectorAll('.tiersel button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tier === t)));
-   try {{ localStorage.setItem('betbot_tier', t); }} catch(e) {{}}
+   try {{ localStorage.setItem('betbot_tier2', t); }} catch(e) {{}}
  }}
  document.querySelectorAll('.tiersel button').forEach(b => b.addEventListener('click', () => setTier(b.dataset.tier)));
- try {{ const t = localStorage.getItem('betbot_tier'); if (t && document.querySelector('.tierpane[data-tier="'+t+'"]')) setTier(t); }} catch(e) {{}}
+ try {{ const t = localStorage.getItem('betbot_tier2'); if (t && document.querySelector('.tierpane[data-tier="'+t+'"]')) setTier(t); }} catch(e) {{}}
  barBtns.forEach(b => b.addEventListener('click', () => show(lastIn[b.dataset.g] || GR[b.dataset.g][0])));
  chipBtns.forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
  let start = 'today';      // κάθε νέα μέρα ανοίγει στο πλάνο· η μνήμη καρτέλας ισχύει μόνο μέσα στην ίδια μέρα

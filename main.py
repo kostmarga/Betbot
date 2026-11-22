@@ -423,6 +423,7 @@ def main(argv=None):
         save_shadows(db, cfg, now, cands)
     except Exception as e:
         log.warning("Σκιώδη ταμεία: %s", e)
+    notify_pending = True           # οι ειδοποιήσεις στέλνονται ΜΕΤΑ την αποθήκευση όλων των δελτίων (κύρια, επίπεδα, επιπλέον)
     from betbot import paper as paper_mod
     tier_lists = {}
     for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)
@@ -441,6 +442,11 @@ def main(argv=None):
                     log.warning("Επιπλέον δελτία %s: %s", tier, e)
             except Exception as e:
                 log.warning("Επίπεδο %s: %s", tier, e)
+    try:                            # ειδοποίηση push για τα ΝΕΑ δελτία (αν υπάρχει NTFY_TOPIC)
+        from betbot import notify as notify_mod
+        notify_mod.new_slips(db, cfg, now)
+    except Exception as e:
+        log.warning("Ειδοποιήσεις: %s", e)
 
     # 5) Κινήσεις αποδόσεων
     leagues = {lg["id"]: lg for lg in cfg["leagues"]}

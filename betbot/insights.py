@@ -45,8 +45,10 @@ def _pm_notes(l, kills, m) -> list:
     notes = []
     p = l.get("p") or 0
     if p:
-        notes.append(f"Είχε πιθανότητα {p * 100:.0f}% — τέτοια σκέλη χάνουν περίπου 1 στις {max(2, round(1 / max(1e-6, 1 - p)))} φορές" +
-                     (" → κανονική απώλεια." if p >= 0.55 else " → ήταν σχεδόν 50/50 εξαρχής."))
+        notes.append(f"Πιθανότητα {p * 100:.0f}%" + (" → κανονική απώλεια." if p >= 0.55 else " → σχεδόν 50/50 εξαρχής."))
+    t = margin_text(l, m)
+    if t:
+        notes.append("Τελικό: " + t)
     w = [x for x in (l.get("warnings") or []) if x]
     if w:
         notes.append("⚠️ Υπήρχε προειδοποίηση πριν τον αγώνα: " + "; ".join(w[:2]))
@@ -59,9 +61,6 @@ def _pm_notes(l, kills, m) -> list:
         if x.startswith("Συμπέρασμα:"):
             notes.append("Το bot το είχε κρίνει: " + x.replace("Συμπέρασμα: ", "")[:80])
             break
-    t = margin_text(l, m)
-    if t:
-        notes.append("Τελικό: " + t)
     if kills > 1:
         notes.append(f"Έριξε {kills} δελτία μαζί (επικάλυψη).")
     return notes
@@ -291,7 +290,7 @@ DAY_JS = """
         +s.L.map(function(l){return '<div class="lgl">'+IC[l.r]+' '+esc(l.m)+': <b>'+esc(l.lb)+'</b> @'+(l.o?l.o.toFixed(2):'—')+(l.sc?' <span class="muted">('+l.sc+')</span>':'')+'</div>';}).join('')+'</details>';}).join('');
     if(d.pm.length){
       h+='<h4 style="margin:14px 0 6px">🩺 Γιατί χάσαμε — αυτοψία κάθε χαμένου σκέλους</h4>';
-      h+=d.pm.map(function(x){return '<div class="card" style="margin:6px 0"><b>❌ '+esc(x.lb)+'</b> <span class="muted">· '+esc(x.m)+(x.n>1?' · έριξε '+x.n+' δελτία':'')+'</span><ul style="margin:6px 0 4px 18px">'+x.notes.map(function(n){return '<li>'+esc(n)+'</li>';}).join('')+'</ul><div><b>Μάθημα:</b> '+esc(x.lesson)+'</div></div>';}).join('');
+      h+=d.pm.map(function(x){return '<div class="card" style="margin:6px 0"><b>❌ '+esc(x.lb)+'</b> <span class="muted">· '+esc(x.m)+(x.n>1?' · έριξε '+x.n+' δελτία':'')+'</span><ul style="margin:6px 0 4px 18px">'+x.notes.slice(0,3).map(function(n){return '<li>'+esc(n)+'</li>';}).join('')+'</ul><div><b>Μάθημα:</b> '+esc(x.lesson)+'</div></div>';}).join('');
     } else if(d.ll===0 && d.lw+d.lo>0){ h+='<p class="muted">Κανένα χαμένο σκέλος ακόμα.</p>'; }
     document.getElementById('day-body').innerHTML=h;
     document.getElementById('day-prev').disabled=(i>=days.length-1); document.getElementById('day-next').disabled=(i<=0); sel.value=String(i);

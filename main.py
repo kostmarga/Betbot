@@ -96,14 +96,15 @@ def day_usage(db, cfg, now) -> dict:
     return use
 
 
-def saturated_matches(db, cfg, now, cat=None) -> set:
+def saturated_matches(db, cfg, now, cat=None, fallback=False) -> set:
     """Αγώνες που ΔΕΝ επιτρέπονται σε νέο δελτίο της κατηγορίας `cat`:
       • (αποκλειστικότητα κατηγοριών, `slip.exclusive_categories`) αγώνες που ήδη υπάρχουν σε δελτίο ΑΛΛΗΣ κατηγορίας — αν χαθεί ο αγώνας, να μη χάνονται δελτία
         σε πολλές κατηγορίες (αίτημα χρήστη 21–22/11/2026),
       • αγώνες που έχουν ήδη φτάσει το όριο δελτίων μέσα στην ΙΔΙΑ κατηγορία (`slip.max_slips_per_match`, προεπιλογή 2: επίπεδα/επιπλέον της ίδιας κατηγορίας)."""
     sl = cfg.get("slip") or {}
     cap = int(sl.get("max_slips_per_match", 2))
-    excl = bool(sl.get("exclusive_categories", True))
+    excl = bool(sl.get("exclusive_categories", True)) and not fallback
+    fb_cap = int(sl.get("fallback_max_slips_per_match", 4)) if fallback else 0      # στην εφεδρική λειτουργία: συνολικό όριο δελτίων ανά αγώνα (όλες οι κατηγορίες)
     out = set()
     for mid, cnt in day_usage(db, cfg, now).items():
         if cat is None:
@@ -113,6 +114,8 @@ def saturated_matches(db, cfg, now, cat=None) -> set:
         if cap > 0 and cnt.get(cat, 0) >= cap:
             out.add(mid)
         if excl and any(c != cat and n > 0 for c, n in cnt.items()):
+            out.add(mid)
+        if fb_cap > 0 and sum(cnt.values()) >= fb_cap:
             out.add(mid)
     return out
 
@@ -142,11 +145,24 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         if not sat or not any(l["match_id"] in sat for l in sl["legs"]):
             return sl
         try:
-            alt = selector.build_lists(cands, cfg_t or cfg, exclude=sat)
+            alt = (selector.build_lists(cands, cfg_t or cfg, exclude=sat).get(listkey) or {}).get("slip")
+            if alt:
+                return alt                        # δελτίο ΜΟΝΟ με αγώνες που δεν χρησιμοποιούν άλλες κατηγορίες
+            if not (cfg.get("slip") or {}).get("exclusive_fallback", True):
+                return None
+            # ΕΦΕΔΡΙΚΑ (αίτημα χρήστη 22/11/2026): αν δεν υπάρχουν άλλοι αγώνες για την κατηγορία, επιτρέπεται να ξαναχρησιμοποιηθούν οι ΚΑΛΥΤΕΡΟΙ αγώνες
+            # άλλων κατηγοριών (με τα ίδια όρια πιθανότητας), με συνολικό όριο δελτίων ανά αγώνα (`slip.fallback_max_slips_per_match`)
+            sat2 = saturated_matches(db, cfg, now, cat, fallback=True)
+            if not any(l["match_id"] in sat2 for l in sl["legs"]):
+                log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες (δεν υπήρχαν άλλοι)", listkey)
+                return sl
+            alt2 = (selector.build_lists(cands, cfg_t or cfg, exclude=sat2).get(listkey) or {}).get("slip")
+            if alt2:
+                log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες (δεν υπήρχαν άλλοι)", listkey)
+            return alt2
         except Exception as e:
             log.warning("Όριο ανά αγώνα (%s): %s", listkey, e)
             return None
-        return (alt.get(listkey) or {}).get("slip")
 
     def put(name, sl):
         name = name + suffix

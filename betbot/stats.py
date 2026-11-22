@@ -191,7 +191,14 @@ def build(db, cfg, now):
             todays[ln] = lst.pop()           # δεν εκδόθηκε σημερινό: το χθεσινό που παίζεται σήμερα γίνεται το κύριο
         if lst:
             today_extra.setdefault(ln, [])[0:0] = lst
-    return {"yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
+    try:
+        from . import insights
+        ins = insights.build(db, cfg, now)
+    except Exception as e:           # η ανάλυση δεν πρέπει να ρίχνει τη σελίδα
+        import logging
+        logging.getLogger("betbot").warning("Insights: %s", e)
+        ins = None
+    return {"insights": ins, "yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
             "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays, "today_extra": today_extra,
             "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),
             "recent": [s for s in sorted(slips, key=lambda s: s["created_at"], reverse=True) if _day(s, tz) < today][:60]}

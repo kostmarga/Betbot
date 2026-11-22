@@ -78,27 +78,43 @@ def build_models(db, cfg, ctx, now, notes):
 
 
 def day_usage(db, cfg, now) -> dict:
-    """Σε πόσα δελτία της σημερινής «ημέρας στοιχημάτων» υπάρχει κάθε αγώνας (match_id -> πλήθος). Δεν μετράνε τα σκιώδη (shadow_)."""
+    """Για κάθε αγώνα της σημερινής «ημέρας στοιχημάτων»: σε πόσα δελτία ανά ΚΑΤΗΓΟΡΙΑ υπάρχει (match_id -> {κατηγορία: πλήθος}). Δεν μετράνε τα σκιώδη (shadow_).
+    Κατηγορία = η βασική λίστα χωρίς επίπεδο/επιπλέον (recommended, safe, overs, x10, fair_corners ...)."""
     from zoneinfo import ZoneInfo
+    from betbot.paper import split_list_name
     from betbot.util import slip_day, sport_day
     tz_ = ZoneInfo(cfg["timezone"])
     today = sport_day(now, tz_)
     use = {}
     for s in db.slips():
-        if str(s.get("list_name") or "").startswith("shadow_") or slip_day(s, tz_) != today:
+        ln = str(s.get("list_name") or "")
+        if ln.startswith("shadow_") or slip_day(s, tz_) != today:
             continue
+        cat = split_list_name(ln)[1]
         for mid in {l["match_id"] for l in s["legs"]}:
-            use[mid] = use.get(mid, 0) + 1
+            use.setdefault(mid, {})[cat] = use.setdefault(mid, {}).get(cat, 0) + 1
     return use
 
 
-def saturated_matches(db, cfg, now) -> set:
-    """Αγώνες που έχουν ήδη φτάσει το όριο δελτίων ανά αγώνα (`slip.max_slips_per_match`, προεπιλογή 2): ΔΕΝ μπαίνουν σε νέο δελτίο (18/11/2026: ο ίδιος αγώνας
-    σε 10 δελτία -> μια ήττα ρίχνει όλα)."""
-    cap = int((cfg.get("slip") or {}).get("max_slips_per_match", 2))
-    if cap <= 0:
-        return set()
-    return {m for m, n in day_usage(db, cfg, now).items() if n >= cap}
+def saturated_matches(db, cfg, now, cat=None) -> set:
+    """Αγώνες που ΔΕΝ επιτρέπονται σε νέο δελτίο της κατηγορίας `cat`:
+      • (αποκλειστικότητα κατηγοριών, `slip.exclusive_categories`) αγώνες που ήδη υπάρχουν σε δελτίο ΑΛΛΗΣ κατηγορίας — αν χαθεί ο αγώνας, να μη χάνονται δελτία
+        σε πολλές κατηγορίες (αίτημα χρήστη 21–22/11/2026),
+      • αγώνες που έχουν ήδη φτάσει το όριο δελτίων μέσα στην ΙΔΙΑ κατηγορία (`slip.max_slips_per_match`, προεπιλογή 2: επίπεδα/επιπλέον της ίδιας κατηγορίας)."""
+    sl = cfg.get("slip") or {}
+    cap = int(sl.get("max_slips_per_match", 2))
+    excl = bool(sl.get("exclusive_categories", True))
+    out = set()
+    for mid, cnt in day_usage(db, cfg, now).items():
+        if cat is None:
+            if cap > 0 and sum(cnt.values()) >= cap:
+                out.add(mid)
+            continue
+        if cap > 0 and cnt.get(cat, 0) >= cap:
+            out.add(mid)
+        if excl and any(c != cat and n > 0 for c, n in cnt.items()):
+            out.add(mid)
+    return out
 
 
 def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
@@ -118,11 +134,11 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         row = db.conn.execute("SELECT created_at FROM slips WHERE slip_id=?", (f"{day}#{name}",)).fetchone()
         return bool(row and row["created_at"] >= fresh_after)
 
-    def pick(listkey, sl):
-        """Το δελτίο που τελικά αποθηκεύεται (με όριο δελτίων ανά αγώνα)."""
+    def pick(listkey, sl, cat):
+        """Το δελτίο που τελικά αποθηκεύεται (αποκλειστικότητα κατηγοριών + όριο δελτίων ανά αγώνα)."""
         if not sl or cands is None:
             return sl
-        sat = saturated_matches(db, cfg, now)
+        sat = saturated_matches(db, cfg, now, cat)
         if not sat or not any(l["match_id"] in sat for l in sl["legs"]):
             return sl
         try:
@@ -138,8 +154,8 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
                      keep_first=True, fresh_after=fresh_after)
 
     combo_on = (cfg["lists"].get("combo") or {}).get("enabled", True)
-    # ΣΕΙΡΑ ΠΡΟΤΕΡΑΙΟΤΗΤΑΣ: πρώτα οι βασικές κατηγορίες· τα λαχεία παίρνουν ό,τι αγώνες απομένουν κάτω από το όριο
-    for lid in ("recommended", "safe", "overs", "btts", "nba_pts", "x10", "x30", "x100", "combo"):
+    # ΣΕΙΡΑ ΠΡΟΤΕΡΑΙΟΤΗΤΑΣ: πρώτα το Safe (σκέλη ≥75%, τα πιο σίγουρα), μετά το Προτεινόμενο, Over κ.λπ.· τα λαχεία παίρνουν ό,τι αγώνες απομένουν
+    for lid in ("safe", "recommended", "overs", "btts", "nba_pts", "x10", "x30", "x100", "combo"):
         if lid == "combo" and not combo_on:
             # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_check.py
             sl = (lists.get("combo") or {}).get("slip")
@@ -150,7 +166,7 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         sl = (lists.get(lid) or {}).get("slip")
         if not sl or locked(lid + suffix):
             continue
-        sl = pick(lid, sl)
+        sl = pick(lid, sl, lid)
         if sl:
             put(lid, sl)
     # Κατηγορίες χωρίς απόδοση πρακτορείου: η «απόδοση» του δελτίου είναι η ελάχιστη (δίκαιη) απόδοση «παίξ' το αν ≥»
@@ -161,7 +177,7 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         name0 = f"fair_{fam}" if sl.get("fair") else fam
         if locked(name0 + suffix):
             continue
-        sl = pick(fam, sl)
+        sl = pick(fam, sl, name0)
         if sl:
             put(f"fair_{fam}" if sl.get("fair") else fam, sl)
 
@@ -237,7 +253,7 @@ def save_extras(db, cfg, now, cands, tier=None, suffix=""):
             used |= {l["match_id"] for l in _j.loads(h["legs_json"])}
         for h in db.conn.execute("SELECT legs_json FROM slips WHERE list_name=? AND created_at>=? AND slip_id NOT LIKE ?", (name, iso(now - timedelta(hours=40)), f"{day}#%")):
             used |= {l["match_id"] for l in _j.loads(h["legs_json"])}      # χθεσινό δελτίο που παίζεται ακόμα
-        used |= saturated_matches(db, cfg, now)          # και αγώνες που έχουν ήδη φτάσει το όριο δελτίων ανά αγώνα
+        used |= saturated_matches(db, cfg, now, lid)     # και αγώνες άλλων κατηγοριών / που έχουν φτάσει το όριο της κατηγορίας
         try:
             alt = selector.build_lists(cands, cfg_t, exclude=used)
         except Exception as e:

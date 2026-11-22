@@ -1000,10 +1000,33 @@ def _verdict_badge(v) -> str:
     return {"wait": "wait", "good": "good", "bad": "bad", "mid": "mid"}.get(v, "wait")
 
 
+ANALYSIS_CSS = """<style>
+.ansnav{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;margin:0 -2px;scrollbar-width:none}.ansnav::-webkit-scrollbar{display:none}
+.ansnav button{flex:0 0 auto;padding:8px 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-size:13.5px;cursor:pointer}
+.ansnav button[aria-pressed=true]{background:var(--ink);color:var(--plane);border-color:var(--ink)}
+.dslip{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:6px 0;background:var(--surface)}.dslip summary{cursor:pointer}.dslip .lgl{padding:3px 0;font-size:13.5px}
+</style>"""
+ANALYSIS_JS = """<script>(function(){var bar=document.getElementById('ansnav');if(!bar)return;
+function set(k){document.querySelectorAll('.ansec').forEach(function(x){x.hidden=(x.dataset.s!==k);});
+bar.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.s===k));});try{localStorage.setItem('betbot_an',k);}catch(e){}
+try{window.dispatchEvent(new Event('resize'));}catch(e){}}
+bar.querySelectorAll('button').forEach(function(b){b.addEventListener('click',function(){set(b.dataset.s);});});
+var k0='day';try{var t=localStorage.getItem('betbot_an');if(t&&bar.querySelector('button[data-s="'+t+'"]'))k0=t;}catch(e){}set(k0);})();</script>"""
+
+
+def _assemble_analysis(G) -> str:
+    """Η Ανάλυση οργανωμένη σε ενότητες με πλοήγηση: Ημέρα · Σύνολο · Ταμεία · Σκέλη · Μαθήματα · Ιστορικό."""
+    tabs = (("day", "📅 Ημέρα"), ("total", "📊 Σύνολο"), ("funds", "💶 Ταμεία"), ("legs", "🔎 Σκέλη"), ("lessons", "🧠 Μαθήματα"), ("more", "🗂 Ιστορικό"))
+    nav = "<div class='ansnav' id='ansnav'>" + "".join(f"<button type='button' data-s='{k}' aria-pressed='false'>{lab}</button>" for k, lab in tabs) + "</div>"
+    secs = "".join(f"<div class='ansec' data-s='{k}' hidden>{''.join(G[k]) or '<div class=card><p class=muted>Δεν υπάρχουν ακόμα δεδομένα εδώ.</p></div>'}</div>" for k, _ in tabs)
+    return ANALYSIS_CSS + nav + secs + ANALYSIS_JS
+
+
 def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
     """📊 Ανάλυση: συμπεράσματα, scorecards ανά κατηγορία/ρίσκο, γραφήματα, βαθμονόμηση."""
     from .paper import CAT_NAME, CATS, TIER_NAME, TIERS
     out = []
+    G = {k: [] for k in ("day", "total", "funds", "legs", "lessons", "more")}      # ομάδες καρτελών της Ανάλυσης
     rows = paper["rows"] if paper else []
     R = {(r["cat"], r["tier"]): r for r in rows}
     tot_settled = sum(r["settled"] for r in rows if not r.get("fair"))
@@ -1018,7 +1041,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
         fn, fw, fl, fo = (sum(r[k] for r in _fr) for k in ("n", "won", "lost", "open"))
         now_b = funded + pl; roi_all = (pl / staked) if staked else None
         tl = lambda k, v, c="": f"<div class='tile'><div class='k'>{k}</div><div class='v {c}'>{v}</div></div>"
-        out.append("<div class='card'><h3>Σύνολο μέχρι σήμερα</h3><p class='muted'>Όλα τα δελτία μαζί: «Δελτία», «Κερδισμένα», «Χαμένα» και «Επιτυχία» περιλαμβάνουν και όσα δεν έχουν απόδοση πρακτορείου (κόρνερ/κάρτες/παίκτες)· τα ποσά (κεφάλαιο, κέρδος, ROI) αφορούν ΜΟΝΟ όσα έχουν απόδοση. "
+        G["total"].append("<div class='card'><h3>Σύνολο μέχρι σήμερα</h3><p class='muted'>Όλα τα δελτία μαζί: «Δελτία», «Κερδισμένα», «Χαμένα» και «Επιτυχία» περιλαμβάνουν και όσα δεν έχουν απόδοση πρακτορείου (κόρνερ/κάρτες/παίκτες)· τα ποσά (κεφάλαιο, κέρδος, ROI) αφορούν ΜΟΝΟ όσα έχουν απόδοση. "
                    f"Κάθε ταμείο παίρνει {paper['weekly']:.0f}€ την εβδομάδα· «κεφάλαιο» = όσα έχουν διατεθεί συνολικά από την αρχή. Προσοχή: ένα μόνο κερδισμένο δελτίο με πολύ υψηλή απόδοση (π.χ. 30+) μπορεί να κάνει το σύνολο θετικό· το πραγματικό μέτρο είναι η επιτυχία και τα ταμεία ξεχωριστά, μετά από αρκετά δελτία.</p><div class='tiles'>"
                    + tl("Δελτία που παίξαμε", f"{n_all + fn}") + tl("Κερδισμένα", n_w + fw, "pos") + tl("Χαμένα", n_l + fl, "neg") + tl("Σε εξέλιξη", n_o + fo)
                    + tl("Επιτυχία", f"{(n_w + fw) / (n_set + fw + fl):.0%}" if (n_set + fw + fl) else "—")
@@ -1040,7 +1063,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
         trs = "".join(f"<tr><td>{E(CAT_NAME[r['cat']])} · {E(TIER_NAME[r['tier']])}</td><td>{r['n']}</td><td>{r['won']}/{r['lost']}</td>"
                       f"<td>{(r['hit'] * 100):.0f}%</td><td>{r['profit']:+.2f}€</td><td>{(r['roi'] * 100):+.0f}%</td></tr>" if r["hit"] is not None and r["roi"] is not None else
                       f"<tr><td>{E(CAT_NAME[r['cat']])} · {E(TIER_NAME[r['tier']])}</td><td>{r['n']}</td><td>{r['won']}/{r['lost']}</td><td>—</td><td>—</td><td>—</td></tr>" for r in core)
-        out.append("<div class='card'><h3>Βασικά δελτία: Προτεινόμενο · Safe · Over</h3><p class='muted'>Μόνο οι κατηγορίες που στοχεύουν στα πιο σίγουρα. "
+        G["total"].append("<div class='card'><h3>Βασικά δελτία: Προτεινόμενο · Safe · Over</h3><p class='muted'>Μόνο οι κατηγορίες που στοχεύουν στα πιο σίγουρα. "
                    "ΔΕΝ περιλαμβάνονται λαχεία (10+/30+/100+), Συνδυαστικό και πειραματικά, ώστε ένα τυχερό δελτίο υψηλής απόδοσης να μη φουσκώνει το ROI. "
                    "Στοιχηματισμένα = εικονικά ποντάρισμα 2€ ανά δελτίο.</p><div class='tiles'>"
                    + tl2("Δελτία κριθέντα", f"{c_set}") + tl2("Πέρασαν", c_w, "pos") + tl2("Δεν πέρασαν", c_l, "neg") + tl2("Σε εξέλιξη", c_o)
@@ -1058,13 +1081,14 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             roi = v["profit"] / v["staked"]
             return (f"<tr><td>{lab}</td><td>{v['n']}{opn}</td><td>{v['won']}</td><td>{v['exp']:.1f}</td><td>{v['won'] / v['n'] * 100:.0f}%</td>"
                     f"<td>{v['profit']:+.2f}€</td><td>{roi * 100:+.0f}%</td></tr>")
-        out.append("<div class='card'><h3>Κύρια vs Επιπλέον δελτία</h3><p class='muted'>Προτεινόμενο · Safe · Over, όλα τα επίπεδα, εικονικά 2€ ανά δελτίο. Τα επιπλέον (μόνο με εντελώς διαφορετικούς αγώνες από το κύριο) "
+        G["total"].append("<div class='card'><h3>Κύρια vs Επιπλέον δελτία</h3><p class='muted'>Προτεινόμενο · Safe · Over, όλα τα επίπεδα, εικονικά 2€ ανά δελτίο. Τα επιπλέον (μόνο με εντελώς διαφορετικούς αγώνες από το κύριο) "
                    "μετρούν ξεχωριστά εδώ για να φαίνεται αν αξίζουν· αν πηγαίνουν χειρότερα από όσο περιμέναμε, τα κλείνουμε.</p><div class='tbl'><table><thead><tr><th></th><th>Κριθέντα</th>"
                    "<th>Πέρασαν</th><th>Αναμενόταν</th><th>Επιτυχία</th><th>Κέρδος</th><th>ROI</th></tr></thead><tbody>"
                    + _mrow("Κύρια", me["main"]) + _mrow("Επιπλέον", me["extra"]) + "</tbody></table></div></div>")
     try:
         from . import insights as _ins
-        out.append(_ins.render(P, (st or {}).get("insights")))
+        _g = _ins.render(P, (st or {}).get("insights"))
+        G["day"].append(_g["day"]); G["total"].append(_g["luck"]); G["legs"].append(_g["legs"]); G["lessons"].insert(0, _g["lessons"])
     except Exception:           # δεν πρέπει να ρίχνει τη σελίδα
         pass
     # ---- συμπεράσματα
@@ -1096,7 +1120,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
             b5 = max(d5, key=lambda r: r["avg_days"])
             ins.append(("▦", "Στόχος 5 στις 7 ημέρες",
                         f"Το πιο κοντά: {CAT_NAME[b5['cat']]} · {TIER_NAME[b5['tier']]} με {b5['avg_days']:.1f}/7 ημέρες ανά εβδομάδα. Προσοχή: πολλές νίκες δεν σημαίνουν κέρδος."))
-    out.append("<div class='card'><h3>💡 Τι μάθαμε μέχρι τώρα</h3>" + "".join(
+    G["lessons"].append("<div class='card'><h3>💡 Τι μάθαμε μέχρι τώρα</h3>" + "".join(
         f"<div class='insight'><div class='ico'>{i}</div><div><b>{E(t)}</b><span>{E(d)}</span></div></div>" for i, t, d in ins) + "</div>")
     # ---- scorecards
     cards = []
@@ -1127,7 +1151,7 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
         if trs:
             cards.append(f"<div class='scorecard'><h4>{E(CAT_NAME[cat])}</h4>{''.join(trs)}</div>")
     if cards:
-        out.append("<h4 style='margin:18px 2px 8px'>Ταμεία ανά κατηγορία και ρίσκο</h4><p class='muted' style='margin:0 2px 8px'>Εικονικά στοιχήματα· "
+        G["funds"].append("<h4 style='margin:18px 2px 8px'>Ταμεία ανά κατηγορία και ρίσκο</h4><p class='muted' style='margin:0 2px 8px'>Εικονικά στοιχήματα· "
                    "η μπάρα δείχνει πόσο κοντά είμαστε στα δελτία που χρειάζονται για κρίση.</p><div class='sc-grid'>" + "".join(cards) + "</div>")
     # ---- γράφημα σωρευτικού Κ/Ζ
     top = sorted([r for r in rows if len(r["series"]) >= 2], key=lambda r: -len(r["series"]))[:6]
@@ -1142,22 +1166,22 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                 data.append(last)
             ds.append({"label": f"{CAT_NAME[r['cat']]} · {TIER_NAME[r['tier']]}", "data": data, "borderColor": SERIES[i % len(SERIES)],
                        "backgroundColor": SERIES[i % len(SERIES)], "tension": .25, "pointRadius": 2, "spanGaps": True})
-        out.append("<div class='card'><h3>💶 Σωρευτικό κέρδος/ζημιά (€, εικονικά)</h3>" + P.chart(
+        G["funds"].append("<div class='card'><h3>💶 Σωρευτικό κέρδος/ζημιά (€, εικονικά)</h3>" + P.chart(
             {"type": "line", "data": {"labels": [f"{d[8:10]}/{d[5:7]}" for d in days], "datasets": ds},
              "options": {"scales": {"y": {"title": {"display": True, "text": "€"}}}, "plugins": {"legend": {"position": "bottom"}}}}) + "</div>")
     # ---- βαθμονόμηση
     lg = (st or {}).get("legs") or {}
     bp = [r for r in lg.get("by_p", []) if r["p"] is not None]
     if bp:
-        out.append("<div class='card'><h3>🎯 Βαθμονόμηση: ό,τι λέμε, βγαίνει;</h3><p class='muted'>Αν οι μπάρες είναι ίδιες, το bot λέει "
+        G["lessons"].append("<div class='card'><h3>🎯 Βαθμονόμηση: ό,τι λέμε, βγαίνει;</h3><p class='muted'>Αν οι μπάρες είναι ίδιες, το bot λέει "
                    "την αλήθεια. Αν το «πραγματικό» είναι χαμηλότερο, είναι υπερβολικά αισιόδοξο.</p>" + P.chart(
             {"type": "bar", "data": {"labels": [f"{r['key']} (n={r['n']})" for r in bp], "datasets": [
                 {"label": "Αναμενόταν %", "data": [round(r["p"] * 100) for r in bp], "backgroundColor": "var(--s1)"},
                 {"label": "Βγήκε %", "data": [round(r["hit"] * 100) for r in bp], "backgroundColor": "var(--s3)"}]},
              "options": {"scales": {"y": {"min": 0, "max": 100}}, "plugins": {"legend": {"position": "bottom"}}}}, small=True) + "</div>")
-    out.append(_goals_card(goals))
-    out.append(extra_html)
-    return "".join(out)
+    G["total"].append(_goals_card(goals))
+    G["more"].append(extra_html)
+    return _assemble_analysis(G)
 
 
 def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, plan=None, goals=None, st=None, cidx=None, paper=None, tier_lists=None, inplay=None, health=None) -> str:

@@ -8,7 +8,7 @@ import math
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 
-from .paper import CAT_NAME, drop_tier_dups, split_list_name
+from .paper import CAT_NAME, TIER_NAME, drop_tier_dups, split_list_name
 from .stats import _LEGACY
 from .util import slip_day, sport_day
 
@@ -38,6 +38,125 @@ def margin_text(leg, m) -> str:
     if mk in ("1X2", "ML", "BTTS"):
         return f"σκορ {h}-{a}"
     return f"σκορ {h}-{a}"
+
+
+def _pm_notes(l, kills, m) -> list:
+    """Αυτόματη «αυτοψία» ενός χαμένου σκέλους: τι ξέραμε πριν και τι έγινε."""
+    notes = []
+    p = l.get("p") or 0
+    if p:
+        notes.append(f"Είχε πιθανότητα {p * 100:.0f}% — τέτοια σκέλη χάνουν περίπου 1 στις {max(2, round(1 / max(1e-6, 1 - p)))} φορές" +
+                     (" → κανονική απώλεια." if p >= 0.55 else " → ήταν σχεδόν 50/50 εξαρχής."))
+    w = [x for x in (l.get("warnings") or []) if x]
+    if w:
+        notes.append("⚠️ Υπήρχε προειδοποίηση πριν τον αγώνα: " + "; ".join(w[:2]))
+    why = l.get("why") or []
+    for x in why:
+        if "ανέβηκε" in x or "ανεβαίνει" in x:
+            notes.append("Η αγορά πήγε κόντρα: " + x[:90])
+            break
+    for x in why:
+        if x.startswith("Συμπέρασμα:"):
+            notes.append("Το bot το είχε κρίνει: " + x.replace("Συμπέρασμα: ", "")[:80])
+            break
+    t = margin_text(l, m)
+    if t:
+        notes.append("Τελικό: " + t)
+    if kills > 1:
+        notes.append(f"Έριξε {kills} δελτία μαζί (επικάλυψη).")
+    return notes
+
+
+def _lesson(l, kills) -> str:
+    p = l.get("p") or 0
+    if [x for x in (l.get("warnings") or []) if x]:
+        return "Το σημάδι υπήρχε πριν: αν επαναληφθεί σε πολλά σκέλη, προτείνεται αυστηρότερος κανόνας."
+    if p >= 0.7:
+        return "Απλή ατυχία: δυνατό σκέλος που έχασε· δεν υπάρχει κάτι να διορθωθεί."
+    if p < 0.55:
+        return "Αδύναμη επιλογή (≈50/50)· μόνο σε λαχεία/χάντικαπ — δεν ταιριάζει στον στόχο «πιο σίγουρα»."
+    return "Μέσης πιθανότητας σκέλος: η απώλεια είναι μέσα στα αναμενόμενα."
+
+
+def days_view(db, slips, tz, today, ndays=21) -> list:
+    """Ανά ημέρα στοιχημάτων: τι παίξαμε, τι κέρδισε/έχασε, και αυτοψία κάθε χαμένου σκέλους."""
+    from datetime import timedelta
+    from .util import parse_iso
+    byday = defaultdict(list)
+    for s in slips:
+        d = slip_day(s, tz)
+        if (today - d).days <= ndays:
+            byday[d].append(s)
+    out = []
+    for d in sorted(byday, reverse=True):
+        ss = sorted(byday[d], key=lambda x: (split_list_name(x["list_name"])[1] not in CORE, x["created_at"]))
+        kills = defaultdict(int)
+        legs_u = {}
+        for s in ss:
+            for l in s["legs"]:
+                k = (l["match_id"], l["market"], l["selection"], l.get("line"))
+                legs_u[k] = l
+                if l.get("result") == "lost":
+                    kills[k] += 1
+        slips_out, pl = [], 0.0
+        for s in ss:
+            tier, cat = split_list_name(s["list_name"])
+            nm = CAT_NAME.get(cat, cat) + ("" if tier == "balanced" else " · " + TIER_NAME[tier]) + (" · επιπλέον" if "+" in str(s["slip_id"]).split("#")[-1] else "")
+            stk = 1.0 if cat in ("x10", "x30", "x100") else 2.0
+            if not cat.startswith("fair_"):
+                if s["status"] == "won":
+                    pl += stk * s["total_odds"] - stk
+                elif s["status"] == "lost":
+                    pl -= stk
+            lg = []
+            for l in s["legs"]:
+                m = db.get_match(l["match_id"])
+                sc = f"{m['home_score']}-{m['away_score']}" if m and m.get("home_score") is not None else ""
+                lg.append({"r": l.get("result") or "open", "lb": str(l.get("label") or "")[:44], "m": f"{l.get('home', '')} – {l.get('away', '')}"[:40],
+                           "sc": sc, "p": round(l.get("p") or 0, 2), "o": round(l.get("odds") or 0, 2)})
+            slips_out.append({"n": nm, "s": s["status"], "o": round(s["total_odds"], 2), "p": round(s["model_prob"] or 0, 3), "f": cat.startswith("fair_"), "L": lg})
+        pm = []
+        for k, n in sorted(kills.items(), key=lambda kv: -kv[1]):
+            l = legs_u[k]
+            m = db.get_match(l["match_id"])
+            pm.append({"lb": str(l.get("label") or "")[:44], "m": f"{l.get('home', '')} – {l.get('away', '')}"[:40], "n": n, "notes": _pm_notes(l, n, m), "lesson": _lesson(l, n)})
+        won = sum(1 for l in legs_u.values() if l.get("result") == "won")
+        lost = sum(1 for l in legs_u.values() if l.get("result") == "lost")
+        opn = sum(1 for l in legs_u.values() if l.get("result") in (None, "open"))
+        exp_w = sum((l.get("p") or 0) for l in legs_u.values() if l.get("result") in ("won", "lost"))
+        out.append({"d": d.isoformat(), "wd": ["Δευ", "Τρι", "Τετ", "Πεμ", "Παρ", "Σαβ", "Κυρ"][d.weekday()], "slips": slips_out,
+                    "n": len(ss), "sw": sum(1 for s in ss if s["status"] == "won"), "sl": sum(1 for s in ss if s["status"] == "lost"), "so": sum(1 for s in ss if s["status"] == "open"),
+                    "lw": won, "ll": lost, "lo": opn, "exp": round(exp_w, 1), "pl": round(pl, 2), "pm": pm})
+    return out
+
+
+def patterns(slips, tz) -> dict:
+    """Μοτίβα σε ΟΛΑ τα κριθέντα μοναδικά σκέλη: σε ποια χαρακτηριστικά πηγαίνουμε χειρότερα/καλύτερα από το αναμενόμενο (με σ)."""
+    from .util import parse_iso
+    legs = {}
+    for s in slips:
+        for l in s["legs"]:
+            if l.get("result") in ("won", "lost") and l.get("p"):
+                legs[(l["match_id"], l["market"], l["selection"], l.get("line"))] = l
+    feats = defaultdict(lambda: [0, 0.0, 0.0, 0])      # (χαρακτηριστικό, τιμή) -> n, Σp, Σp(1-p), νίκες
+    for l in legs.values():
+        p = l["p"]
+        v = str(l.get("verdict") or "")
+        vb = ("ΑΞΙΖΕΙ ΜΕ ΕΠΙΦΥΛΑΞΕΙΣ" if "ΕΠΙΦΥΛΑΞΕΙΣ" in v else "ΟΡΙΑΚΟ" if "ΟΡΙΑΚΟ" in v else "ΑΞΙΖΕΙ" if "ΑΞΙΖΕΙ" in v else "άλλο")
+        for key in (("Αγορά", grp(l)), ("Λίγκα", l.get("league_name") or l.get("league") or ""), ("Άθλημα", l.get("sport") or ""),
+                    ("Πιθανότητα", "<60%" if p < .6 else "60–70%" if p < .7 else "70–80%" if p < .8 else "80%+"),
+                    ("Προειδοποίηση πριν", "είχε" if [x for x in (l.get("warnings") or []) if x] else "δεν είχε"), ("Κρίση bot", vb)):
+            f = feats[key]
+            f[0] += 1; f[1] += p; f[2] += p * (1 - p); f[3] += l["result"] == "won"
+    rows = []
+    for (name, val), (n, e, var, w) in feats.items():
+        if n >= 12 and val:
+            sd = math.sqrt(var)
+            rows.append({"f": name, "v": val, "n": n, "w": int(w), "e": round(e, 1), "sd": round(sd, 1), "z": round((w - e) / sd, 1) if sd else 0.0})
+    tested = len(rows)
+    rows.sort(key=lambda r: r["z"])
+    return {"worst": [r for r in rows if r["z"] <= -1.5][:6], "best": [r for r in rows[::-1] if r["z"] >= 1.5][:4], "tested": tested,
+            "chance": round(tested * 0.134, 1), "n_legs": len(legs)}
 
 
 def build(db, cfg, now) -> dict:
@@ -110,7 +229,7 @@ def build(db, cfg, now) -> dict:
             e["n"] += 1; e["cats"].add(cat)
     exp_out = sorted(({"m": e["m"], "n": e["n"], "c": sorted(e["cats"])} for e in exp.values()), key=lambda x: (-x["n"], x["m"]))[:20]
     return {"legs": legs_out, "core": {"pts": core_pts, "w": int(cw), "e": round(ce, 1), "sd": round(csd, 1), "n": len(core_sel)}, "cats": cat_rows,
-            "kill": kill_out, "lost_slips": lost_slips, "exposure": exp_out}
+            "kill": kill_out, "lost_slips": lost_slips, "exposure": exp_out, "days": days_view(db, slips, tz, today), "patterns": patterns(slips, tz)}
 
 
 EXPLORER_JS = """
@@ -148,11 +267,55 @@ EXPLORER_JS = """
 """
 
 
-def render(P, ins) -> str:
-    """HTML κάρτες: μετρητής τύχης, εξερεύνηση σκελών, αυτοψία χαμένων, έκθεση σήμερα."""
+DAY_JS = """
+(function(){
+  var el=document.getElementById('dayv'); if(!el) return;
+  var days=JSON.parse(document.getElementById('dayv-data').textContent); if(!days.length) return;
+  var i=0, IC={won:'✅',lost:'❌',void:'↩️',open:'⏳'}, SC={won:'ΠΕΡΑΣΕ',lost:'ΔΕΝ ΠΕΡΑΣΕ',void:'ΑΚΥΡΟ',open:'ΣΕ ΕΞΕΛΙΞΗ'};
+  function esc(t){return String(t).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+  var sel=document.getElementById('day-sel');
+  sel.innerHTML=days.map(function(d,k){return '<option value="'+k+'">'+d.wd+' '+d.d.slice(8)+'/'+d.d.slice(5,7)+(k===0?' (πιο πρόσφατη)':'')+'</option>';}).join('');
+  function show(){
+    var d=days[i], h='';
+    var pl=d.pl; 
+    h+='<div class="tiles"><div class="tile"><div class="k">Δελτία</div><div class="v">'+d.n+'</div></div>'
+      +'<div class="tile"><div class="k">Πέρασαν</div><div class="v pos">'+d.sw+'</div></div>'
+      +'<div class="tile"><div class="k">Δεν πέρασαν</div><div class="v neg">'+d.sl+'</div></div>'
+      +'<div class="tile"><div class="k">Σε εξέλιξη</div><div class="v">'+d.so+'</div></div>'
+      +'<div class="tile"><div class="k">Σκέλη ✅/❌</div><div class="v">'+d.lw+'/'+d.ll+'</div></div>'
+      +'<div class="tile"><div class="k">Αναμενόταν ✅</div><div class="v">'+d.exp.toFixed(1)+'</div></div>'
+      +'<div class="tile"><div class="k">Κ/Ζ ημέρας (εικον.)</div><div class="v '+(pl>0?'pos':pl<0?'neg':'')+'">'+(pl>=0?'+':'')+pl.toFixed(2)+'€</div></div></div>';
+    h+='<p class="muted" style="margin:6px 0">Μοναδικά σκέλη: '+(d.lw+d.ll+d.lo)+' ('+d.lw+' ✅, '+d.ll+' ❌'+(d.lo?', '+d.lo+' ⏳':'')+'). Αν η διαφορά ✅ από «αναμενόταν» είναι μικρή, η μέρα ήταν κανονική· η επικάλυψη είναι αυτή που μεγαλώνει τις ήττες δελτίων.</p>';
+    h+=d.slips.map(function(s){
+      return '<details class="dslip"><summary><b>'+IC[s.s]+' '+esc(s.n)+'</b> · '+s.o.toFixed(2)+' · '+Math.round(s.p*100)+'%'+(s.f?' · χωρίς απόδοση':'')+'</summary>'
+        +s.L.map(function(l){return '<div class="lgl">'+IC[l.r]+' '+esc(l.m)+': <b>'+esc(l.lb)+'</b> @'+(l.o?l.o.toFixed(2):'—')+(l.sc?' <span class="muted">('+l.sc+')</span>':'')+'</div>';}).join('')+'</details>';}).join('');
+    if(d.pm.length){
+      h+='<h4 style="margin:14px 0 6px">🩺 Γιατί χάσαμε — αυτοψία κάθε χαμένου σκέλους</h4>';
+      h+=d.pm.map(function(x){return '<div class="card" style="margin:6px 0"><b>❌ '+esc(x.lb)+'</b> <span class="muted">· '+esc(x.m)+(x.n>1?' · έριξε '+x.n+' δελτία':'')+'</span><ul style="margin:6px 0 4px 18px">'+x.notes.map(function(n){return '<li>'+esc(n)+'</li>';}).join('')+'</ul><div><b>Μάθημα:</b> '+esc(x.lesson)+'</div></div>';}).join('');
+    } else if(d.ll===0 && d.lw+d.lo>0){ h+='<p class="muted">Κανένα χαμένο σκέλος ακόμα.</p>'; }
+    document.getElementById('day-body').innerHTML=h;
+    document.getElementById('day-prev').disabled=(i>=days.length-1); document.getElementById('day-next').disabled=(i<=0); sel.value=String(i);
+  }
+  document.getElementById('day-prev').onclick=function(){if(i<days.length-1){i++;show();}};
+  document.getElementById('day-next').onclick=function(){if(i>0){i--;show();}};
+  sel.onchange=function(){i=parseInt(sel.value,10);show();};
+  show();
+})();
+"""
+
+
+def render(P, ins) -> dict:
+    """HTML ανά ομάδα καρτελών της Ανάλυσης: day, luck, legs, lessons."""
+    G = {"day": "", "luck": "", "legs": "", "lessons": ""}
     if not ins:
-        return ""
-    out = []
+        return G
+    # --- καρτέλα «Ημέρα»
+    if ins.get("days"):
+        G["day"] += ("<div class='card'><h3>📅 Ημέρα προς ημέρα</h3><p class='muted'>Τι παίξαμε, τι κερδίσαμε, τι χάσαμε — και αυτοψία γιατί χάθηκε κάθε σκέλος. "
+                     "Η «ημέρα στοιχημάτων» πάει από τις 06:00 ως τις 05:59.</p>"
+                     "<div style='display:flex;gap:6px;align-items:center;margin:8px 0'><button id='day-prev' type='button'>◀ Παλαιότερη</button><select id='day-sel' style='flex:1'></select>"
+                     "<button id='day-next' type='button'>Νεότερη ▶</button></div><div id='dayv'><div id='day-body'></div></div>"
+                     "<script type='application/json' id='dayv-data'>" + json.dumps(ins["days"], ensure_ascii=False).replace("</", "<\\/") + "</script><script>" + DAY_JS + "</script></div>")
     # --- μετρητής τύχης
     core = ins["core"]
     if core["n"] >= 3:
@@ -168,35 +331,52 @@ def render(P, ins) -> str:
         verdict = ("μέσα στην κανονική διακύμανση" if abs(z) <= 1.5 else "κάτω από το αναμενόμενο — να το προσέχουμε" if z < 0 else "πάνω από το αναμενόμενο (πιθανή τύχη)")
         rows = "".join(f"<tr><td>{E(r['c'])}</td><td>{r['n']}</td><td>{r['w']}</td><td>{r['e']:.1f} ± {r['sd']:.1f}</td>"
                        f"<td class='{'neg' if r['z'] < -1.5 else 'pos' if r['z'] > 1.5 else ''}'>{r['z']:+.1f}σ</td></tr>" for r in ins["cats"] if r["n"] >= 2)
-        out.append("<div class='card'><h3>🍀 Μετρητής τύχης</h3><p class='muted'>Πόσες νίκες έχουμε σε σχέση με όσες περίμενε το μοντέλο, για Προτεινόμενο · Safe · Over (όλα τα επίπεδα). "
-                   "Η γραμμή μέσα στις διακεκομμένες = κανονική διακύμανση· εκτός ±2σ = αξίζει έλεγχο.</p>"
-                   f"<p><b>{core['n']}</b> δελτία · νίκες <b>{core['w']}</b> · αναμενόταν <b>{core['e']:.1f} ± {core['sd']:.1f}</b> · <b>{z:+.1f}σ</b> — {verdict}.</p>"
-                   + P.chart(cfgc) + "<div class='tbl'><table><thead><tr><th>Κατηγορία</th><th>Δελτία</th><th>Νίκες</th><th>Αναμενόταν</th><th>Διαφορά</th></tr></thead><tbody>"
-                   + rows + "</tbody></table></div></div>")
+        G["luck"] = ("<div class='card'><h3>🍀 Μετρητής τύχης</h3><p class='muted'>Πόσες νίκες έχουμε σε σχέση με όσες περίμενε το μοντέλο, για Προτεινόμενο · Safe · Over (όλα τα επίπεδα). "
+                     "Η γραμμή μέσα στις διακεκομμένες = κανονική διακύμανση· εκτός ±2σ = αξίζει έλεγχο.</p>"
+                     f"<p><b>{core['n']}</b> δελτία · νίκες <b>{core['w']}</b> · αναμενόταν <b>{core['e']:.1f} ± {core['sd']:.1f}</b> · <b>{z:+.1f}σ</b> — {verdict}.</p>"
+                     + P.chart(cfgc) + "<div class='tbl'><table><thead><tr><th>Κατηγορία</th><th>Δελτία</th><th>Νίκες</th><th>Αναμενόταν</th><th>σ</th></tr></thead><tbody>"
+                     + rows + "</tbody></table></div></div>")
     # --- εξερεύνηση σκελών
     if ins["legs"]:
         sel = lambda i, w="": f"<select id='{i}' {w}></select>"
-        out.append("<div class='card'><h3>🔎 Εξερεύνηση σκελών</h3><p class='muted'>Όλα τα μοναδικά σκέλη που κρίθηκαν (ένα σκέλος που μπήκε σε πολλά δελτία μετράει μία φορά). "
-                   "Φίλτραρε για να δεις πού πάμε καλά ή άσχημα — με τη διαφορά από τις αναμενόμενες νίκες.</p>"
-                   "<div id='legx' style='display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:8px 0'>"
-                   + sel("lx-sp") + sel("lx-lg") + sel("lx-g") + sel("lx-c") + sel("lx-pb") + sel("lx-ob")
-                   + "<select id='lx-res'><option value=''>Όλα τα αποτελέσματα</option><option value='won'>Μόνο ✅ πέρασαν</option><option value='lost'>Μόνο ❌ έχασαν</option></select>"
-                   + "<select id='lx-days'><option value=''>Όλες οι ημέρες</option><option value='7'>Τελευταίες 7</option><option value='14'>Τελευταίες 14</option><option value='30'>Τελευταίες 30</option></select></div>"
-                   "<div id='lx-sum' style='margin:8px 0'></div><div class='tbl'><table><thead><tr><th></th><th>Ημ.</th><th>Σκέλος</th><th>p</th><th>Απόδ.</th></tr></thead><tbody id='lx-list'></tbody></table></div><p class='muted'>Δείχνονται τα 40 πιο πρόσφατα με τα φίλτρα· η σύνοψη πάνω μετράει ΟΛΑ.</p>"
-                   "<script type='application/json' id='legx-data'>" + json.dumps(ins["legs"], ensure_ascii=False).replace("</", "<\\/") + "</script><script>" + EXPLORER_JS + "</script></div>")
-    # --- αυτοψία χαμένων
+        G["legs"] = ("<div class='card'><h3>🔎 Εξερεύνηση σκελών</h3><p class='muted'>Όλα τα μοναδικά σκέλη που κρίθηκαν (ένα σκέλος που μπήκε σε πολλά δελτία μετράει μία φορά). "
+                     "Φίλτραρε για να δεις πού πάμε καλά ή άσχημα — με τη διαφορά από τις αναμενόμενες νίκες.</p>"
+                     "<div id='legx' style='display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin:8px 0'>"
+                     + sel("lx-sp") + sel("lx-lg") + sel("lx-g") + sel("lx-c") + sel("lx-pb") + sel("lx-ob")
+                     + "<select id='lx-res'><option value=''>Όλα τα αποτελέσματα</option><option value='won'>Μόνο ✅ πέρασαν</option><option value='lost'>Μόνο ❌ έχασαν</option></select>"
+                     + "<select id='lx-days'><option value=''>Όλες οι ημέρες</option><option value='7'>Τελευταίες 7</option><option value='14'>Τελευταίες 14</option><option value='30'>Τελευταίες 30</option></select></div>"
+                     "<div id='lx-sum' style='margin:8px 0'></div><div class='tbl'><table><thead><tr><th></th><th>Ημ.</th><th>Σκέλος</th><th>p</th><th>Απόδ.</th></tr></thead><tbody id='lx-list'></tbody></table></div>"
+                     "<p class='muted'>Δείχνονται τα 40 πιο πρόσφατα με τα φίλτρα· η σύνοψη πάνω μετράει ΟΛΑ.</p>"
+                     "<script type='application/json' id='legx-data'>" + json.dumps(ins["legs"], ensure_ascii=False).replace("</", "<\\/") + "</script><script>" + EXPLORER_JS + "</script></div>")
+    # --- Μαθήματα: μοτίβα + αυτοψία 7 ημερών
+    pt = ins.get("patterns") or {}
+    if pt.get("n_legs"):
+        def trs(lst, cls):
+            return "".join(f"<tr><td>{E(r['f'])}: <b>{E(r['v'])}</b></td><td>{r['n']}</td><td>{r['w']}</td><td>{r['e']:.1f} ± {r['sd']:.1f}</td><td class='{cls}'>{r['z']:+.1f}σ</td></tr>" for r in lst)
+        head = "<thead><tr><th>Χαρακτηριστικό</th><th>Σκέλη</th><th>Νίκες</th><th>Αναμενόταν</th><th>σ</th></tr></thead>"
+        body = ""
+        if pt.get("worst"):
+            body += "<h4 style='margin:10px 0 4px'>Πιθανές «παγίδες» (κάτω από το αναμενόμενο)</h4><div class='tbl'><table>" + head + "<tbody>" + trs(pt["worst"], "neg") + "</tbody></table></div>"
+        else:
+            body += "<p>✅ Κανένα χαρακτηριστικό (αγορά, λίγκα, άθλημα, πιθανότητα, προειδοποίηση, κρίση του bot) δεν είναι σημαντικά κάτω από το αναμενόμενο.</p>"
+        if pt.get("best"):
+            body += "<h4 style='margin:10px 0 4px'>Δυνατά σημεία (πάνω από το αναμενόμενο)</h4><div class='tbl'><table>" + head + "<tbody>" + trs(pt["best"], "pos") + "</tbody></table></div>"
+        G["lessons"] += ("<div class='card'><h3>🧠 Μοτίβα: πού χάνουμε περισσότερο από το αναμενόμενο</h3>"
+                         f"<p class='muted'>Έλεγχος σε {pt['n_legs']} κριθέντα σκέλη, {pt['tested']} χαρακτηριστικά (με ≥12 σκέλη). Από τύχη μόνο, περίπου {pt['chance']:.0f} από αυτά θα βγουν "
+                         "«ύποπτα» (|διαφορά| > 1,5σ). Γι' αυτό ΔΕΝ αλλάζουμε κανόνα για ένα μοτίβο μόνο του· χρειάζεται να μείνει κάτω από −2σ με 30+ σκέλη για 2 εβδομάδες. "
+                         "Τότε σου προτείνω ρητά τον κανόνα και τον εφαρμόζουμε μαζί.</p>" + body + "</div>")
     if ins["kill"]:
-        trs = "".join(f"<tr><td><b>{k['n']}</b></td><td>{E(k['lb'])}<div class='muted'>{E(k['m'])} · {k['d']} · {E(k['t'])}</div></td><td>{int(k['p'] * 100)}%</td><td class='muted'>{E(k['c'])}</td></tr>"
-                      for k in ins["kill"])
-        out.append("<div class='card'><h3>🩺 Αυτοψία: τι έριξε τα δελτία (τελευταίες 7 ημέρες)</h3>"
-                   f"<p class='muted'>{ins['lost_slips']} δελτία έχασαν. Εδώ τα σκέλη που τα έριξαν και πόσα δελτία έριξε το καθένα (αριστερά). "
-                   "Αν ένα σκέλος έριξε πολλά δελτία, είχαμε υπερβολική επικάλυψη.</p><div class='tbl'><table><thead><tr><th>Δελτία</th><th>Σκέλος</th><th>p</th><th>Κατηγορίες</th></tr></thead><tbody>"
-                   + trs + "</tbody></table></div></div>")
-    # --- έκθεση σήμερα
+        trs_ = "".join(f"<tr><td><b>{k['n']}</b></td><td>{E(k['lb'])}<div class='muted'>{E(k['m'])} · {k['d']} · {E(k['t'])}</div></td><td>{int(k['p'] * 100)}%</td><td class='muted'>{E(k['c'])}</td></tr>"
+                       for k in ins["kill"])
+        G["lessons"] += ("<div class='card'><h3>🩺 Τι έριξε τα δελτία (τελευταίες 7 ημέρες)</h3>"
+                         f"<p class='muted'>{ins['lost_slips']} δελτία έχασαν. Εδώ τα σκέλη που τα έριξαν και πόσα δελτία έριξε το καθένα (αριστερά). "
+                         "Αν ένα σκέλος έριξε πολλά δελτία, είχαμε υπερβολική επικάλυψη.</p><div class='tbl'><table><thead><tr><th>Δελτία</th><th>Σκέλος</th><th>p</th><th>Κατηγορίες</th></tr></thead><tbody>"
+                         + trs_ + "</tbody></table></div></div>")
+    # --- έκθεση σήμερα (στην καρτέλα Ημέρα)
     if ins["exposure"]:
-        trs = "".join(f"<tr><td>{'⚠️' if x['n'] > 2 else '🔁' if len(x['c']) > 1 else ''}</td><td>{E(x['m'])}</td><td><b>{x['n']}</b></td><td class='muted'>{E(', '.join(x['c']))}</td></tr>"
-                      for x in ins["exposure"])
-        out.append("<div class='card'><h3>⚖️ Έκθεση σήμερα</h3><p class='muted'>Κάθε αγώνας σε πόσα δελτία της ημέρας υπάρχει. ⚠️ = πάνω από 2 δελτία, 🔁 = σε περισσότερες από μία κατηγορίες "
-                   "(επιτρέπεται μόνο όταν δεν υπήρχαν άλλοι αγώνες).</p><div class='tbl'><table><thead><tr><th></th><th>Αγώνας</th><th>Δελτία</th><th>Κατηγορίες</th></tr></thead><tbody>"
-                   + trs + "</tbody></table></div></div>")
-    return "".join(out)
+        trs_ = "".join(f"<tr><td>{'⚠️' if x['n'] > 2 else '🔁' if len(x['c']) > 1 else ''}</td><td>{E(x['m'])}</td><td><b>{x['n']}</b></td><td class='muted'>{E(', '.join(x['c']))}</td></tr>"
+                       for x in ins["exposure"])
+        G["day"] += ("<div class='card'><h3>⚖️ Έκθεση σήμερα</h3><p class='muted'>Κάθε αγώνας σε πόσα δελτία της ημέρας υπάρχει. ⚠️ = πάνω από 2 δελτία, 🔁 = σε περισσότερες από μία κατηγορίες "
+                     "(επιτρέπεται μόνο όταν δεν υπήρχαν άλλοι αγώνες).</p><div class='tbl'><table><thead><tr><th></th><th>Αγώνας</th><th>Δελτία</th><th>Κατηγορίες</th></tr></thead><tbody>"
+                     + trs_ + "</tbody></table></div></div>")
+    return G

@@ -68,6 +68,7 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           PAGE_URL: ${{ vars.PAGE_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}     # ειδοποιήσεις push για νέα δελτία (ntfy.sh)· προαιρετικό — βλ. README
         run: python main.py
 
       - name: Αντίγραφο βάσης (πριν από οποιαδήποτε εντολή git)

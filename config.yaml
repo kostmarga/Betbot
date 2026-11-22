@@ -163,6 +163,11 @@ collectors:
     events_url: ""
     timeout: 20
 
+notify:
+  enabled: true                 # ειδοποίηση push (ntfy.sh) όταν βγαίνει ΝΕΟ δελτίο· χρειάζεται το secret NTFY_TOPIC, αλλιώς δεν στέλνεται τίποτα
+  categories: [recommended, safe, overs]    # ποιες κατηγορίες ειδοποιούν (π.χ. + btts, x10, x30, x100, nba_pts)
+  tiers: [strong, balanced, bold]
+
 ui:
   default_tier: strong        # ποιο επίπεδο ρίσκου ανοίγει πρώτο στις καρτέλες δελτίων: strong = «Υψηλή πιθανότητα», balanced = «Μέση», bold = «Χαμηλή»
 

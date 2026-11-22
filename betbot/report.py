@@ -1062,6 +1062,11 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                    "μετρούν ξεχωριστά εδώ για να φαίνεται αν αξίζουν· αν πηγαίνουν χειρότερα από όσο περιμέναμε, τα κλείνουμε.</p><div class='tbl'><table><thead><tr><th></th><th>Κριθέντα</th>"
                    "<th>Πέρασαν</th><th>Αναμενόταν</th><th>Επιτυχία</th><th>Κέρδος</th><th>ROI</th></tr></thead><tbody>"
                    + _mrow("Κύρια", me["main"]) + _mrow("Επιπλέον", me["extra"]) + "</tbody></table></div></div>")
+    try:
+        from . import insights as _ins
+        out.append(_ins.render(P, (st or {}).get("insights")))
+    except Exception:           # δεν πρέπει να ρίχνει τη σελίδα
+        pass
     # ---- συμπεράσματα
     ins = []
     if not tot_settled:

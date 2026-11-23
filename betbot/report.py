@@ -543,13 +543,15 @@ def _alternatives_html(P, lists, plan, cfg, cidx, tctx=None, view=None) -> str:
                             ("fair_players", "players", "👤 Δελτίο παικτών")):
         if lid in in_plan or (lid == "safe" and "safe" in in_plan):
             continue
+        if lid == "combo" and not ((cfg.get("lists") or {}).get("combo") or {}).get("enabled", True):
+            continue                      # το Συνδυαστικό είναι κλειστό (μόνο σκιώδες): δεν προτείνεται ούτε φαίνεται στο ημερολόγιο
         sl = view(lid, lists[key].get("slip"), fair=lid.startswith("fair_")) if view else lists[key].get("slip")
         if sl and (sl["total_odds"] <= 8):
             blocks.append(_slip_compact(P, title, sl, cidx, fair=bool(sl.get("fair")), tctx=tctx))
     if not blocks:
         return ""
     return ("<div class='card'><h3>➕ Δελτία που επίσης θα μπορούσες να παίξεις σήμερα</h3>"
-            "<p class='muted'>Ένα δελτίο ανά κατηγορία. Δεν προστίθενται στο πλάνο ποσών: αν προτιμάς κάποιο "
+            "<p class='muted'>Τα δελτία των άλλων κατηγοριών (Safe, κόρνερ, κάρτες, παίκτες): είναι ΤΑ ΙΔΙΑ που βλέπεις στα «Δελτία» και στο Ημερολόγιο, εικονικά τα μετράμε όλα. Δεν προστίθενται στο πλάνο ποσών: αν προτιμάς κάποιο "
             f"<b>αντί</b> για τα προτεινόμενα, κράτα το ίδιο ποσό ({unit:.2f}€) και το όριο των στοιχημάτων της ημέρας.</p>"
             + "".join(blocks) + "</div>")
 

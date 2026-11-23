@@ -30,7 +30,7 @@ from betbot.models import BasketballModel, CountModel, FootballModel, PlayerMode
 from betbot.util import iso, log
 
 SLIM_KEYS = ("match_id", "league", "league_name", "sport", "kickoff", "home", "away", "market",
-             "selection", "line", "label", "odds", "p_model", "p_market", "p", "p_raw", "cal", "min_play", "verdict", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
+             "selection", "line", "label", "odds", "p_model", "p_market", "p", "p_raw", "p_base", "learn", "cal", "min_play", "verdict", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
 
 
 def load_cfg(path="config.yaml"):
@@ -408,6 +408,8 @@ def main(argv=None):
     models = build_models(db, cfg, ctx, now, notes)
 
     # 4) Επιλογές + λίστες
+    from betbot import learn as learn_mod
+    cfg["_learn"] = learn_mod.build_table(db, cfg)         # διορθώσεις βαθμονόμησης από κριθέντα σκέλη
     cands = selector.build_candidates(db, cfg, models, now)
     lists = selector.build_lists(cands, cfg)
     log.info("Επιλογές με απόδοση: %d · χωρίς απόδοση: %d · αγώνες: %d",

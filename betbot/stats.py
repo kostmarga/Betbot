@@ -198,7 +198,14 @@ def build(db, cfg, now):
         import logging
         logging.getLogger("betbot").warning("Insights: %s", e)
         ins = None
-    return {"insights": ins, "yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
+    try:
+        from . import learn
+        lrn = learn.report_rows(learn.build_table(db, cfg), cfg) if (cfg.get("learn") or {}).get("enabled") else None
+    except Exception as e:
+        import logging
+        logging.getLogger("betbot").warning("Learn: %s", e)
+        lrn = None
+    return {"learn": lrn, "insights": ins, "yesterday": yesterday, "scores": scores, "summary": summary_by_list(slips),
             "grid": day_grid(slips, tz, today), "legs": leg_stats(slips), "today": today, "n_slips": len(slips), "today_slips": todays, "today_extra": today_extra,
             "calendar": calendar_data(db, db.slips(), tz, {**NAMES, "corners": "🚩 Κόρνερ", "cards": "🟨 Κάρτες", "throw_ins": "↔️ Πλάγια", "players": "👤 Παίκτες"}, today),
             "recent": [s for s in sorted(slips, key=lambda s: s["created_at"], reverse=True) if _day(s, tz) < today][:60]}

@@ -1184,6 +1184,16 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                 {"label": "Αναμενόταν %", "data": [round(r["p"] * 100) for r in bp], "backgroundColor": "var(--s1)"},
                 {"label": "Βγήκε %", "data": [round(r["hit"] * 100) for r in bp], "backgroundColor": "var(--s3)"}]},
              "options": {"scales": {"y": {"min": 0, "max": 100}}, "plugins": {"legend": {"position": "bottom"}}}}, small=True) + "</div>")
+    lrn = (st or {}).get("learn")
+    if lrn:
+        act = [r for r in lrn if abs(r["adj"]) >= 0.5]
+        trs = "".join(f"<tr><td>{E(r['k'])}: {E(r['v'])}</td><td>{r['w']}/{r['n']}</td><td>{r['e']:.0f}</td><td>{r['z']:+.1f}</td>"
+                      f"<td><b>{('%+.1f' % r['adj']) if abs(r['adj']) >= 0.5 else '—'}</b></td></tr>" for r in (act or lrn)[:10])
+        G["lessons"].insert(0, "<div class='card'><h3>🧠 Τι έμαθε το bot από τα αποτελέσματα</h3><p class='muted'>"
+                   + ("Αυτές οι διορθώσεις εφαρμόζονται ήδη στις επόμενες πιθανότητες (μονάδες %, με ισχυρή συρρίκνωση)."
+                      if act else "Καμία διόρθωση ακόμα: οι αποκλίσεις είναι μέσα στην τύχη. Όταν υπάρξει σαφής απόκλιση, θα εφαρμοστεί αυτόματα.")
+                   + "</p><div class='tbl'><table><thead><tr><th>Χαρακτηριστικό</th><th>Νίκες/σκέλη</th><th>Αναμενόμενες</th><th>σ</th><th>Διόρθωση</th></tr></thead><tbody>"
+                   + trs + "</tbody></table></div></div>")
     G["more"].append(_goals_card(goals))
     G["more"].append(extra_html)
     return _assemble_analysis(G)

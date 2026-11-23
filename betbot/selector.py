@@ -329,6 +329,9 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         tail.append(f"Πιθανότητα {p * 100:.0f}%: η αγορά δίνει {p_raw * 100:.0f}% και τα φαβορί αυτού του επιπέδου βγαίνουν στο ιστορικό "
                     f"λίγο συχνότερα (+{cal_d * 100:.1f} μονάδες)")
     c["notes"], c["notes_tail"] = notes, tail
+    if (ctx.cfg or {}).get("_learn"):
+        from . import learn
+        learn.apply(c, ctx.cfg["_learn"], ctx.cfg)          # διόρθωση βαθμονόμησης από τα αποτελέσματά μας
     return c
 
 
@@ -594,9 +597,10 @@ def build_slip(cands, lo, hi, min_legs, max_legs, cfg, exclude=frozenset(), max_
         return None
     legs = sorted(best[1], key=lambda l: l["kickoff"])
     total = math.prod(l["odds"] for l in legs)
-    p = math.prod(l["p"] for l in legs)
+    from . import learn
+    p, p_ind = learn.slip_probability(legs, cfg)             # με συσχέτιση σκελών (ίδια λίγκα/τύπος αγοράς)
     pq = [l["p_market"] for l in legs if l["p_market"]]
-    return {"legs": list(legs), "total_odds": total, "p_win": p,
+    return {"legs": list(legs), "total_odds": total, "p_win": p, "p_ind": p_ind,
             "p_market": math.prod(pq) if len(pq) == len(legs) else None, "ev": p * total - 1}
 
 

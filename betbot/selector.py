@@ -623,14 +623,20 @@ def tier_cfg(cfg, tier):
     return c
 
 
-def build_lists(cands: dict, cfg, exclude=None) -> dict:
+def thing_key(c) -> tuple:
+    """«Το ίδιο πράγμα» σε έναν αγώνα: αγορά-οικογένεια + επιλογή (π.χ. Over 1.5 και Over 2.5 γκολ = το ίδιο πράγμα· Over 2.5 και BTTS = διαφορετικά)."""
+    return (c["match_id"], c.get("family") or c.get("market"), c.get("selection"))
+
+
+def build_lists(cands: dict, cfg, exclude=None, exclude_things=None) -> dict:
     """Όλες οι λίστες/δελτία της ημέρας. Επιστρέφει dict list_id -> περιεχόμενο.
     exclude: σύνολο match_id που ΔΕΝ επιτρέπονται (π.χ. για «επιπλέον δελτίο» με εντελώς διαφορετικούς αγώνες από το κύριο)."""
-    if exclude:
-        ex = set(exclude)
-        cands = {**cands, "with_odds": [c for c in cands["with_odds"] if c["match_id"] not in ex],
-                 "fair": [c for c in cands["fair"] if c["match_id"] not in ex],
-                 "props": [c for c in cands.get("props", []) if c["match_id"] not in ex]}
+    if exclude or exclude_things:
+        ex, et = set(exclude or ()), set(exclude_things or ())
+        okc = lambda c: c["match_id"] not in ex and thing_key(c) not in et
+        cands = {**cands, "with_odds": [c for c in cands["with_odds"] if okc(c)],
+                 "fair": [c for c in cands["fair"] if okc(c)],
+                 "props": [c for c in cands.get("props", []) if okc(c)]}
     L = cfg["lists"]
     wo = cands["with_odds"]
     ok = [c for c in wo if (c["edge"] or 0) >= cfg["selection"]["min_edge"]]

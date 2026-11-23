@@ -96,6 +96,24 @@ def day_usage(db, cfg, now) -> dict:
     return use
 
 
+def day_things(db, cfg, now, cat) -> set:
+    """Τα «πράγματα» (αγώνας + οικογένεια αγοράς + επιλογή) που ήδη υπάρχουν σε δελτία ΑΛΛΩΝ κατηγοριών της σημερινής ημέρας στοιχημάτων.
+    Αίτημα χρήστη 23/11/2026: ποτέ το ίδιο σκέλος σε 2 δελτία (αν χαθεί, χάνονται και τα δύο) — ακόμα και στην εφεδρική επαναχρησιμοποίηση αγώνα."""
+    from zoneinfo import ZoneInfo
+    from betbot.paper import split_list_name
+    from betbot.util import slip_day, sport_day
+    tz_ = ZoneInfo(cfg["timezone"])
+    today = sport_day(now, tz_)
+    out = set()
+    for s in db.slips():
+        ln = str(s.get("list_name") or "")
+        if ln.startswith("shadow_") or slip_day(s, tz_) != today or split_list_name(ln)[1] == cat:
+            continue
+        for l in s["legs"]:
+            out.add((l["match_id"], l.get("family") or l.get("market"), l.get("selection")))
+    return out
+
+
 def saturated_matches(db, cfg, now, cat=None, fallback=False) -> set:
     """Αγώνες που ΔΕΝ επιτρέπονται σε νέο δελτίο της κατηγορίας `cat`:
       • (αποκλειστικότητα κατηγοριών, `slip.exclusive_categories`) αγώνες που ήδη υπάρχουν σε δελτίο ΑΛΛΗΣ κατηγορίας — αν χαθεί ο αγώνας, να μη χάνονται δελτία
@@ -153,12 +171,13 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
             # ΕΦΕΔΡΙΚΑ (αίτημα χρήστη 22/11/2026): αν δεν υπάρχουν άλλοι αγώνες για την κατηγορία, επιτρέπεται να ξαναχρησιμοποιηθούν οι ΚΑΛΥΤΕΡΟΙ αγώνες
             # άλλων κατηγοριών (με τα ίδια όρια πιθανότητας), με συνολικό όριο δελτίων ανά αγώνα (`slip.fallback_max_slips_per_match`)
             sat2 = saturated_matches(db, cfg, now, cat, fallback=True)
-            if not any(l["match_id"] in sat2 for l in sl["legs"]):
+            things = day_things(db, cfg, now, cat)           # το ίδιο σκέλος ΠΟΤΕ σε 2 δελτία: μόνο διαφορετικό «πράγμα» στον ίδιο αγώνα
+            if not any(l["match_id"] in sat2 or selector.thing_key(l) in things for l in sl["legs"]):
                 log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες (δεν υπήρχαν άλλοι)", listkey)
                 return sl
-            alt2 = (selector.build_lists(cands, cfg_t or cfg, exclude=sat2).get(listkey) or {}).get("slip")
+            alt2 = (selector.build_lists(cands, cfg_t or cfg, exclude=sat2, exclude_things=things).get(listkey) or {}).get("slip")
             if alt2:
-                log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες (δεν υπήρχαν άλλοι)", listkey)
+                log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες με ΔΙΑΦΟΡΕΤΙΚΕΣ επιλογές (δεν υπήρχαν άλλοι)", listkey)
             return alt2
         except Exception as e:
             log.warning("Όριο ανά αγώνα (%s): %s", listkey, e)

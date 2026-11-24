@@ -30,7 +30,7 @@ from betbot.models import BasketballModel, CountModel, FootballModel, PlayerMode
 from betbot.util import iso, log
 
 SLIM_KEYS = ("match_id", "league", "league_name", "sport", "kickoff", "home", "away", "market",
-             "selection", "line", "label", "odds", "p_model", "p_market", "p", "p_raw", "p_base", "learn", "cal", "min_play", "verdict", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
+             "selection", "line", "label", "odds", "p_model", "p_market", "q_sharp", "p", "p_raw", "p_base", "learn", "cal", "min_play", "verdict", "edge", "family", "best_source", "why", "form_home", "form_away", "warnings")
 
 
 def load_cfg(path="config.yaml"):
@@ -250,6 +250,48 @@ def save_shadows(db, cfg, now, cands):
     return n
 
 
+def save_value_scan(db, cfg, now, cands):
+    """«Αναζήτηση αξίας» (σκιώδες πείραμα, list_name = shadow_vscan, ΜΟΝΑ στοιχήματα 1 μονάδας): επιλογές όπου η τιμή του Stoiximan είναι
+    ΨΗΛΟΤΕΡΗ από τη δίκαιη τιμή του Pinnacle (edge = τιμή_stx × p_pinnacle − 1 ≥ `value_scan.min_edge`). Δεν εμφανίζεται ως πρόταση·
+    κρίνεται στο παρασκήνιο (ROI + CLV έναντι κλεισίματος Pinnacle) για να δούμε αν υπάρχει πραγματικό πλεονέκτημα (backtest 24/11: λίγες, αλλά με θετικό CLV)."""
+    from zoneinfo import ZoneInfo
+    from betbot.util import sport_day
+    v = cfg.get("value_scan") or {}
+    if not v.get("enabled", False):
+        return 0
+    tz_ = ZoneInfo(cfg["timezone"])
+    day = sport_day(now, tz_).strftime("%Y-%m-%d")
+    fresh_after = iso(datetime.strptime(day, "%Y-%m-%d").replace(hour=6, tzinfo=tz_))
+    have = db.conn.execute("SELECT slip_id FROM slips WHERE list_name='shadow_vscan' AND slip_id LIKE ?", (day + "#%",)).fetchall()
+    room = int(v.get("max_per_day", 6)) - len(have)
+    if room <= 0:
+        return 0
+    me, lo, hi, mo = float(v.get("min_edge", 0.02)), float(v.get("min_p", 0.2)), float(v.get("max_p", 0.9)), float(v.get("max_odds", 6.0))
+    found = []
+    for c in cands.get("with_odds", []):
+        pm = c.get("p_market")
+        if not (c.get("q_sharp") and c.get("best_source") == "stoiximan" and c.get("odds") and pm) or c["market"] not in ("1X2", "OU", "BTTS", "ML", "SPREAD", "TOTAL"):
+            continue
+        edge = pm * c["odds"] - 1
+        if edge >= me and lo <= pm <= hi and c["odds"] <= mo:
+            found.append((edge, c))
+    n = 0
+    seen_m = set()
+    for edge, c in sorted(found, key=lambda x: -x[0]):
+        k = (c["match_id"], c["market"], c.get("line"))
+        if k in seen_m or n >= room:
+            continue
+        seen_m.add(k)
+        sid = f"{day}#shadow_vscan:{c['match_id']}:{c['market']}:{c['selection']}:{c.get('line')}"
+        if any(r["slip_id"].startswith(f"{day}#shadow_vscan:{c['match_id']}:{c['market']}:") and r["slip_id"].endswith(f":{c.get('line')}") for r in have):
+            continue                      # ίδια αγορά/γραμμή του αγώνα έχει ήδη καταγραφεί (κλειδωμένη η πρώτη τιμή)
+        if db.save_slip(sid, iso(now), "shadow_vscan", c["odds"], pm, 1.0, [slim(c)], keep_first=True, fresh_after=fresh_after) is not False:
+            n += 1
+    if n:
+        log.info("Αναζήτηση αξίας: %d νέες επιλογές (σκιώδες πείραμα)", n)
+    return n
+
+
 EXTRA_LISTS = ("recommended", "safe", "overs")      # επιπλέον δελτία μόνο στις βασικές κατηγορίες (όχι λαχεία/πειραματικά)
 
 
@@ -442,6 +484,7 @@ def main(argv=None):
         log.warning("Επιπλέον δελτία: %s", e)
     try:
         save_shadows(db, cfg, now, cands)
+        save_value_scan(db, cfg, now, cands)
     except Exception as e:
         log.warning("Σκιώδη ταμεία: %s", e)
     notify_pending = True           # οι ειδοποιήσεις στέλνονται ΜΕΤΑ την αποθήκευση όλων των δελτίων (κύρια, επίπεδα, επιπλέον)

@@ -295,3 +295,12 @@ correlation:
   same_league: 0.06
   same_group: 0.03
   global: 0.0
+
+# Αναζήτηση αξίας (σκιώδες πείραμα, μονά στοιχήματα): τιμή Stoiximan > δίκαιη τιμή Pinnacle
+value_scan:
+  enabled: true
+  min_edge: 0.02       # τιμή_stx × p_pinnacle − 1
+  min_p: 0.20          # όχι μεγάλες αποδόσεις (θορυβώδες edge)
+  max_p: 0.90
+  max_odds: 6.0
+  max_per_day: 6

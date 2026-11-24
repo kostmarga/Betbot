@@ -295,6 +295,7 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
         "market": market, "selection": sel, "line": line, "family": MARKET_FAMILY.get(market, market),
         "label": label(market, sel, line, ctx.home, ctx.away, extra),
         "odds": price, "p_model": p_model, "p_market": q, "p": p, "p_raw": p_raw, "cal": cal_d,
+        "q_sharp": bool(q is not None and key in (getattr(ctx, "sharp", None) or {})),     # η πιθανότητα βγήκε από Pinnacle (devig)
         "min_play": (round(1 / p, 2) if (price and p > 0) else None),
         "edge": (p * price - 1) if price else None,
         "best_source": ("stoiximan" if odds_row.get("stx_price") else odds_row.get("best_source")) if odds_row else None,

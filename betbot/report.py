@@ -757,7 +757,9 @@ def _clv_card(clv) -> str:
             "χρειάζονται 200+ επιλογές για σοβαρό συμπέρασμα.</p><div class='tiles'>"
             f"<div class='tile'><div class='k'>Επιλογές</div><div class='v'>{clv['n']}</div></div>"
             f"<div class='tile'><div class='k'>Μέσο CLV</div><div class='v {'pos' if good else ''}'>{clv['mean'] * 100:+.1f}%</div></div>"
-            f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div></div></div>")
+            f"<div class='tile'><div class='k'>Με καλύτερη τιμή</div><div class='v'>{clv['pos'] * 100:.0f}%</div></div>"
+            + (f"<div class='tile'><div class='k'>Αναμ. κέρδος vs Pinnacle ({clv['fair_n']})</div><div class='v {'pos' if clv['fair_mean'] > 0 else 'neg'}'>{clv['fair_mean'] * 100:+.1f}%</div></div>"
+               if clv.get("fair_mean") is not None else "") + "</div></div>")
 
 
 CAL_JS = """
@@ -1196,6 +1198,20 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
                       if act else "Καμία διόρθωση ακόμα: οι αποκλίσεις είναι μέσα στην τύχη. Όταν υπάρξει σαφής απόκλιση, θα εφαρμοστεί αυτόματα.")
                    + "</p><div class='tbl'><table><thead><tr><th>Χαρακτηριστικό</th><th>Νίκες/σκέλη</th><th>Αναμενόμενες</th><th>σ</th><th>Διόρθωση</th></tr></thead><tbody>"
                    + trs + "</tbody></table></div></div>")
+    vs = (st or {}).get("value")
+    if vs and vs.get("n"):
+        f = lambda x, d=1: "—" if x is None else f"{x * 100:+.{d}f}%"
+        trs = "".join(f"<tr><td>{E(str(r['m']))}<div class='muted'>{E(str(r['lb']))} @{r['o']:.2f}</div></td><td>{f(r['e'])}</td><td>{f(r['clv'])}</td>"
+                      f"<td>{'✅' if r['st'] == 'won' else '❌' if r['st'] == 'lost' else '⏳'}</td></tr>" for r in vs["rows"])
+        G["more"].append("<div class='card'><h3>💎 Αναζήτηση αξίας (πείραμα, δεν παίζεται)</h3><p class='muted'>Μονά στοιχήματα όπου το Stoiximan δίνει ΠΙΟ ΨΗΛΗ τιμή από τη δίκαιη του Pinnacle. "
+                         "Εικονικά, 1 μονάδα το καθένα· στόχος να δούμε αν υπάρχει πραγματικό πλεονέκτημα. CLV = η τιμή μας έναντι της δίκαιης τιμής κλεισίματος Pinnacle (θετικό = καλό σημάδι). "
+                         "Χρειάζονται 100+ επιλογές για συμπέρασμα.</p><div class='tiles'>"
+                         f"<div class='tile'><div class='k'>Επιλογές</div><div class='v'>{vs['n']}</div></div>"
+                         f"<div class='tile'><div class='k'>Κριθέντα</div><div class='v'>{vs['won']}/{vs['settled']} ✅</div></div>"
+                         f"<div class='tile'><div class='k'>ROI</div><div class='v'>{f(vs['roi'], 0)}</div></div>"
+                         f"<div class='tile'><div class='k'>Μέσο edge</div><div class='v'>{f(vs['edge'])}</div></div>"
+                         f"<div class='tile'><div class='k'>CLV ({vs['clv_n']})</div><div class='v'>{f(vs['clv'])}</div></div></div>"
+                         "<div class='tbl'><table><thead><tr><th>Επιλογή</th><th>Edge</th><th>CLV</th><th></th></tr></thead><tbody>" + trs + "</tbody></table></div></div>")
     G["more"].append(_goals_card(goals))
     G["more"].append(extra_html)
     return _assemble_analysis(G)

@@ -222,11 +222,11 @@ lists:
                 single_min_prob: 0.65}
   safe:        {count: 10, min_odds: 1.12, min_leg_prob: 0.75, min_total: 1.85, max_total: 2.30, min_legs: 2, max_legs: 4,
                 max_basketball_legs: 1}     # Safe ΔΕΛΤΙΟ (ο χρήστης παίζει μόνο δελτία)
-  x10:         {min_leg_prob: 0.65, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
-  x30:         {min_leg_prob: 0.63, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
-  x100:        {min_leg_prob: 0.60, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
-  overs:       {min_leg_prob: 0.62, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
-  btts:        {min_leg_prob: 0.58, count: 12, min_total: 3.0, max_total: 9, min_legs: 2, max_legs: 4}   # BTTS (και οι δύο σκοράρουν): πιθανότητες από Pinnacle/αγορά· ΔΕΝ υπάρχει backtest BTTS (νέα κατηγορία, 17/11/2026)
+  x10:         {enabled: false, shadow: true, min_leg_prob: 0.65, min_total: 9,   max_total: 14,  min_legs: 3, max_legs: 6, max_basketball_legs: 2}
+  x30:         {enabled: false, shadow: true, min_leg_prob: 0.63, min_total: 28,  max_total: 45,  min_legs: 4, max_legs: 8}
+  x100:        {enabled: false, shadow: true, min_leg_prob: 0.60, min_total: 100, max_total: 250, min_legs: 5, max_legs: 10}
+  overs:       {enabled: false, shadow: true, min_leg_prob: 0.62, count: 12, only_over: true, min_total: 8, max_total: 25, min_legs: 3, max_legs: 7}
+  btts:        {enabled: false, shadow: true, min_leg_prob: 0.58, count: 12, min_total: 3.0, max_total: 9, min_legs: 2, max_legs: 4}   # BTTS (και οι δύο σκοράρουν): πιθανότητες από Pinnacle/αγορά· ΔΕΝ υπάρχει backtest BTTS (νέα κατηγορία, 17/11/2026)
   nba_pts:     {min_leg_prob: 0.62, count: 12, min_total: 1.85, max_total: 4.5, min_legs: 2, max_legs: 3, min_odds: 1.20, max_odds: 1.80, shrink: 0.90, min_edge: -0.06, leagues: [NBA]}   # 🏀 Πόντοι παικτών NBA (Pinnacle βάση + Stoiximan γραμμές)· ΠΕΙΡΑΜΑΤΙΚΟ, μόνο παπέρ, ΔΕΝ υπάρχει backtest (17/11/2026)
   corners:     {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
   cards:       {min_leg_prob: 0.60, count: 12, min_edge: 0.0, min_total: 2.5, max_total: 12, min_legs: 2, max_legs: 4, allow_probable: true}
@@ -291,6 +291,8 @@ learn:
   weak_n: 20           # «αδύναμη αγορά»: ≥20 σκέλη, z ≤ −1.5 και ROI ως μονό ≤ −12% → εκτός Προτεινόμενου/Safe (27/11/2026: Over γκολ, Χάντικαπ)
   weak_z: -1.5
   weak_roi: -0.12
+  weak_exception_p: 0.82     # εξαίρεση: σκέλος «αδύναμης» αγοράς (π.χ. Over) μπαίνει σε Προτεινόμενο/Safe ΜΟΝΟ αν p ≥ 82%, με βάση Pinnacle και edge ≥ −5%
+  weak_exception_edge: -0.05
 
 # Συσχέτιση σκελών μέσα στο δελτίο (εκτίμηση από ιστορικό: ίδια λίγκα ≈0.08, ίδιος τύπος αγοράς ≈0.02)
 correlation:

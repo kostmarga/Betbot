@@ -543,8 +543,8 @@ def _alternatives_html(P, lists, plan, cfg, cidx, tctx=None, view=None) -> str:
                             ("fair_players", "players", "👤 Δελτίο παικτών")):
         if lid in in_plan or (lid == "safe" and "safe" in in_plan):
             continue
-        if lid == "combo" and not ((cfg.get("lists") or {}).get("combo") or {}).get("enabled", True):
-            continue                      # το Συνδυαστικό είναι κλειστό (μόνο σκιώδες): δεν προτείνεται ούτε φαίνεται στο ημερολόγιο
+        if not ((cfg.get("lists") or {}).get(key) or {}).get("enabled", True):
+            continue                      # κλειστή λίστα (μόνο σκιώδης): δεν προτείνεται ούτε φαίνεται στο ημερολόγιο
         sl = view(lid, lists[key].get("slip"), fair=lid.startswith("fair_")) if view else lists[key].get("slip")
         if sl and (sl["total_odds"] <= 8):
             blocks.append(_slip_compact(P, title, sl, cidx, fair=bool(sl.get("fair")), tctx=tctx))
@@ -560,6 +560,8 @@ def _lottery_html(P, lists, cfg, cidx, tctx=None, view=None) -> str:
     """Δελτία μεγάλης απόδοσης (10+/30+/100+): ΜΟΝΟ ως λαχεία, στο τέλος, με ειλικρινή πιθανότητα."""
     parts = []
     for lid, title in (("x10", "🎯 Δελτίο 10+"), ("x30", "🔥 Δελτίο 30+"), ("x100", "🎰 Δελτίο 100+")):
+        if not ((cfg.get("lists") or {}).get(lid) or {}).get("enabled", True):
+            continue                      # λαχεία κλειστά από 27/11/2026 (μόνο σκιώδη)
         sl = view(lid, lists[lid]["slip"]) if view else lists[lid]["slip"]
         if sl:
             parts.append(f"<h4>{title}: απόδοση {sl['total_odds']:.1f}</h4>{_lot_note(sl)}{P.pick_table(_enrich(sl['legs'], cidx, tctx=tctx))}")
@@ -1458,9 +1460,10 @@ def render_html(cfg, now, lists, cands, moves, hist_by_list, notes, clv=None, pl
     bar_html = "".join(
         f"<button data-g='{gid}' aria-selected='{str(i == 0).lower()}'><svg viewBox='0 0 24 24'><path d='{ico}'/></svg>{lab}</button>"
         for i, (gid, lab, ico, _t) in enumerate(GROUPS))
+    _off = {t for t in SLIP_TABS if not ((cfg.get("lists") or {}).get(t) or {}).get("enabled", True)}      # κλειστές λίστες: χωρίς καρτέλα
     chips_html = "".join(
-        f"<div class='chipnav' id='cn-{gid}' hidden>" + "".join(f"<button data-t='{t}' aria-selected='false'>{E(plain(names[t]))}</button>" for t in tabs) + "</div>"
-        for gid, _l, _i, tabs in GROUPS if len(tabs) > 1)
+        f"<div class='chipnav' id='cn-{gid}' hidden>" + "".join(f"<button data-t='{t}' aria-selected='false'>{E(plain(names[t]))}</button>" for t in tabs if t not in _off) + "</div>"
+        for gid, _l, _i, tabs in GROUPS if len([t for t in tabs if t not in _off]) > 1)
     tabs_html = ""
     js = json.dumps([[cid, c] for cid, c in P.charts], ensure_ascii=False)
     return calm(f"""<!doctype html><html lang="el"><head><meta charset="utf-8">

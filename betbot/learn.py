@@ -105,6 +105,12 @@ def _block_weak(c_, table, cfg):
     lc = (cfg or {}).get("learn") or {}
     bz, bn = float(lc.get("block_z", -2.5)), int(lc.get("block_n", 25))
     bad = [f for f in features(c_) if f[0] != "Γενικά" and f in table and ((table[f]["z"] <= bz and table[f]["n"] >= bn) or is_weak(f[0], table[f], cfg))]
+    if bad and all(is_weak(f[0], table[f], cfg) and table[f]["z"] > bz for f in bad):
+        # ΕΞΑΙΡΕΣΗ (αίτημα χρήστη 27/11/2026): ένα εξαιρετικό σκέλος αδύναμης αγοράς (π.χ. Over 1.5 με p ≥ 82% και Pinnacle) επιτρέπεται στα βασικά δελτία
+        if (c_["p"] >= float(lc.get("weak_exception_p", 0.82)) and c_.get("q_sharp") and (c_.get("p_market") or 0) >= float(lc.get("weak_exception_p", 0.82)) - 0.04
+                and (c_.get("edge") if c_.get("edge") is not None else -1) >= float(lc.get("weak_exception_edge", -0.05))):
+            c_.setdefault("notes_tail", []).append("Αγορά που συνήθως αποφεύγουμε, αλλά αυτό το σκέλος είναι από τα ΚΑΛΥΤΕΡΑ (πολύ υψηλή πιθανότητα, επιβεβαιωμένη από Pinnacle)")
+            return
     if bad:
         c_["blocked"].update({"recommended", "safe"})
         t = table[bad[0]]
@@ -117,14 +123,15 @@ def apply(c_, table, cfg):
     c_["p_base"] = p0
     adj, parts = adjustment(c_, table, cfg)
     c_["learn"] = round(adj, 4)
-    _block_weak(c_, table, cfg)
     if abs(adj) < 0.0005:
+        _block_weak(c_, table, cfg)
         return c_
     p = min(0.97, max(0.01, p0 + adj))
     c_["p"] = p
     if c_.get("odds"):
         c_["edge"] = p * c_["odds"] - 1
         c_["min_play"] = round(1 / p, 2)
+    _block_weak(c_, table, cfg)
     top = max(parts, key=lambda x: abs(x[1]))[0]
     t = table[top]
     c_.setdefault("notes_tail", []).append(

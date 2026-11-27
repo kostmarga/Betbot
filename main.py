@@ -188,14 +188,15 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         db.save_slip(f"{day}#{name}", created, name, sl["total_odds"], sl["p_win"], stake, [slim(l) for l in sl["legs"]],
                      keep_first=True, fresh_after=fresh_after)
 
-    combo_on = (cfg["lists"].get("combo") or {}).get("enabled", True)
     # ΣΕΙΡΑ ΠΡΟΤΕΡΑΙΟΤΗΤΑΣ: πρώτα το Safe (σκέλη ≥75%, τα πιο σίγουρα), μετά το Προτεινόμενο, Over κ.λπ.· τα λαχεία παίρνουν ό,τι αγώνες απομένουν
     for lid in ("safe", "recommended", "overs", "btts", "nba_pts", "x10", "x30", "x100", "combo"):
-        if lid == "combo" and not combo_on:
-            # «σκιώδες» Συνδυαστικό: φτιάχνεται και κρίνεται στο παρασκήνιο (list_name shadow_combo), ΔΕΝ εμφανίζεται πουθενά· έλεγχος με tools/shadow_check.py
-            sl = (lists.get("combo") or {}).get("slip")
-            if sl and (cfg["lists"].get("combo") or {}).get("shadow", False):
-                db.save_slip(f"{day}#shadow_combo{suffix}", created, f"shadow_combo{suffix}", sl["total_odds"], sl["p_win"], stake,
+        lc_ = cfg["lists"].get(lid) or {}
+        if not lc_.get("enabled", True):
+            # ΚΛΕΙΣΤΗ λίστα (Συνδυαστικό από 17/11, Over/BTTS/λαχεία από 27/11/2026: χαμηλή πιθανότητα, αίτημα χρήστη): φτιάχνεται και κρίνεται στο
+            # παρασκήνιο (list_name shadow_<λίστα>), ΔΕΝ εμφανίζεται ως πρόταση ούτε στο ημερολόγιο· έλεγχος με tools/shadow_check.py
+            sl = (lists.get(lid) or {}).get("slip")
+            if sl and lc_.get("shadow", False):
+                db.save_slip(f"{day}#shadow_{lid}{suffix}", created, f"shadow_{lid}{suffix}", sl["total_odds"], sl["p_win"], stake,
                              [slim(l) for l in sl["legs"]], keep_first=True, fresh_after=fresh_after)
             continue
         sl = (lists.get(lid) or {}).get("slip")
@@ -316,7 +317,7 @@ def save_extras(db, cfg, now, cands, tier=None, suffix=""):
     for lid in EXTRA_LISTS:
         if n_today + saved >= cap:
             break
-        if lid == "combo" and not (cfg["lists"].get("combo") or {}).get("enabled", True):
+        if not (cfg["lists"].get(lid) or {}).get("enabled", True):
             continue
         name = lid + suffix
         row = db.conn.execute("SELECT legs_json, created_at, model_prob FROM slips WHERE slip_id=?", (f"{day}#{name}",)).fetchone()

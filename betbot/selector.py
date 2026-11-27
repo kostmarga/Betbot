@@ -285,6 +285,12 @@ def _cand(ctx, key, p_model, odds_row=None, q=None, extra=None, blend=0.5):
     # ο χρήστης δεν έχει) είναι ~5% πάνω από του Stoiximan και φούσκωνε τις αποδόσεις και το ROI (βρέθηκε 19/11/2026 με το δελτίο 12 σκελών)
     price = ((odds_row.get("stx_price") or odds_row.get("best_price") or odds_row["price"])) if odds_row else None
     p = (blend * p_model + (1 - blend) * q) if (odds_row and q is not None) else p_model
+    # ΠΛΑΦΟΝ ΑΙΣΙΟΔΟΞΙΑΣ ΜΟΝΤΕΛΟΥ (27/11/2026): όταν το δικό μας μοντέλο είναι ΠΙΟ αισιόδοξο από την αγορά κατά ≥4 μονάδες, τα σκέλη κέρδισαν
+    # 51% έναντι 62% αναμενόμενου (n=61, z=−1.9, ROI μονό −23%)· όταν συμφωνεί ή είναι πιο συντηρητικό, βγαίνουν κανονικά. Άρα δεν «πιστεύουμε»
+    # το μοντέλο πάνω από την αγορά + `selection.market_cap` μονάδες.
+    mcap = (ctx.cfg.get("selection") or {}).get("market_cap")
+    if mcap is not None and odds_row and q is not None:
+        p = min(p, q + float(mcap))
     p_raw, cal_d = p, 0.0
     if ctx.sport == "football" and market == "1X2" and odds_row and q is not None:
         p, cal_d = calibrate_football(p, ctx.cfg)

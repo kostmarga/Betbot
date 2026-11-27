@@ -40,7 +40,19 @@ def margin_text(leg, m) -> str:
     return f"σκορ {h}-{a}"
 
 
-def _pm_notes(l, kills, m) -> list:
+def _weak_note(l, table, cfg):
+    """Αν το χαμένο σκέλος ανήκει σε αγορά που έχει αποδειχθεί αδύναμη (πολύ κάτω από το αναμενόμενο και αρνητικό ROI), λέει ποια και τι κάνουμε."""
+    if not table:
+        return None
+    from . import learn
+    for f in learn.features(l):
+        v = table.get(f)
+        if v and learn.is_weak(f[0], v, cfg):
+            return (f"Αδύναμη αγορά «{f[1]}»: {v['w']} νίκες στα {v['n']} (αναμ. {v['e']:.0f}), ως μονό ROI {v['roi'] * 100:+.0f}% → πλέον ΔΕΝ μπαίνει στο Προτεινόμενο/Safe.")
+    return None
+
+
+def _pm_notes(l, kills, m, table=None, cfg=None) -> list:
     """Αυτόματη «αυτοψία» ενός χαμένου σκέλους: τι ξέραμε πριν και τι έγινε."""
     notes = []
     p = l.get("p") or 0
@@ -61,13 +73,18 @@ def _pm_notes(l, kills, m) -> list:
         if x.startswith("Συμπέρασμα:"):
             notes.append("Το bot το είχε κρίνει: " + x.replace("Συμπέρασμα: ", "")[:80])
             break
+    wk = _weak_note(l, table, cfg)
+    if wk:
+        notes.insert(1, wk)
     if kills > 1:
         notes.append(f"Έριξε {kills} δελτία μαζί (επικάλυψη).")
     return notes
 
 
-def _lesson(l, kills) -> str:
+def _lesson(l, kills, table=None, cfg=None) -> str:
     p = l.get("p") or 0
+    if _weak_note(l, table, cfg):
+        return "Όχι απλή ατυχία: η αγορά αυτή χάνει συστηματικά για το bot· έχει βγει από τα «πιο σίγουρα» δελτία."
     if [x for x in (l.get("warnings") or []) if x]:
         return "Το σημάδι υπήρχε πριν: αν επαναληφθεί σε πολλά σκέλη, προτείνεται αυστηρότερος κανόνας."
     if p >= 0.7:
@@ -77,7 +94,7 @@ def _lesson(l, kills) -> str:
     return "Μέσης πιθανότητας σκέλος: η απώλεια είναι μέσα στα αναμενόμενα."
 
 
-def days_view(db, slips, tz, today, ndays=21) -> list:
+def days_view(db, slips, tz, today, ndays=21, table=None, cfg=None) -> list:
     """Ανά ημέρα στοιχημάτων: τι παίξαμε, τι κέρδισε/έχασε, και αυτοψία κάθε χαμένου σκέλους."""
     from datetime import timedelta
     from .util import parse_iso
@@ -118,7 +135,7 @@ def days_view(db, slips, tz, today, ndays=21) -> list:
         for k, n in sorted(kills.items(), key=lambda kv: -kv[1]):
             l = legs_u[k]
             m = db.get_match(l["match_id"])
-            pm.append({"lb": str(l.get("label") or "")[:44], "m": f"{l.get('home', '')} – {l.get('away', '')}"[:40], "n": n, "notes": _pm_notes(l, n, m), "lesson": _lesson(l, n)})
+            pm.append({"lb": str(l.get("label") or "")[:44], "m": f"{l.get('home', '')} – {l.get('away', '')}"[:40], "n": n, "notes": _pm_notes(l, n, m, table, cfg), "lesson": _lesson(l, n, table, cfg)})
         won = sum(1 for l in legs_u.values() if l.get("result") == "won")
         lost = sum(1 for l in legs_u.values() if l.get("result") == "lost")
         opn = sum(1 for l in legs_u.values() if l.get("result") in (None, "open"))
@@ -156,6 +173,14 @@ def patterns(slips, tz) -> dict:
     rows.sort(key=lambda r: r["z"])
     return {"worst": [r for r in rows if r["z"] <= -1.5][:6], "best": [r for r in rows[::-1] if r["z"] >= 1.5][:4], "tested": tested,
             "chance": round(tested * 0.134, 1), "n_legs": len(legs)}
+
+
+def _learn_table(db, cfg):
+    try:
+        from . import learn
+        return learn.build_table(db, cfg) if (cfg.get("learn") or {}).get("enabled") else None
+    except Exception:
+        return None
 
 
 def build(db, cfg, now) -> dict:
@@ -228,7 +253,7 @@ def build(db, cfg, now) -> dict:
             e["n"] += 1; e["cats"].add(cat)
     exp_out = sorted(({"m": e["m"], "n": e["n"], "c": sorted(e["cats"])} for e in exp.values()), key=lambda x: (-x["n"], x["m"]))[:20]
     return {"legs": legs_out, "core": {"pts": core_pts, "w": int(cw), "e": round(ce, 1), "sd": round(csd, 1), "n": len(core_sel)}, "cats": cat_rows,
-            "kill": kill_out, "lost_slips": lost_slips, "exposure": exp_out, "days": days_view(db, slips, tz, today), "patterns": patterns(slips, tz)}
+            "kill": kill_out, "lost_slips": lost_slips, "exposure": exp_out, "days": days_view(db, slips, tz, today, table=_learn_table(db, cfg), cfg=cfg), "patterns": patterns(slips, tz)}
 
 
 EXPLORER_JS = """

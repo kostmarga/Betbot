@@ -29,7 +29,7 @@ def _pband(p: float) -> str:
 def features(l) -> list:
     """Τα χαρακτηριστικά ενός σκέλους στα οποία μαθαίνουμε διορθώσεις: (είδος, τιμή)."""
     p = l.get("p_base") or l.get("p") or 0.5
-    out = [("Αγορά", _grp(l)), ("Λίγκα", l.get("league_name") or l.get("league") or ""), ("Πιθανότητα", _pband(p))]
+    out = [("Γενικά", "όλα τα σκέλη"), ("Αγορά", _grp(l)), ("Λίγκα", l.get("league_name") or l.get("league") or ""), ("Πιθανότητα", _pband(p))]
     if [x for x in (l.get("warnings") or []) if x]:
         out.append(("Προειδοποίηση", "είχε"))
     return [(a, b) for a, b in out if b]
@@ -58,21 +58,31 @@ def build_table(db, cfg) -> dict:
     k0 = float(c.get("prior_n", 40))
     min_n = int(c.get("min_n", 20))
     min_z = float(c.get("min_abs_z", 1.0))
-    agg = defaultdict(lambda: [0, 0, 0.0, 0.0])
+    agg = defaultdict(lambda: [0, 0, 0.0, 0.0, 0.0])
     for l in settled_legs(db):
         p = l.get("p_base") or l.get("p")
+        o = l.get("odds") or 0
         for f in features(l):
             a = agg[f]
             a[0] += 1; a[1] += l["result"] == "won"; a[2] += p; a[3] += p * (1 - p)
+            if o:
+                a[4] += (o - 1) if l["result"] == "won" else -1          # ROI αν το σκέλος παιζόταν μόνο του (1 μονάδα)
     table = {}
-    for f, (n, w, e, var) in agg.items():
+    for f, (n, w, e, var, pl) in agg.items():
         sd = math.sqrt(var)
         z = (w - e) / sd if sd else 0.0
         adj = 0.0
         if n >= min_n and abs(z) >= min_z:
             adj = (w - e) / (n + k0)          # μονάδες πιθανότητας, συρρικνωμένη προς το 0
-        table[f] = {"n": n, "w": int(w), "e": round(e, 1), "z": round(z, 1), "adj": adj}
+        table[f] = {"n": n, "w": int(w), "e": round(e, 1), "z": round(z, 1), "adj": adj, "roi": (pl / n) if n else 0.0}
     return table
+
+
+def is_weak(kind, v, cfg) -> bool:
+    """Αδύναμη αγορά: αρκετά σκέλη, ξεκάθαρα κάτω από το αναμενόμενο ΚΑΙ αρνητικό ROI ως μονό (βρέθηκε 27/11/2026: Over γκολ −19%, Χάντικαπ −26%)."""
+    c = (cfg or {}).get("learn") or {}
+    return (kind == "Αγορά" and v["n"] >= int(c.get("weak_n", 20)) and v["z"] <= float(c.get("weak_z", -1.5))
+            and v.get("roi", 0) <= float(c.get("weak_roi", -0.12)))
 
 
 def adjustment(l, table, cfg):
@@ -90,12 +100,24 @@ def adjustment(l, table, cfg):
     return tot, parts
 
 
+def _block_weak(c_, table, cfg):
+    """Αδύναμο χαρακτηριστικό (πολύ κάτω από το αναμενόμενο ή αδύναμη αγορά) → όχι στα «πιο σίγουρα» δελτία (Προτεινόμενο/Safe)."""
+    lc = (cfg or {}).get("learn") or {}
+    bz, bn = float(lc.get("block_z", -2.5)), int(lc.get("block_n", 25))
+    bad = [f for f in features(c_) if f[0] != "Γενικά" and f in table and ((table[f]["z"] <= bz and table[f]["n"] >= bn) or is_weak(f[0], table[f], cfg))]
+    if bad:
+        c_["blocked"].update({"recommended", "safe"})
+        t = table[bad[0]]
+        c_.setdefault("warnings", []).append(f"Ιστορικά αδύναμο: {bad[0][0]} «{bad[0][1]}» ({t['w']} νίκες στα {t['n']}, αναμ. {t['e']:.0f}) — εκτός Προτεινόμενου/Safe")
+
+
 def apply(c_, table, cfg):
     """Εφαρμόζει τη διόρθωση σε υποψήφιο (`p`, `edge`, `min_play`, `p_base`, `learn`). Καλείται από το selector._cand."""
     p0 = c_["p"]
     c_["p_base"] = p0
     adj, parts = adjustment(c_, table, cfg)
     c_["learn"] = round(adj, 4)
+    _block_weak(c_, table, cfg)
     if abs(adj) < 0.0005:
         return c_
     p = min(0.97, max(0.01, p0 + adj))
@@ -103,11 +125,6 @@ def apply(c_, table, cfg):
     if c_.get("odds"):
         c_["edge"] = p * c_["odds"] - 1
         c_["min_play"] = round(1 / p, 2)
-    bz, bn = float(((cfg or {}).get("learn") or {}).get("block_z", -2.5)), int(((cfg or {}).get("learn") or {}).get("block_n", 25))
-    bad = [f for f, _ in parts if table[f]["z"] <= bz and table[f]["n"] >= bn]
-    if bad:                                           # στατιστικά σαφής αδυναμία → όχι στα «πιο σίγουρα» δελτία
-        c_["blocked"].update({"recommended", "safe"})
-        c_.setdefault("warnings", []).append(f"Ιστορικά αδύναμο χαρακτηριστικό: {bad[0][0]} «{bad[0][1]}» (εκτός Προτεινόμενου/Safe)")
     top = max(parts, key=lambda x: abs(x[1]))[0]
     t = table[top]
     c_.setdefault("notes_tail", []).append(
@@ -148,6 +165,7 @@ def report_rows(table, cfg) -> list:
     rows = []
     for (kind, val), v in table.items():
         if v["n"] >= 12:
-            rows.append({"k": kind, "v": val, "n": v["n"], "w": v["w"], "e": v["e"], "z": v["z"], "adj": round(v["adj"] * 100, 1)})
+            rows.append({"k": kind, "v": val, "n": v["n"], "w": v["w"], "e": v["e"], "z": v["z"], "adj": round(v["adj"] * 100, 1),
+                         "roi": round(v.get("roi", 0) * 100, 1), "weak": is_weak(kind, v, cfg)})
     rows.sort(key=lambda r: (-abs(r["adj"]), -r["n"]))
     return rows

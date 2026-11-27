@@ -1190,13 +1190,14 @@ def _analysis_html(P, cfg, paper, st, goals, clv, extra_html="") -> str:
              "options": {"scales": {"y": {"min": 0, "max": 100}}, "plugins": {"legend": {"position": "bottom"}}}}, small=True) + "</div>")
     lrn = (st or {}).get("learn")
     if lrn:
-        act = [r for r in lrn if abs(r["adj"]) >= 0.5]
-        trs = "".join(f"<tr><td>{E(r['k'])}: {E(r['v'])}</td><td>{r['w']}/{r['n']}</td><td>{r['e']:.0f}</td><td>{r['z']:+.1f}</td>"
-                      f"<td><b>{('%+.1f' % r['adj']) if abs(r['adj']) >= 0.5 else '—'}</b></td></tr>" for r in (act or lrn)[:10])
+        act = [r for r in lrn if abs(r["adj"]) >= 0.5 or r.get("weak")]
+        trs = "".join(f"<tr><td>{'⛔ ' if r.get('weak') else ''}{E(r['k'])}: {E(r['v'])}</td><td>{r['w']}/{r['n']}</td><td>{r['e']:.0f}</td><td>{r['z']:+.1f}</td>"
+                      f"<td>{r.get('roi', 0):+.0f}%</td><td><b>{('%+.1f' % r['adj']) if abs(r['adj']) >= 0.5 else '—'}</b></td></tr>" for r in (act or lrn)[:12])
         G["lessons"].insert(0, "<div class='card'><h3>🧠 Τι έμαθε το bot από τα αποτελέσματα</h3><p class='muted'>"
-                   + ("Αυτές οι διορθώσεις εφαρμόζονται ήδη στις επόμενες πιθανότητες (μονάδες %, με ισχυρή συρρίκνωση)."
+                   + ("Αυτές οι διορθώσεις εφαρμόζονται ήδη στις επόμενες πιθανότητες (μονάδες %). ⛔ = αγορά που χάνει συστηματικά ως μονό (ROI αρνητικό, πολύ κάτω από το αναμενόμενο): "
+                      "δεν μπαίνει πια στο Προτεινόμενο/Safe."
                       if act else "Καμία διόρθωση ακόμα: οι αποκλίσεις είναι μέσα στην τύχη. Όταν υπάρξει σαφής απόκλιση, θα εφαρμοστεί αυτόματα.")
-                   + "</p><div class='tbl'><table><thead><tr><th>Χαρακτηριστικό</th><th>Νίκες/σκέλη</th><th>Αναμενόμενες</th><th>σ</th><th>Διόρθωση</th></tr></thead><tbody>"
+                   + "</p><div class='tbl'><table><thead><tr><th>Χαρακτηριστικό</th><th>Νίκες/σκέλη</th><th>Αναμ.</th><th>σ</th><th>ROI μονό</th><th>Διόρθωση</th></tr></thead><tbody>"
                    + trs + "</tbody></table></div></div>")
     vs = (st or {}).get("value")
     if vs and vs.get("n"):

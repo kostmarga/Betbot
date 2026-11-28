@@ -620,7 +620,9 @@ def tier_cfg(cfg, tier):
         return cfg
     c = copy.deepcopy(cfg)
     d = float(t.get("leg_prob_delta", 0))
-    for lst in c["lists"].values():
+    for name, lst in c["lists"].items():
+        if name in ("x10", "x30", "x100"):
+            continue            # λαχεία: το όριο σκέλους ΔΕΝ χαλαρώνει στο «Χαμηλή πιθανότητα» (28/11/2026: δελτίο 100+ με σκέλη ~58% δεν ήταν «safe»)
         if isinstance(lst, dict) and "min_leg_prob" in lst:
             lst["min_leg_prob"] = round(min(0.92, max(0.45, lst["min_leg_prob"] + d)), 3)
     c["lists"]["recommended"]["single_min_prob"] = round(min(0.92, c["lists"]["recommended"]["single_min_prob"] + d), 3)

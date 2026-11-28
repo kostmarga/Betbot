@@ -114,6 +114,26 @@ def day_things(db, cfg, now, cat) -> set:
     return out
 
 
+def tier_used_matches(db, cfg, now, cat, suffix) -> set:
+    """Αγώνες που ήδη χρησιμοποιούν δελτία της ΙΔΙΑΣ κατηγορίας αλλά ΑΛΛΟΥ επιπέδου ρίσκου (Υψηλή/Μέση/Χαμηλή πιθανότητα) την ίδια ημέρα στοιχημάτων.
+    Αίτημα χρήστη 28/11/2026: κάθε επίπεδο να έχει ΔΙΑΦΟΡΕΤΙΚΑ παιχνίδια, όχι τα ίδια με άλλα ποσοστά."""
+    from zoneinfo import ZoneInfo
+    from betbot import paper as pm
+    from betbot.util import slip_day, sport_day
+    tz_ = ZoneInfo(cfg["timezone"])
+    today = sport_day(now, tz_)
+    mine = next((t for t, sf in pm.SUFFIX.items() if sf == suffix), "balanced")
+    out = set()
+    for s in db.slips():
+        ln = str(s.get("list_name") or "")
+        if ln.startswith("shadow_") or slip_day(s, tz_) != today:
+            continue
+        tier, base = pm.split_list_name(ln)
+        if base == cat and tier != mine:
+            out |= {l["match_id"] for l in s["legs"]}
+    return out
+
+
 def saturated_matches(db, cfg, now, cat=None, fallback=False) -> set:
     """Αγώνες που ΔΕΝ επιτρέπονται σε νέο δελτίο της κατηγορίας `cat`:
       • (αποκλειστικότητα κατηγοριών, `slip.exclusive_categories`) αγώνες που ήδη υπάρχουν σε δελτίο ΑΛΛΗΣ κατηγορίας — αν χαθεί ο αγώνας, να μη χάνονται δελτία
@@ -159,7 +179,8 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
         """Το δελτίο που τελικά αποθηκεύεται (αποκλειστικότητα κατηγοριών + όριο δελτίων ανά αγώνα)."""
         if not sl or cands is None:
             return sl
-        sat = saturated_matches(db, cfg, now, cat)
+        tier_used = tier_used_matches(db, cfg, now, cat, suffix)       # κάθε επίπεδο ρίσκου → ΔΙΑΦΟΡΕΤΙΚΟΙ αγώνες (αυστηρά, και στην εφεδρική λειτουργία)
+        sat = saturated_matches(db, cfg, now, cat) | tier_used
         if not sat or not any(l["match_id"] in sat for l in sl["legs"]):
             return sl
         try:
@@ -170,7 +191,7 @@ def save_lists(db, cfg, now, lists, suffix="", cands=None, cfg_t=None):
                 return None
             # ΕΦΕΔΡΙΚΑ (αίτημα χρήστη 22/11/2026): αν δεν υπάρχουν άλλοι αγώνες για την κατηγορία, επιτρέπεται να ξαναχρησιμοποιηθούν οι ΚΑΛΥΤΕΡΟΙ αγώνες
             # άλλων κατηγοριών (με τα ίδια όρια πιθανότητας), με συνολικό όριο δελτίων ανά αγώνα (`slip.fallback_max_slips_per_match`)
-            sat2 = saturated_matches(db, cfg, now, cat, fallback=True)
+            sat2 = saturated_matches(db, cfg, now, cat, fallback=True) | tier_used
             things = day_things(db, cfg, now, cat)           # το ίδιο σκέλος ΠΟΤΕ σε 2 δελτία: μόνο διαφορετικό «πράγμα» στον ίδιο αγώνα
             if not any(l["match_id"] in sat2 or selector.thing_key(l) in things for l in sl["legs"]):
                 log.info("Εφεδρικά: η κατηγορία %s ξαναχρησιμοποιεί κορυφαίους αγώνες (δεν υπήρχαν άλλοι)", listkey)
@@ -476,6 +497,26 @@ def main(argv=None):
     lists = selector.build_lists(cands, cfg)
     log.info("Επιλογές με απόδοση: %d · χωρίς απόδοση: %d · αγώνες: %d",
              len(cands["with_odds"]), len(cands["fair"]), len(cands["contexts"]))
+    from betbot import paper as paper_mod
+    tier_lists = {}
+
+    def _do_tier(tier, suf):
+        try:
+            tier_lists[tier] = selector.build_lists(cands, selector.tier_cfg(cfg, tier))
+            for k, x in tier_lists[tier].items():     # ίδιο δελτίο με το Ισορροπημένο → δεν αποθηκεύεται/δεν εμφανίζεται δεύτερη φορά
+                b = lists.get(k)
+                if isinstance(x, dict) and x.get("slip") and isinstance(b, dict) and b.get("slip") \
+                        and paper_mod.leg_sig(x["slip"]["legs"]) == paper_mod.leg_sig(b["slip"]["legs"]):
+                    tier_lists[tier][k] = {**x, "slip": None}
+            save_lists(db, cfg, now, tier_lists[tier], suffix=suf, cands=cands, cfg_t=selector.tier_cfg(cfg, tier))
+            try:
+                save_extras(db, cfg, now, cands, tier=tier, suffix=suf)
+            except Exception as e:
+                log.warning("Επιπλέον δελτία %s: %s", tier, e)
+        except Exception as e:
+            log.warning("Επίπεδο %s: %s", tier, e)
+
+    _do_tier("strong", "~s")           # ΣΕΙΡΑ: πρώτα «Υψηλή πιθανότητα» (τα πιο σίγουρα), μετά το κύριο («Μέση»), τελευταίο το «Χαμηλή» — κάθε επίπεδο με ΔΙΑΦΟΡΕΤΙΚΟΥΣ αγώνες
     save_lists(db, cfg, now, lists, cands=cands)
     try:
         n_ex = save_extras(db, cfg, now, cands)
@@ -490,23 +531,7 @@ def main(argv=None):
         log.warning("Σκιώδη ταμεία: %s", e)
     notify_pending = True           # οι ειδοποιήσεις στέλνονται ΜΕΤΑ την αποθήκευση όλων των δελτίων (κύρια, επίπεδα, επιπλέον)
     from betbot import paper as paper_mod
-    tier_lists = {}
-    for tier, suf in paper_mod.SUFFIX.items():     # επίπεδα ρίσκου «στα χαρτιά» (το balanced είναι τα κανονικά δελτία)
-        if suf:
-            try:
-                tier_lists[tier] = selector.build_lists(cands, selector.tier_cfg(cfg, tier))
-                for k, x in tier_lists[tier].items():     # ίδιο δελτίο με το Ισορροπημένο → δεν αποθηκεύεται/δεν εμφανίζεται δεύτερη φορά
-                    b = lists.get(k)
-                    if isinstance(x, dict) and x.get("slip") and isinstance(b, dict) and b.get("slip") \
-                            and paper_mod.leg_sig(x["slip"]["legs"]) == paper_mod.leg_sig(b["slip"]["legs"]):
-                        tier_lists[tier][k] = {**x, "slip": None}
-                save_lists(db, cfg, now, tier_lists[tier], suffix=suf, cands=cands, cfg_t=selector.tier_cfg(cfg, tier))
-                try:
-                    save_extras(db, cfg, now, cands, tier=tier, suffix=suf)
-                except Exception as e:
-                    log.warning("Επιπλέον δελτία %s: %s", tier, e)
-            except Exception as e:
-                log.warning("Επίπεδο %s: %s", tier, e)
+    _do_tier("bold", "~b")
     try:                            # ειδοποίηση push για τα ΝΕΑ δελτία (αν υπάρχει NTFY_TOPIC)
         from betbot import notify as notify_mod
         notify_mod.new_slips(db, cfg, now)
